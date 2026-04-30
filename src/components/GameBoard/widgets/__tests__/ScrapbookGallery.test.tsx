@@ -675,6 +675,81 @@ describe("ScrapbookGallery — empty-URL metadata-only entries (playtest 2026-04
 // and that the empty-URL pathway from ImageBusProvider arrives unaltered.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Lightbox dismiss isolation — playtest 2026-04-30 bug
+// "Closing a Scrapbook lightbox dumps the player back to the lobby."
+// The Lightbox renders inside the dockview panel DOM tree; backdrop clicks
+// were bubbling into the panel container and triggering route-changing
+// behavior. Fix portals to document.body and stops backdrop click
+// propagation. Tests guard against either regression.
+// ---------------------------------------------------------------------------
+
+describe("ScrapbookGallery — lightbox dismiss isolation (playtest 2026-04-30)", () => {
+  it("renders the lightbox in document.body (not inside the gallery container)", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({ render_id: "r-portal", url: "https://example.invalid/a.webp" }),
+    ];
+    const { container, getByTestId } = render(
+      <ScrapbookGallery images={images} />,
+    );
+    const card = container.querySelector(
+      '[data-testid="scrapbook-entry-r-portal"] [role="button"]',
+    ) as HTMLElement;
+    fireEvent.click(card);
+    const lightbox = getByTestId("scrapbook-lightbox");
+    // Portal escape: lightbox must NOT be a descendant of the gallery container,
+    // otherwise its events bubble through dockview's panel system.
+    expect(container.contains(lightbox)).toBe(false);
+    expect(document.body.contains(lightbox)).toBe(true);
+  });
+
+  it("backdrop click closes the lightbox AND stops propagation to ancestors", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({ render_id: "r-bg", url: "https://example.invalid/a.webp" }),
+    ];
+    let ancestorClicks = 0;
+    const { container, getByTestId, queryByTestId } = render(
+      <div onClick={() => { ancestorClicks += 1; }}>
+        <ScrapbookGallery images={images} />
+      </div>,
+    );
+    const card = container.querySelector(
+      '[data-testid="scrapbook-entry-r-bg"] [role="button"]',
+    ) as HTMLElement;
+    fireEvent.click(card);
+    // First click opened the lightbox via the card; that click is allowed
+    // to bubble (it doesn't do anything navigational). Reset the counter.
+    ancestorClicks = 0;
+    const lightbox = getByTestId("scrapbook-lightbox");
+    fireEvent.click(lightbox);
+    expect(queryByTestId("scrapbook-lightbox")).toBeNull();
+    // The dockview panel ancestor must NOT receive the backdrop click —
+    // that's what dumps the player to the lobby in production.
+    expect(ancestorClicks).toBe(0);
+  });
+
+  it("close-button click closes the lightbox AND stops propagation to ancestors", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({ render_id: "r-x", url: "https://example.invalid/a.webp" }),
+    ];
+    let ancestorClicks = 0;
+    const { container, getByLabelText, queryByTestId } = render(
+      <div onClick={() => { ancestorClicks += 1; }}>
+        <ScrapbookGallery images={images} />
+      </div>,
+    );
+    const card = container.querySelector(
+      '[data-testid="scrapbook-entry-r-x"] [role="button"]',
+    ) as HTMLElement;
+    fireEvent.click(card);
+    ancestorClicks = 0;
+    const closeButton = getByLabelText("Close lightbox");
+    fireEvent.click(closeButton);
+    expect(queryByTestId("scrapbook-lightbox")).toBeNull();
+    expect(ancestorClicks).toBe(0);
+  });
+});
+
 describe("ScrapbookGallery — wiring (gallery widget → component)", () => {
   it("ImageGalleryWidget renders ScrapbookGallery with the empty-URL entries from ImageBusProvider", async () => {
     const widgetMod = await import("../ImageGalleryWidget");

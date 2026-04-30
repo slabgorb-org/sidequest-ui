@@ -11,6 +11,7 @@
  * fallbacks"). This lets 33-17 ship before 33-18 enriches the server payload.
  */
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { GalleryImage, NpcRole, ScrapbookNpc } from "@/providers/ImageBusProvider";
 
 export type ScrapbookEntry = GalleryImage;
@@ -173,12 +174,20 @@ function Lightbox({
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  return (
+  // Portal to document.body so backdrop clicks don't bubble through the
+  // dockview panel React/DOM tree. Playtest 2026-04-30: clicking off the
+  // lightbox dumped the player back to the lobby because the click event
+  // propagated up through the panel container; isolating to body restores
+  // expected modal-dismiss behavior. Matches JournalView's lightbox pattern.
+  return createPortal(
     <div
       data-testid="scrapbook-lightbox"
       data-has-image={hasImage ? "true" : "false"}
       className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         className="relative max-w-[90vw] max-h-[90vh] flex flex-col items-center"
@@ -214,13 +223,17 @@ function Lightbox({
         <button
           type="button"
           aria-label="Close lightbox"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center text-lg"
         >
           ×
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
