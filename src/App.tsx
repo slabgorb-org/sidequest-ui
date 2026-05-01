@@ -80,10 +80,19 @@ function sanitizeErrorMessage(raw: string): string {
 
 const SESSION_KEY = "sidequest-session";
 
-// SavedSession stores only the game_slug (MP-01 migration). The old
-// playerName+genre+world shape is gone — use game_slug for all reconnect paths.
+// SavedSession stores the game_slug + mode (MP-01 + playtest 2026-04-30
+// follow-on). Mode tells the auto-reconnect navigate path whether the URL
+// prefix should be /play/ (multiplayer) or /solo/ (solo). Pre-fix, the
+// auto-reconnect always wrote /solo/<slug> regardless of mode — on a
+// reload that briefly bounced through "/" the MP URL got rewritten to
+// /solo/, half the tabs ended up on /solo/<MP-slug> while the other half
+// stayed on /play/<MP-slug>, and `/solo/` semantics could diverge later
+// (different reducers, different reconnect path, different side panels).
+// Old saved sessions without `mode` default to "solo" — matches pre-fix
+// behavior for any persisted entry written before this change.
 interface SavedSession {
   gameSlug: string;
+  mode?: "solo" | "multiplayer";
 }
 
 function loadSession(): SavedSession | null {
@@ -98,9 +107,9 @@ function loadSession(): SavedSession | null {
   }
 }
 
-function saveSession(gameSlug: string) {
+function saveSession(gameSlug: string, mode: "solo" | "multiplayer") {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ gameSlug }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ gameSlug, mode }));
   } catch {
     // non-critical
   }
@@ -1203,7 +1212,17 @@ function AppInner() {
     if (slug) return;
     const saved = loadSession();
     if (!saved) return;
-    navigate(`/solo/${saved.gameSlug}`);
+    // Pingpong 2026-04-30: this navigate used to always write /solo/
+    // regardless of the saved session's actual mode. Half the tabs in
+    // a 4P MP playtest reload ended up on /solo/<MP-slug> while peers
+    // stayed on /play/<MP-slug>; the URL stopped reflecting the
+    // session's mode and the per-prefix reducers would have started
+    // diverging on the next mode-gated render. Resume the saved session
+    // on the prefix that matches its mode. Old saved sessions written
+    // before this fix lack the mode field and default to "solo" — same
+    // outcome as the pre-fix behavior for those rows.
+    const prefix = saved.mode === "multiplayer" ? "/play" : "/solo";
+    navigate(`${prefix}/${saved.gameSlug}`);
   }, [navigate, slug]);
 
   // Slug-mode connect: when AppInner mounts at /solo/:slug or /play/:slug,
@@ -1274,7 +1293,6 @@ function AppInner() {
         // depend on currentGenre being non-null on first game render.
         setCurrentGenre(body.genre_slug);
         setCurrentWorld(body.world_slug);
-        saveSession(slug);
         // Record this slug in journey history so a page refresh on this
         // tab doesn't re-trigger the slug-mode NamePrompt. Player 1 already
         // appends history via ConnectScreen; this call covers Player 2's
@@ -1282,6 +1300,12 @@ function AppInner() {
         // raw string but JourneyEntry expects "solo" | "multiplayer".
         const normalizedMode: "solo" | "multiplayer" =
           body.mode === "solo" ? "solo" : "multiplayer";
+        // Save mode alongside the slug so the auto-reconnect path
+        // resumes on the correct prefix (/play/ for MP, /solo/ for solo).
+        // Pre-fix this saved only the slug and the auto-reconnect always
+        // wrote /solo/<slug> — pingpong 2026-04-30 caught the URL rewrite
+        // on MP reload.
+        saveSession(slug, normalizedMode);
         // Stash the mode so the MP session widget can decide whether to
         // render. Solo mode: nothing to share, no roster — widget hidden.
         setSessionMode(normalizedMode);

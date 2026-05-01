@@ -108,3 +108,72 @@ describe("Wiring: App.tsx WebSocket OPEN-transition cleanup (playtest 2026-04-11
     expect(src).toMatch(/const\s+saved\s*=\s*loadSession\(\)[\s\S]*?if\s*\(\s*saved\s*\)/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Wiring: SavedSession carries mode so auto-reconnect picks /play/ vs /solo/
+// (playtest 2026-04-30 follow-on)
+//
+// Pre-fix the auto-reconnect navigate always wrote /solo/<slug> regardless
+// of the saved session's actual mode. Reload of an MP session that briefly
+// passed through "/" rewrote /play/<MP-slug> to /solo/<MP-slug>; per-prefix
+// reducers and reconnect paths would then diverge from the server's notion
+// of the session. saveSession now carries mode, the auto-reconnect path
+// reads it, and the prefix matches the server-side session.mode.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("Wiring: SavedSession mode + auto-reconnect prefix (playtest 2026-04-30)", () => {
+  const readAppSrc = async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    return fs.readFileSync(path.resolve(__dirname, "./App.tsx"), "utf-8");
+  };
+
+  it("saveSession persists both gameSlug and mode to sessionStorage", async () => {
+    const src = await readAppSrc();
+    // The signature must accept a mode arg, and the persisted JSON must
+    // include both fields. Pre-fix wrote only `{ gameSlug }`, which gave
+    // the auto-reconnect path no way to recover the URL prefix.
+    expect(src).toMatch(
+      /function\s+saveSession\(\s*gameSlug:\s*string,\s*mode:\s*"solo"\s*\|\s*"multiplayer"\s*\)/,
+    );
+    expect(src).toMatch(
+      /sessionStorage\.setItem\([^,]+,\s*JSON\.stringify\(\s*\{\s*gameSlug,\s*mode\s*\}\s*\)\s*\)/,
+    );
+  });
+
+  it("SavedSession type carries an optional mode field", async () => {
+    const src = await readAppSrc();
+    // SavedSession must declare an optional mode field. Without it the
+    // auto-reconnect path can't tell /play/ from /solo/.
+    expect(src).toMatch(/mode\?:\s*"solo"\s*\|\s*"multiplayer"/);
+    // And it must live on SavedSession itself (the only such interface
+    // in App.tsx).
+    expect(src).toMatch(/interface\s+SavedSession/);
+  });
+
+  it("auto-reconnect navigate selects /play/ when saved.mode is multiplayer, /solo/ otherwise", async () => {
+    const src = await readAppSrc();
+    // The branching prefix selection must be present and key on saved.mode.
+    // Pre-fix line was a hardcoded `navigate(\`/solo/${saved.gameSlug}\`)`.
+    expect(src).toMatch(
+      /const\s+prefix\s*=\s*saved\.mode\s*===\s*"multiplayer"\s*\?\s*"\/play"\s*:\s*"\/solo"/,
+    );
+    expect(src).toMatch(
+      /navigate\(\s*`\$\{prefix\}\/\$\{saved\.gameSlug\}`\s*\)/,
+    );
+    // Defensive: ensure no remaining unconditional /solo/<saved.gameSlug>
+    // navigate exists in App.tsx that would re-introduce the bug.
+    expect(src).not.toMatch(/navigate\(\s*`\/solo\/\$\{saved\.gameSlug\}`/);
+  });
+
+  it("slug-connect saveSession call passes the normalized server-side mode", async () => {
+    const src = await readAppSrc();
+    // saveSession must be called with both slug and the mode normalized
+    // from the /api/games/:slug response — not bare slug. Pre-fix the
+    // call was `saveSession(slug)`, which left mode unrecorded on every
+    // resume.
+    expect(src).toMatch(/saveSession\(\s*slug,\s*normalizedMode\s*\)/);
+    // Old single-arg call site must be gone.
+    expect(src).not.toMatch(/saveSession\(\s*slug\s*\)/);
+  });
+});
