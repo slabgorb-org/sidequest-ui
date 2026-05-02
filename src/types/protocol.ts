@@ -32,6 +32,10 @@ export const MessageType = {
   SCENARIO_EVENT: "SCENARIO_EVENT",
   ACHIEVEMENT_EARNED: "ACHIEVEMENT_EARNED",
   CONFRONTATION: "CONFRONTATION",
+  // Phase 5 (Story 47-3): magic-confrontation outcome dispatch. Carries
+  // the resolved branch + mandatory_outputs so the ConfrontationOverlay
+  // mounts a reveal panel and the LedgerPanel updates.
+  CONFRONTATION_OUTCOME: "CONFRONTATION_OUTCOME",
   RENDER_QUEUED: "RENDER_QUEUED",
   JOURNAL_REQUEST: "JOURNAL_REQUEST",
   JOURNAL_RESPONSE: "JOURNAL_RESPONSE",

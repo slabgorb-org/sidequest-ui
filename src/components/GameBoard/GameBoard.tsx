@@ -30,7 +30,7 @@ import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import type { ConfrontationData } from "@/components/ConfrontationOverlay";
+import type { ConfrontationData, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import type { CharacterSummary } from "@/types/party";
@@ -131,6 +131,8 @@ export interface GameBoardProps {
   // the provider so the feature can be revived without re-plumbing data.
   knowledgeEntries?: KnowledgeEntry[];
   confrontationData?: ConfrontationData | null;
+  /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
+  confrontationOutcome?: ConfrontationOutcome | null;
   onBeatSelect?: (beatId: string) => void;
   onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
@@ -177,6 +179,7 @@ export function GameBoard({
   nowPlaying = null,
   knowledgeEntries,
   confrontationData,
+  confrontationOutcome,
   onBeatSelect,
   onYield,
   diceRequest,
@@ -360,6 +363,7 @@ export function GameBoard({
         return confrontationData ? (
           <ConfrontationWidget
             data={confrontationData}
+            outcome={confrontationOutcome ?? null}
             onBeatSelect={onBeatSelect}
             onYield={onYield}
             diceRequest={diceRequest}
@@ -384,7 +388,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      knowledgeEntries, confrontationData, onBeatSelect, onYield, diceRequest, diceResult,
+      knowledgeEntries, confrontationData, confrontationOutcome, onBeatSelect, onYield, diceRequest, diceResult,
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,

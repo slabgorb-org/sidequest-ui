@@ -78,6 +78,27 @@ export interface ConfrontationData {
   active?: boolean;
 }
 
+/**
+ * Outcome of a magic confrontation (Story 47-3 Phase 5). Carried on
+ * the new ``CONFRONTATION_OUTCOME`` WebSocket message; the overlay
+ * mounts a branch-explicit reveal panel when this is non-null. The
+ * four branches mirror server
+ * ``sidequest/magic/confrontations.py:_BranchName``.
+ */
+export type ConfrontationBranch =
+  | "clear_win"
+  | "pyrrhic_win"
+  | "clear_loss"
+  | "refused";
+
+export interface ConfrontationOutcome {
+  confrontation_id: string;
+  label: string;
+  branch: ConfrontationBranch;
+  /** Mandatory advancement output IDs that fired with this branch. */
+  mandatory_outputs: string[];
+}
+
 interface ConfrontationOverlayProps {
   data: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
@@ -89,6 +110,13 @@ interface ConfrontationOverlayProps {
   playerId?: string;
   onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
   onYield?: () => void;
+  /**
+   * Phase 5: branch-explicit outcome reveal. When non-null, the overlay
+   * renders a panel callout above the beat list with the resolved
+   * branch + mandatory_outputs (per design Decision #9: explicit panel
+   * callout at outcome time, always shown).
+   */
+  outcome?: ConfrontationOutcome | null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -266,7 +294,77 @@ function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
 // Main component
 // ═══════════════════════════════════════════════════════════
 
-export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, diceResult, playerId, onDiceThrow, onYield }: ConfrontationOverlayProps) {
+/**
+ * Humanize a mandatory_output id ("sanity_decrement" → "Sanity drops")
+ * for the reveal panel. Falls back to the raw id when no mapping exists
+ * — better to surface an unstyled token than to silently swallow it.
+ */
+const OUTPUT_HUMANIZE: Record<string, string> = {
+  sanity_decrement: "Sanity drops",
+  sanity_increment: "Sanity recovers",
+  notice_decrement: "Notice fades",
+  notice_increment: "Notice rises",
+  hegemony_heat_increment: "Hegemony heat rises",
+  hegemony_heat_decrement: "Hegemony heat eases",
+  control_tier_advance: "Control of the touch grows (tier advance)",
+  status_add_scratch: "Scratch status added",
+  status_add_wound: "Wound status added",
+  status_add_scar: "Scar status added",
+  scar_political: "Political scar added",
+  character_scar_extracted: "Character extracted (Scar)",
+  item_acquired: "Item acquired",
+  item_acquired_alien: "Alien item acquired",
+  item_acquired_with_low_bond: "Item acquired (low bond)",
+  item_history_increment: "Item history grows",
+  bond_increment: "Bond strengthens",
+  bond_decrement: "Bond weakens",
+  bond_increment_to_alien: "Alien bond strengthens",
+  lore_revealed: "Lore revealed",
+  lore_revealed_major: "Major lore revealed",
+  sanity_floor_lowered: "Sanity floor lowered",
+  status_clear_bleeding_through: "Bleeding-through clears",
+};
+
+function humanizeOutput(outputId: string): string {
+  return OUTPUT_HUMANIZE[outputId] ?? outputId;
+}
+
+function ConfrontationOutcomeReveal({
+  outcome,
+}: {
+  outcome: ConfrontationOutcome;
+}) {
+  return (
+    <div
+      data-testid="confrontation-outcome-reveal"
+      data-branch={outcome.branch}
+      className={`confrontation-outcome-reveal mt-3 p-2 rounded border outcome-${outcome.branch}`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-wide mb-1">
+        {outcome.label} · {outcome.branch.replace(/_/g, " ")}
+      </div>
+      <ul className="mandatory-outputs text-xs space-y-0.5">
+        {outcome.mandatory_outputs.map((id) => (
+          <li key={id} data-output-id={id}>
+            {humanizeOutput(id)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function ConfrontationOverlay({
+  data,
+  onBeatSelect,
+  inline,
+  diceRequest,
+  diceResult,
+  playerId,
+  onDiceThrow,
+  onYield,
+  outcome,
+}: ConfrontationOverlayProps) {
   if (!data) return null;
 
   const isStandoff = data.type === 'standoff';
@@ -288,6 +386,13 @@ export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, 
       className={overlayClasses}
     >
       <h3 className="text-sm font-bold mb-2">{data.label}</h3>
+
+      {/* Phase 5 (Story 47-3): branch-explicit outcome reveal. Renders
+          when the server has dispatched a CONFRONTATION_OUTCOME for
+          this confrontation. Per design Decision #9: explicit panel
+          callout at outcome time, always shown — players never have to
+          infer what mandatory_outputs fired. */}
+      {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
 
       {/* Actor portraits */}
       <div className="flex justify-around mb-3">

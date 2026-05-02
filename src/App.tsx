@@ -22,7 +22,7 @@ import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/types/party";
-import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
+import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type {
@@ -370,6 +370,13 @@ function AppInner() {
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
+  // Phase 5 (Story 47-3): branch-explicit outcome reveal. Driven by
+  // CONFRONTATION_OUTCOME WebSocket messages — the server resolves a
+  // magic confrontation, applies its mandatory_outputs, and dispatches
+  // the resolved branch + outputs here so the overlay can mount the
+  // reveal panel. Cleared when a fresh CONFRONTATION arrives (a new
+  // confrontation starts) or the active confrontation closes.
+  const [confrontationOutcome, setConfrontationOutcome] = useState<ConfrontationOutcome | null>(null);
   // Tracks whether a CONFRONTATION message arrived this turn — used by
   // NARRATION_END to decide whether the encounter has resolved (fix: playtest-2026-04-12).
   const confrontationReceivedThisTurnRef = useRef(false);
@@ -501,6 +508,11 @@ function AppInner() {
         // arrive in the same batch).
         if (!confrontationReceivedThisTurnRef.current) {
           setConfrontationData(null);
+          // Phase 5 (Story 47-3): clear the outcome reveal alongside
+          // the underlying confrontation. Holding the panel past the
+          // turn boundary would superimpose the previous resolution
+          // on the next confrontation.
+          setConfrontationOutcome(null);
         }
         confrontationReceivedThisTurnRef.current = false;
         // Clear the dice TARGET banner and roll-result widget once the
@@ -797,6 +809,18 @@ function AppInner() {
       const payload = msg.payload as unknown as ConfrontationData;
       confrontationReceivedThisTurnRef.current = true;
       setConfrontationData(payload.active !== false ? payload : null);
+      // Fresh confrontation arriving — clear any stale outcome reveal so
+      // the new confrontation starts in its un-resolved state.
+      setConfrontationOutcome(null);
+      return;
+    }
+    // Phase 5 (Story 47-3): magic-confrontation outcome dispatch. The
+    // server has applied mandatory_outputs and is broadcasting the
+    // resolved branch so the ConfrontationOverlay can mount its reveal
+    // panel.
+    if (msg.type === MessageType.CONFRONTATION_OUTCOME) {
+      const payload = msg.payload as unknown as ConfrontationOutcome;
+      setConfrontationOutcome(payload);
       return;
     }
 
@@ -1138,6 +1162,7 @@ function AppInner() {
     setActivePlayerName(null);
     setCanType(true);
     setConfrontationData(null);
+    setConfrontationOutcome(null);
     setDiceRequest(null);
     setDiceResult(null);
     setPaused(false);
@@ -1758,6 +1783,7 @@ function AppInner() {
                 depletions={gameState.depletions}
                 resourceAlerts={gameState.resourceAlerts}
                 confrontationData={confrontationData}
+                confrontationOutcome={confrontationOutcome}
                 onBeatSelect={handleBeatSelect}
                 onYield={handleYield}
                 diceRequest={diceRequest}
