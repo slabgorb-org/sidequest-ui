@@ -1,4 +1,4 @@
-import { render, screen, renderHook } from '@testing-library/react';
+import { render, screen, renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import {
   GameStateProvider,
@@ -8,6 +8,7 @@ import {
 } from '../GameStateProvider';
 import { useStateMirror } from '../../hooks/useStateMirror';
 import { MessageType, type GameMessage } from '../../types/protocol';
+import type { NarrationDelta } from '../../types/payloads';
 import type { ReactNode } from 'react';
 
 /** Wrapper for renderHook that provides GameStateProvider context. */
@@ -275,5 +276,69 @@ describe('useStateMirror — SESSION_EVENT initial state', () => {
     expect(result.current.state.location).toBe('Temple Courtyard');
     // Quest from initial state should still be present
     expect(result.current.state.quests).toEqual({ 'Defend the Temple': 'active' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wiring test — Task 16: streaming narration slice (per project rule
+// "every test suite needs a wiring test")
+// ---------------------------------------------------------------------------
+
+describe('GameStateProvider — streaming narration slice wiring', () => {
+  it('dispatchStreamingAction routes a narration.delta into the streaming slice', async () => {
+    const deltaMsg: NarrationDelta = {
+      kind: 'narration.delta',
+      payload: { turn_id: 'wiring-t-1', chunk: 'Wired text', seq: 0 },
+    };
+
+    const { result } = renderHook(() => useGameState(), { wrapper });
+
+    act(() => {
+      result.current.dispatchStreamingAction(deltaMsg);
+    });
+
+    // The streaming slice should now have the chunk for this turn
+    const turn = result.current.streamingNarration.turns.get('wiring-t-1');
+    expect(turn).toBeDefined();
+    expect(turn!.chunks).toEqual(['Wired text']);
+    expect(turn!.canonical).toBeNull();
+  });
+
+  it('displayTextForTurn returns streamed text before canonical arrives', () => {
+    const { result } = renderHook(() => useGameState(), { wrapper });
+
+    act(() => {
+      result.current.dispatchStreamingAction({
+        kind: 'narration.delta',
+        payload: { turn_id: 'wiring-t-2', chunk: 'Hello ', seq: 0 },
+      });
+      result.current.dispatchStreamingAction({
+        kind: 'narration.delta',
+        payload: { turn_id: 'wiring-t-2', chunk: 'world.', seq: 1 },
+      });
+    });
+
+    expect(result.current.displayTextForTurn('wiring-t-2')).toBe('Hello world.');
+  });
+
+  it('dispatchStreamingAction routes a canonical NarrationMessage into the streaming slice', () => {
+    const { result } = renderHook(() => useGameState(), { wrapper });
+
+    act(() => {
+      result.current.dispatchStreamingAction({
+        kind: 'narration.delta',
+        payload: { turn_id: 'wiring-t-3', chunk: 'Partial', seq: 0 },
+      });
+    });
+
+    act(() => {
+      result.current.dispatchStreamingAction({
+        type: MessageType.NARRATION,
+        payload: { text: 'CANONICAL TEXT' },
+        player_id: 'p1',
+      });
+    });
+
+    expect(result.current.displayTextForTurn('wiring-t-3')).toBe('CANONICAL TEXT');
   });
 });
