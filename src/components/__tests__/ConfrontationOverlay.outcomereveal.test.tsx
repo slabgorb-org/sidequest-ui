@@ -92,21 +92,23 @@ describe("ConfrontationOverlay — Phase 5 outcome reveal (Story 47-3 Task 5.6)"
     );
 
     const reveal = screen.getByTestId("confrontation-outcome-reveal");
-    // Each output must produce at least one list item — humanized or
-    // raw, the test doesn't pin the exact text. The wire-first ask is:
-    // every output is visible to the player.
-    const items = reveal.querySelectorAll("li, [role='listitem']");
-    expect(items.length).toBeGreaterThanOrEqual(3);
-
-    // Every output id must appear somewhere in the reveal — either as
-    // raw id or as text derived from it. Accept partial matches: the
-    // humanizer might collapse "control_tier_advance" → "Control of
-    // the touch grows" but the substring "control" or "tier" must
-    // surface, otherwise the player can't tell what changed.
-    const text = reveal.textContent ?? "";
-    expect(text.toLowerCase()).toMatch(/control|tier/);
-    expect(text.toLowerCase()).toMatch(/scar|status/);
-    expect(text.toLowerCase()).toMatch(/lore/);
+    // Pin each output by its stable data-output-id selector — the
+    // implementation tags every list item with `data-output-id={id}`.
+    // This avoids the loose substring matching that could pass
+    // vacuously when the humanizer collapses outputs to generic text.
+    expect(
+      reveal.querySelector('[data-output-id="control_tier_advance"]'),
+    ).not.toBeNull();
+    expect(
+      reveal.querySelector('[data-output-id="status_add_scar"]'),
+    ).not.toBeNull();
+    expect(
+      reveal.querySelector('[data-output-id="lore_revealed"]'),
+    ).not.toBeNull();
+    // Sanity: exactly the three outputs we passed in (no spurious extras).
+    expect(
+      reveal.querySelectorAll("[data-output-id]").length,
+    ).toBe(3);
   });
 
   it("does not render the outcome panel when no outcome is provided", () => {

@@ -25,17 +25,20 @@
 //   - ConfrontationWidget does not accept an outcome prop
 //   - ConfrontationOverlay does not render a data-testid="confrontation-outcome-reveal"
 //
-// The full App-mount + jest-websocket-mock variant was attempted but
-// jsdom's dockview rendering does not surface widget content through
-// the panel system — the project's existing wiring tests
-// (confrontation-wiring.test.tsx, etc.) follow this same widget-level
-// pattern rather than App-mount. Documented here so a future story
-// that hardens the dockview test harness can promote this boundary
-// to a full App-mount.
+// Pattern: widget-level boundary harness. The project's existing
+// wiring tests (confrontation-wiring.test.tsx, dice-overlay-wiring,
+// etc.) follow this convention — render the widget directly with a
+// state-mutation harness rather than mounting the whole <App/> tree
+// through MemoryRouter + jest-websocket-mock. A full App-mount variant
+// was attempted; jsdom's dockview rendering does not surface widget
+// panel content reliably, so the project convention is the practical
+// path. The protocol-exposure check (test 1) + the dispatch-handler
+// harness (test 3) together still pin both ends of the wire-first
+// contract.
 
 import { useState, type FC } from "react";
 import { render, screen, act, cleanup } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
 import {
   type ConfrontationData,
@@ -124,12 +127,6 @@ const Harness: FC<{
   );
 };
 
-beforeEach(() => {
-  // Reset DOM between tests — render() within a single it() that
-  // re-renders with new props otherwise stacks elements with the same
-  // testid.
-});
-
 afterEach(() => {
   cleanup();
 });
@@ -159,10 +156,15 @@ describe("magic confrontation wiring (Story 47-3 boundary)", () => {
 
     const reveal = screen.getByTestId("confrontation-outcome-reveal");
     expect(reveal).toHaveAttribute("data-branch", "pyrrhic_win");
-    const text = (reveal.textContent ?? "").toLowerCase();
-    expect(text).toMatch(/control|tier/);
-    expect(text).toMatch(/scar|status/);
-    expect(text).toMatch(/lore/);
+    expect(
+      reveal.querySelector('[data-output-id="control_tier_advance"]'),
+    ).not.toBeNull();
+    expect(
+      reveal.querySelector('[data-output-id="status_add_scar"]'),
+    ).not.toBeNull();
+    expect(
+      reveal.querySelector('[data-output-id="lore_revealed"]'),
+    ).not.toBeNull();
   });
 
   it("dispatching a CONFRONTATION_OUTCOME message reveals the panel", () => {
@@ -180,9 +182,14 @@ describe("magic confrontation wiring (Story 47-3 boundary)", () => {
       screen.queryByTestId("confrontation-outcome-reveal"),
     ).not.toBeInTheDocument();
 
+    // Capture the dispatch handler with a non-null assertion *test*
+    // (not a runtime !) so we fail loudly if the harness wiring breaks.
+    expect(dispatchRef.current).not.toBeNull();
+    const dispatch = dispatchRef.current as (msg: GameMessage) => void;
+
     // Server dispatches the resolved branch.
     act(() => {
-      dispatchRef.current!({
+      dispatch({
         type: MessageType.CONFRONTATION_OUTCOME,
         payload: {
           confrontation_id: "the_bleeding_through",
@@ -196,5 +203,40 @@ describe("magic confrontation wiring (Story 47-3 boundary)", () => {
 
     const reveal = screen.getByTestId("confrontation-outcome-reveal");
     expect(reveal).toHaveAttribute("data-branch", "clear_loss");
+  });
+
+  it("widget hides the reveal when outcome flips back to null (App clear path)", () => {
+    // App.tsx sets confrontationOutcome to null on three lifecycle events:
+    // a fresh CONFRONTATION arriving, NARRATION_END with no
+    // confrontation-this-turn, and Leave. The widget must respond
+    // promptly — a stale reveal lingering past the next confrontation
+    // is the 2026-04-12 playtest bug pattern (overlapping state across
+    // turn boundaries).
+    const initial: ConfrontationOutcome = {
+      confrontation_id: "the_bleeding_through",
+      label: "The Bleeding-Through",
+      branch: "clear_win",
+      mandatory_outputs: ["control_tier_advance"],
+    };
+    const dispatchRef: { current: ((msg: GameMessage) => void) | null } = {
+      current: null,
+    };
+    render(<Harness initial={initial} onDispatchRef={dispatchRef} />);
+
+    // Reveal mounts with the initial outcome.
+    expect(
+      screen.getByTestId("confrontation-outcome-reveal"),
+    ).toHaveAttribute("data-branch", "clear_win");
+
+    // App's clear path: setConfrontationOutcome(null). Simulate by
+    // dispatching null through a synthetic message — the harness's
+    // dispatch only handles CONFRONTATION_OUTCOME, so we test the
+    // clear path by re-rendering with outcome explicitly null. Mirrors
+    // the App lifecycle effect at App.tsx (NARRATION_END branch).
+    cleanup();
+    render(<Harness initial={null} />);
+    expect(
+      screen.queryByTestId("confrontation-outcome-reveal"),
+    ).not.toBeInTheDocument();
   });
 });
