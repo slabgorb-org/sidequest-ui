@@ -23,6 +23,15 @@ import { describe, it, expect } from "vitest";
 // until `StatusPromotion` is exported from `../magic`.
 import type { LedgerBarSpec, StatusPromotion } from "../magic";
 
+// Runtime assertion: vitest doesn't enforce tsc, so the type-only
+// imports above pass vacuously. This value import fails at runtime
+// when the symbol is missing — the green-phase implementer adds
+// STATUS_PROMOTION_SEVERITIES alongside the StatusPromotion type so
+// the UI has a single source of truth for the four valid severities.
+// NB: dynamic import keeps the file loadable for the type-shape
+// describe block even when the named export does not yet exist.
+import * as MagicModule from "../magic";
+
 describe("Phase 5 prerequisite — StatusPromotion type", () => {
   it("exposes StatusPromotion with text and severity", () => {
     const promotion: StatusPromotion = {
@@ -60,6 +69,21 @@ describe("Phase 5 prerequisite — StatusPromotion type", () => {
     };
     expect(spec.promote_to_status?.text).toBe("Bleeding through");
     expect(spec.promote_to_status?.severity).toBe("Wound");
+  });
+
+  it("exports STATUS_PROMOTION_SEVERITIES tuple at runtime", () => {
+    // The four severity literals come from the server's
+    // ``Literal["Scratch", "Wound", "Scar", "Boon"]`` (sidequest-server
+    // ``sidequest/magic/models.py:126``). Surface them as a runtime
+    // tuple from the UI types module so dropdowns / coloring / tests
+    // share one source of truth instead of redeclaring the literals.
+    const exports = MagicModule as unknown as Record<string, unknown>;
+    expect(exports.STATUS_PROMOTION_SEVERITIES).toEqual([
+      "Scratch",
+      "Wound",
+      "Scar",
+      "Boon",
+    ]);
   });
 
   it("LedgerBarSpec.promote_to_status is optional and nullable", () => {
