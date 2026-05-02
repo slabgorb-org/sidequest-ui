@@ -9,9 +9,10 @@
  * the dock — classic "infrastructure exists but not wired" per CLAUDE.md.
  */
 import { render } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MapWidget } from "../MapWidget";
 import type { MapState } from "@/components/MapOverlay";
+import type { OrbitalIntentResponse } from "@/types/orbital-intent";
 
 function roomGraphMapState(): MapState {
   // Shape matches MAP_UPDATE emitted by build_room_graph_explored in
@@ -145,6 +146,70 @@ describe("MapWidget", () => {
         default: string;
       };
       expect(src.default).toContain("@/components/Automapper");
+    });
+
+    it("MapWidget module imports OrbitalChartView (orbital map Task 16)", async () => {
+      const src = (await import("../MapWidget?raw")) as unknown as {
+        default: string;
+      };
+      expect(src.default).toContain("@/components/OrbitalChart");
+      expect(src.default).toContain("@/hooks/useOrbitalChart");
+    });
+  });
+
+  describe("orbital chart routing (worldSlug=coyote_star)", () => {
+    it("renders the loading state before any chart arrives", () => {
+      const sendOrbitalIntent = vi.fn();
+      const { getByTestId } = render(
+        <MapWidget
+          mapData={null}
+          worldSlug="coyote_star"
+          lastOrbitalChart={null}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      expect(getByTestId("map-panel-orbital-loading")).toBeInTheDocument();
+      // The hook auto-fetches the initial system_root view.
+      expect(sendOrbitalIntent).toHaveBeenCalledWith({
+        kind: "view_map",
+        scope: "system_root",
+      });
+    });
+
+    it("renders the chart panel once a server response arrives", () => {
+      const sendOrbitalIntent = vi.fn();
+      const chart: OrbitalIntentResponse = {
+        scope_center: "coyote",
+        svg: '<svg data-testid="orbital-svg"><circle data-body-id="red_prospect"/></svg>',
+        t_hours: 0,
+        party_at: "turning_hub",
+      };
+      const { getByTestId } = render(
+        <MapWidget
+          mapData={null}
+          worldSlug="coyote_star"
+          lastOrbitalChart={chart}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      expect(getByTestId("map-panel-orbital")).toBeInTheDocument();
+      expect(
+        getByTestId("orbital-chart-container").getAttribute("data-scope-center")
+      ).toBe("coyote");
+    });
+
+    it("non-orbital world falls through to existing routing", () => {
+      const sendOrbitalIntent = vi.fn();
+      const { getByTestId } = render(
+        <MapWidget
+          mapData={null}
+          worldSlug="flickering_reach"
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      // Empty-state, not the orbital panel.
+      expect(getByTestId("map-panel-empty")).toBeInTheDocument();
+      expect(sendOrbitalIntent).not.toHaveBeenCalled();
     });
   });
 

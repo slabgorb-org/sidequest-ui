@@ -40,6 +40,7 @@ import type { GameMessage } from "@/types/protocol";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 import type { MagicState } from "@/types/magic";
+import type { OrbitalIntent, OrbitalIntentResponse } from "@/types/orbital-intent";
 
 import { WIDGET_REGISTRY, type WidgetId } from "./widgetRegistry";
 import { BackgroundCanvas } from "./BackgroundCanvas";
@@ -156,6 +157,10 @@ export interface GameBoardProps {
   resourceAlerts?: ResourceAlert[];
   /** Magic ledger (Coyote Star Phase 4). Forwarded to CharacterWidget. */
   magicState?: MagicState | null;
+  /** Latest ORBITAL_CHART response — feeds MapWidget's orbital chart panel. */
+  lastOrbitalChart?: OrbitalIntentResponse | null;
+  /** Sends an OrbitalIntent over the WebSocket — feeds MapWidget. */
+  sendOrbitalIntent?: (intent: OrbitalIntent) => void;
 }
 
 export function GameBoard({
@@ -190,6 +195,8 @@ export function GameBoard({
   depletions,
   resourceAlerts,
   magicState,
+  lastOrbitalChart,
+  sendOrbitalIntent,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -339,7 +346,14 @@ export function GameBoard({
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
       case "map":
-        return <MapWidget mapData={mapData ?? null} worldSlug={worldSlug} />;
+        return (
+          <MapWidget
+            mapData={mapData ?? null}
+            worldSlug={worldSlug}
+            lastOrbitalChart={lastOrbitalChart ?? null}
+            sendOrbitalIntent={sendOrbitalIntent}
+          />
+        );
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
@@ -374,7 +388,7 @@ export function GameBoard({
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId, magicState]);
+      activePlayerId, magicState, lastOrbitalChart, sendOrbitalIntent]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
   const isMultiplayer =
