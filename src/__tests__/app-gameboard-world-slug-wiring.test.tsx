@@ -1,19 +1,18 @@
 // App → GameBoard worldSlug wiring — regression guard for the
-// playtest 2026-04-29 Orrery bug.
+// playtest 2026-04-29 Orrery bug, still load-bearing post-2026-05-02
+// migration to the server-rendered orbital chart (Task 16).
 //
 // Pre-fix: App.tsx fetched both genre_slug AND world_slug from
 // `/api/games/:slug`, but only stashed genre_slug in React state. The
 // `<GameBoard>` call site forwarded `genreSlug={currentGenre}` and never
 // passed `worldSlug` at all. Net effect on the Coyote Star session:
-// MapWidget called `getOrreryDataForWorld(undefined)` (returns null), the
-// Orrery branch failed, and the empty-state "No map data yet" fallback
-// rendered instead of the registered Orrery view.
+// MapWidget saw worldSlug=undefined, the orbital branch never activated,
+// and the empty-state "No map data yet" fallback rendered instead.
 //
-// MapWidget.test.tsx already covers the GameBoard→Orrery side (calling
+// MapWidget.test.tsx already covers the GameBoard→MapWidget side (calling
 // <MapWidget worldSlug="coyote_star" /> directly). The gap was at the
-// App.tsx call site — `getOrreryDataForWorld(undefined)` is the only
-// observable symptom from above. This test mocks <GameBoard> to capture
-// the worldSlug prop and asserts that, after the slug-connect handshake
+// App.tsx call site. This test mocks <GameBoard> to capture the
+// worldSlug prop and asserts that, after the slug-connect handshake
 // completes for a Coyote Star session, App actually forwards
 // worldSlug="coyote_star" — the prop the production-fix added.
 //

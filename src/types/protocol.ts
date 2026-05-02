@@ -49,6 +49,11 @@ export const MessageType = {
   GAME_PAUSED: "GAME_PAUSED",
   GAME_RESUMED: "GAME_RESUMED",
   YIELD: "YIELD",
+  // Orbital chart UI (orbital-map plan Task 15b). Inbound intent carries
+  // an OrbitalIntent payload; server responds with ORBITAL_CHART carrying
+  // a fresh SVG.
+  ORBITAL_INTENT: "ORBITAL_INTENT",
+  ORBITAL_CHART: "ORBITAL_CHART",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

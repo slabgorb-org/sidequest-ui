@@ -24,6 +24,10 @@ import type { CharacterSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type {
+  OrbitalIntent,
+  OrbitalIntentResponse,
+} from "@/types/orbital-intent";
 import type { GenresResponse } from "@/types/genres";
 import { MultiplayerSessionStatus, type SessionPlayerStatus } from "@/components/MultiplayerSessionStatus";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
@@ -35,12 +39,6 @@ import { appendHistory, loadHistory } from "@/screens/lobby/historyStore";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
-);
-
-const LazyOrrery = lazy(() =>
-  import("@/components/Orrery").then((m) => ({
-    default: () => <m.OrreryView data={m.COYOTE_STAR_ORRERY} />,
-  })),
 );
 
 // DiceOverlay overlay removed — dice now render inline in the Confrontation panel
@@ -378,6 +376,10 @@ function AppInner() {
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
+
+  // Orbital chart state from ORBITAL_CHART messages (orbital map Task 15b).
+  // The MapWidget's useOrbitalChart hook consumes this as `lastResponse`.
+  const [lastOrbitalChart, setLastOrbitalChart] = useState<OrbitalIntentResponse | null>(null);
   // Beat ID pending a client-side dice roll — set when user picks a beat,
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
@@ -799,6 +801,12 @@ function AppInner() {
       return;
     }
 
+    // Orbital chart — server response to ORBITAL_INTENT (orbital map Task 15b).
+    if (msg.type === MessageType.ORBITAL_CHART) {
+      setLastOrbitalChart(msg.payload as unknown as OrbitalIntentResponse);
+      return;
+    }
+
     // Server says the session is gone — re-send the connect handshake so the
     // server can restore (or start fresh).  This happens after a server restart
     // when the client's WebSocket auto-reconnects but never re-sent the connect.
@@ -1051,6 +1059,19 @@ function AppInner() {
   // face values (physics-is-the-roll, story 34-12). The server treats `face`
   // as the authoritative roll result and echoes `throw_params` to spectators
   // for deterministic replay animation.
+  // Orbital chart — UI sends OrbitalIntent over the WebSocket (orbital map
+  // Task 15b/16). Server replies with ORBITAL_CHART, which feeds back via
+  // ``lastOrbitalChart`` above. ``sendRef`` is read at call time so the
+  // callback survives reconnects without re-binding.
+  const sendOrbitalIntent = useCallback((intent: OrbitalIntent) => {
+    if (!sendRef.current) return;
+    sendRef.current({
+      type: MessageType.ORBITAL_INTENT,
+      payload: intent,
+      player_id: "",
+    } as unknown as GameMessage);
+  }, []);
+
   const handleDiceThrow = useCallback(
     (params: DiceThrowParams, face: number[]) => {
       if (!diceRequest) return;
@@ -1744,6 +1765,8 @@ function AppInner() {
                 turnStatusEntries={turnStatusEntries}
                 layoutMode={layoutMode}
                 magicState={gameState.magicState ?? null}
+                lastOrbitalChart={lastOrbitalChart}
+                sendOrbitalIntent={sendOrbitalIntent}
               />
             </ImageBusProvider>
             {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
@@ -1838,29 +1861,12 @@ function LobbyRoot() {
   );
 }
 
-function OrreryRoute() {
-  return (
-    <div style={{ width: "100%", height: "100vh", background: "#000" }}>
-      <Suspense
-        fallback={
-          <div style={{ color: "#f5d020", background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'VT323',monospace" }}>
-            loading orrery…
-          </div>
-        }
-      >
-        <LazyOrrery />
-      </Suspense>
-    </div>
-  );
-}
-
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LobbyRoot />} />
       <Route path="/solo/:slug" element={<LobbyRoot />} />
       <Route path="/play/:slug" element={<LobbyRoot />} />
-      <Route path="/orrery" element={<OrreryRoute />} />
     </Routes>
   );
 }
