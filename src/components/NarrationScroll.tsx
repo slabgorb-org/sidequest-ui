@@ -1,8 +1,13 @@
-import { useMemo, useEffect, useRef, useCallback } from "react";
+import { useMemo, useEffect, useRef, useCallback, useState } from "react";
 import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import { renderSegment } from "./narrativeRenderers";
-import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
+import { ThinkingIndicator, EmptyNarrationState, NarratorConsidersInterstitial } from "./NarrationShared";
+import { useGameState } from "@/providers/GameStateProvider";
+import { displayTextForTurn } from "@/providers/streamingNarration";
+
+const STALL_THRESHOLD_MS = 5000;
+const STALL_POLL_INTERVAL_MS = 250;
 
 export interface NarrationScrollProps {
   messages: GameMessage[];
@@ -10,6 +15,8 @@ export interface NarrationScrollProps {
 }
 
 export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
+  const { streamingNarration } = useGameState();
+
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)),
     [messages],
@@ -50,6 +57,76 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
   const historySegments = hasHistory ? segments.slice(0, lastSeparatorIdx) : [];
   const currentSegments = hasHistory ? segments.slice(lastSeparatorIdx + 1) : segments;
 
+  // Streaming segment: rendered as a live suffix when the current turn is
+  // in-flight (delta chunks arrived, canonical not yet landed).
+  // Rules (per task spec):
+  //   - activeTurnId must be non-null (a turn is streaming)
+  //   - turns entry must exist and have canonical === null (no canonical yet)
+  //   - displayTextForTurn must return a non-empty string
+  // If activeTurnId is set but has no turns entry, render nothing (no fallback).
+  const { activeTurnId, activeTurnStartedAt, turns } = streamingNarration;
+  const liveText =
+    activeTurnId !== null &&
+    turns.has(activeTurnId) &&
+    turns.get(activeTurnId)!.canonical === null
+      ? displayTextForTurn(streamingNarration, activeTurnId)
+      : null;
+
+  // Stall interstitial: shown when a turn has been open for 5+ seconds but
+  // no delta chunks have arrived yet. This tells the player the narrator is
+  // working, rather than leaving dead silence.
+  //
+  // Implementation: `nowSnapshot` is updated exclusively inside interval/timeout
+  // callbacks and the effect cleanup — never in the synchronous effect body
+  // (the purity linter forbids both: calling Date.now() in render, and
+  // calling setState synchronously inside an effect body).
+  //
+  // Guard: if activeTurnStartedAt is null when activeTurnId is set, that is a
+  // bug in the reducer — do NOT show the interstitial; log a warning instead.
+  const [nowSnapshot, setNowSnapshot] = useState<number | null>(null);
+  const warnedTurnRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (activeTurnId === null || activeTurnStartedAt === null) {
+      if (activeTurnId !== null && activeTurnStartedAt === null) {
+        if (warnedTurnRef.current !== activeTurnId) {
+          warnedTurnRef.current = activeTurnId;
+          console.warn(
+            "[NarrationScroll] activeTurnId is set but activeTurnStartedAt is null — " +
+              "reducer bug; stall interstitial suppressed for turn:",
+            activeTurnId,
+          );
+        }
+      }
+      // No active turn or missing timestamp — clear and bail.
+      // NOTE: cleanup sets nowSnapshot to null; the early return just skips
+      // setting up the interval.
+      return () => setNowSnapshot(null);
+    }
+
+    // Poll every STALL_POLL_INTERVAL_MS. The interval callback captures the
+    // current clock value into React state, which is the only lint-safe way
+    // to derive elapsed time without calling Date.now() in the render body.
+    const interval = setInterval(() => {
+      setNowSnapshot(Date.now());
+    }, STALL_POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(interval);
+      setNowSnapshot(null);
+    };
+  }, [activeTurnId, activeTurnStartedAt]);
+
+  const hasNoContent =
+    activeTurnId !== null &&
+    activeTurnStartedAt !== null &&
+    (liveText === null || liveText === "");
+
+  const shouldShowInterstitial =
+    hasNoContent &&
+    nowSnapshot !== null &&
+    nowSnapshot - activeTurnStartedAt >= STALL_THRESHOLD_MS;
+
   return (
     <div
       ref={scrollRef}
@@ -59,7 +136,7 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
     >
       <div className="flex-1" />
       <div className="px-6 py-8 space-y-4">
-        {segments.length === 0 ? (
+        {segments.length === 0 && !liveText && !shouldShowInterstitial ? (
           <EmptyNarrationState />
         ) : (
           <>
@@ -75,6 +152,25 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
             {currentSegments.map((seg, i) =>
               renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
             )}
+            {/* Live streaming segment — rendered only while canonical has not
+                yet arrived for the active turn. Reuses current-turn typography
+                (text-2xl leading-loose) to match canonical narration styling.
+                Appears as a suffix after any canonical segments that may already
+                exist in the current turn block. */}
+            {liveText && (
+              <div
+                data-testid="narration-streaming-text"
+                className="max-w-[85ch] mx-auto mb-6"
+              >
+                <div className="prose dark:prose-invert text-2xl leading-loose">
+                  {liveText}
+                </div>
+              </div>
+            )}
+            {/* Stall interstitial — shown when a turn has been open for 5+
+                seconds with no chunks and no canonical. Gives the player a
+                clear signal the narrator is working rather than dead silence. */}
+            {shouldShowInterstitial && <NarratorConsidersInterstitial />}
           </>
         )}
         {thinking && <ThinkingIndicator />}

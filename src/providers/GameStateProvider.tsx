@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { MagicState } from '@/types/magic';
+import {
+  reduceStreamingNarration,
+  displayTextForTurn,
+  initialStreamingState,
+  type StreamingNarrationState,
+} from './streamingNarration';
+import type { NarrationDelta, NarrationMessage } from '@/types/payloads';
 
 export interface CharacterState {
   name: string;
@@ -63,7 +70,16 @@ export interface GameStateContextValue {
   setState: (state: ClientGameState) => void;
   localPlayerId: string;
   setLocalPlayerId: (id: string) => void;
+  streamingNarration: StreamingNarrationState;
+  dispatchStreamingAction: (action: NarrationDelta | NarrationMessage) => void;
+  /** Replace the entire streaming narration state — used by useStateMirror for
+   *  idempotent full-replay (mirrors how setState replaces the whole game state). */
+  setStreamingNarration: (state: StreamingNarrationState) => void;
+  displayTextForTurn: (turn_id: string) => string | null;
 }
+
+// Re-export so consumers can import from the provider module
+export type { StreamingNarrationState };
 
 // react-refresh would prefer this constant lived in a non-component file, but
 // 11 importers across the codebase reach for it from this module. The rule's
@@ -82,6 +98,10 @@ const GameStateContext = createContext<GameStateContextValue>({
   setState: () => {},
   localPlayerId: '',
   setLocalPlayerId: () => {},
+  streamingNarration: initialStreamingState,
+  dispatchStreamingAction: () => {},
+  setStreamingNarration: () => {},
+  displayTextForTurn: () => null,
 });
 
 export interface GameStateProviderProps {
@@ -146,6 +166,29 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   const setState = useCallback((s: ClientGameState) => setStateRaw(s), []);
   const [localPlayerId, setLocalPlayerId] = useState('');
 
+  // Streaming narration accumulator slice (Task 16).
+  // Tracks per-turn delta chunks and canonical text so Task 17 can render
+  // streaming prose before the canonical NarrationMessage arrives.
+  const [streamingNarrationState, setStreamingNarrationState] =
+    useState<StreamingNarrationState>(initialStreamingState);
+
+  const dispatchStreamingAction = useCallback(
+    (action: NarrationDelta | NarrationMessage) => {
+      setStreamingNarrationState((prev) => reduceStreamingNarration(prev, action));
+    },
+    [],
+  );
+
+  const setStreamingNarration = useCallback(
+    (s: StreamingNarrationState) => setStreamingNarrationState(s),
+    [],
+  );
+
+  const displayTextForTurnBound = useCallback(
+    (turn_id: string) => displayTextForTurn(streamingNarrationState, turn_id),
+    [streamingNarrationState],
+  );
+
   // Persist full game state to sessionStorage for HMR survival
   useEffect(() => {
     saveGameStateToStorage(state);
@@ -159,7 +202,18 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   }, [state.journal]);
 
   return (
-    <GameStateContext.Provider value={{ state, setState, localPlayerId, setLocalPlayerId }}>
+    <GameStateContext.Provider
+      value={{
+        state,
+        setState,
+        localPlayerId,
+        setLocalPlayerId,
+        streamingNarration: streamingNarrationState,
+        dispatchStreamingAction,
+        setStreamingNarration,
+        displayTextForTurn: displayTextForTurnBound,
+      }}
+    >
       {children}
     </GameStateContext.Provider>
   );
