@@ -36,7 +36,7 @@
 // harness (test 3) together still pin both ends of the wire-first
 // contract.
 
-import { useState, type FC } from "react";
+import { useEffect, useState, type FC } from "react";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
@@ -117,7 +117,13 @@ const Harness: FC<{
       setOutcome(msg.payload as unknown as ConfrontationOutcome);
     }
   };
-  if (onDispatchRef) onDispatchRef.current = dispatch;
+  // Wrap the ref assignment in useEffect so we don't access ``current``
+  // during render — react-hooks/refs ESLint rule (Westley round 2
+  // BLOCKER #2). The effect runs after each render, which is the right
+  // time to expose the latest ``dispatch`` closure to the test.
+  useEffect(() => {
+    if (onDispatchRef) onDispatchRef.current = dispatch;
+  });
 
   return (
     <ConfrontationWidget
