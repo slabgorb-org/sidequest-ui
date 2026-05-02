@@ -3,6 +3,8 @@ import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import { renderSegment } from "./narrativeRenderers";
 import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
+import { useGameState } from "@/providers/GameStateProvider";
+import { displayTextForTurn } from "@/providers/streamingNarration";
 
 export interface NarrationScrollProps {
   messages: GameMessage[];
@@ -10,6 +12,8 @@ export interface NarrationScrollProps {
 }
 
 export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
+  const { streamingNarration } = useGameState();
+
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)),
     [messages],
@@ -50,6 +54,21 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
   const historySegments = hasHistory ? segments.slice(0, lastSeparatorIdx) : [];
   const currentSegments = hasHistory ? segments.slice(lastSeparatorIdx + 1) : segments;
 
+  // Streaming segment: rendered as a live suffix when the current turn is
+  // in-flight (delta chunks arrived, canonical not yet landed).
+  // Rules (per task spec):
+  //   - activeTurnId must be non-null (a turn is streaming)
+  //   - turns entry must exist and have canonical === null (no canonical yet)
+  //   - displayTextForTurn must return a non-empty string
+  // If activeTurnId is set but has no turns entry, render nothing (no fallback).
+  const { activeTurnId, turns } = streamingNarration;
+  const liveText =
+    activeTurnId !== null &&
+    turns.has(activeTurnId) &&
+    turns.get(activeTurnId)!.canonical === null
+      ? displayTextForTurn(streamingNarration, activeTurnId)
+      : null;
+
   return (
     <div
       ref={scrollRef}
@@ -59,7 +78,7 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
     >
       <div className="flex-1" />
       <div className="px-6 py-8 space-y-4">
-        {segments.length === 0 ? (
+        {segments.length === 0 && !liveText ? (
           <EmptyNarrationState />
         ) : (
           <>
@@ -74,6 +93,21 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
             {/* Current turn — full opacity, larger leading for serif body */}
             {currentSegments.map((seg, i) =>
               renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
+            )}
+            {/* Live streaming segment — rendered only while canonical has not
+                yet arrived for the active turn. Reuses current-turn typography
+                (text-2xl leading-loose) to match canonical narration styling.
+                Appears as a suffix after any canonical segments that may already
+                exist in the current turn block. */}
+            {liveText && (
+              <div
+                data-testid="narration-streaming-text"
+                className="max-w-[85ch] mx-auto mb-6"
+              >
+                <div className="prose dark:prose-invert text-2xl leading-loose">
+                  {liveText}
+                </div>
+              </div>
             )}
           </>
         )}
