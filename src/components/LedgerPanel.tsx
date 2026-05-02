@@ -39,8 +39,21 @@ function BarRow({ bar }: { bar: LedgerBar }) {
     transition: "width 600ms ease-out",
   };
   const className = `ledger-bar ${near ? "near-threshold" : ""}`.trim();
+  // Phase 5 (Story 47-3): when the bar carries a `promote_to_status`
+  // and is near or past its threshold, surface the promotion as a
+  // preview node so the player sees the impending Status without
+  // opening a separate panel. The data-promotion-severity attribute
+  // is the stable selector tests + theme styling pin against.
+  const promotion = bar.spec.promote_to_status ?? null;
+  const showPromotion = promotion !== null && near;
   return (
-    <div className={className} data-testid={`ledger-${bar.spec.id}`}>
+    <div
+      className={className}
+      data-testid={`ledger-${bar.spec.id}`}
+      {...(showPromotion
+        ? { "data-promotion-severity": promotion!.severity }
+        : {})}
+    >
       <div className="ledger-bar-label flex justify-between items-center text-xs">
         <span className="bar-id text-[var(--primary)]">{bar.spec.id}</span>
         <span className="bar-value font-mono">{bar.value.toFixed(2)}</span>
@@ -51,6 +64,14 @@ function BarRow({ bar }: { bar: LedgerBar }) {
           style={fillStyle}
         />
       </div>
+      {showPromotion && (
+        <div
+          className={`ledger-bar-promotion text-[10px] uppercase tracking-wide promotion-${promotion!.severity.toLowerCase()}`}
+          data-promotion-severity={promotion!.severity}
+        >
+          {promotion!.severity} · {promotion!.text}
+        </div>
+      )}
     </div>
   );
 }

@@ -24,6 +24,36 @@ export type LedgerScope =
 
 export type LedgerDirection = "up" | "down" | "bidirectional";
 
+/**
+ * Severity tiers for status promotions, mirroring server
+ * ``Literal["Scratch", "Wound", "Scar", "Boon"]`` from
+ * ``sidequest-server/sidequest/magic/models.py:126``. Exported as a
+ * runtime tuple so dropdowns, coloring, and tests share one source of
+ * truth without redeclaring the literals.
+ */
+export const STATUS_PROMOTION_SEVERITIES = [
+  "Scratch",
+  "Wound",
+  "Scar",
+  "Boon",
+] as const;
+
+export type StatusPromotionSeverity =
+  (typeof STATUS_PROMOTION_SEVERITIES)[number];
+
+/**
+ * Per-bar config: how a threshold crossing surfaces in the Status panel.
+ *
+ * World-content, not engine code (architect §5.3, 2026-04-29) — different
+ * worlds may map the same bar id to different status text/severity. A bar
+ * that omits this block produces no auto-promoted Status; the silent skip
+ * is intentional, not a fallback.
+ */
+export interface StatusPromotion {
+  text: string;
+  severity: StatusPromotionSeverity;
+}
+
 export interface LedgerBarSpec {
   id: string;
   scope: LedgerScope;
@@ -37,6 +67,13 @@ export interface LedgerBarSpec {
   consequence_on_low_cross?: string | null;
   decay_per_session: number;
   starts_at_chargen: number;
+  /**
+   * Optional Status-panel promotion: the text + severity surfaced when
+   * the bar's threshold crosses (or, in the Phase 5 confrontation
+   * outcome path, when a ``status_add_*`` mandatory_output fires).
+   * World-scope bars (hegemony_heat etc.) leave this absent.
+   */
+  promote_to_status?: StatusPromotion | null;
 }
 
 export interface LedgerBar {
