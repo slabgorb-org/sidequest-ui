@@ -72,6 +72,9 @@ export interface GameStateContextValue {
   setLocalPlayerId: (id: string) => void;
   streamingNarration: StreamingNarrationState;
   dispatchStreamingAction: (action: NarrationDelta | NarrationMessage) => void;
+  /** Replace the entire streaming narration state — used by useStateMirror for
+   *  idempotent full-replay (mirrors how setState replaces the whole game state). */
+  setStreamingNarration: (state: StreamingNarrationState) => void;
   displayTextForTurn: (turn_id: string) => string | null;
 }
 
@@ -97,6 +100,7 @@ const GameStateContext = createContext<GameStateContextValue>({
   setLocalPlayerId: () => {},
   streamingNarration: initialStreamingState,
   dispatchStreamingAction: () => {},
+  setStreamingNarration: () => {},
   displayTextForTurn: () => null,
 });
 
@@ -175,6 +179,11 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
     [],
   );
 
+  const setStreamingNarration = useCallback(
+    (s: StreamingNarrationState) => setStreamingNarrationState(s),
+    [],
+  );
+
   const displayTextForTurnBound = useCallback(
     (turn_id: string) => displayTextForTurn(streamingNarrationState, turn_id),
     [streamingNarrationState],
@@ -201,6 +210,7 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
         setLocalPlayerId,
         streamingNarration: streamingNarrationState,
         dispatchStreamingAction,
+        setStreamingNarration,
         displayTextForTurn: displayTextForTurnBound,
       }}
     >

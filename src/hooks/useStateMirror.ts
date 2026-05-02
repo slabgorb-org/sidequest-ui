@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
+import { isNarrationDelta } from '../types/payloads';
+import type { NarrationMessage } from '../types/payloads';
+import { reduceStreamingNarration, initialStreamingState } from '../providers/streamingNarration';
 import type { MagicState } from '../types/magic';
 
 const VALID_CATEGORIES: string[] = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
@@ -39,7 +42,7 @@ interface FootnoteData {
  * Accumulates footnotes into knowledge entries.
  */
 export function useStateMirror(messages: GameMessage[]): void {
-  const { setState, setLocalPlayerId } = useGameState();
+  const { setState, setLocalPlayerId, setStreamingNarration } = useGameState();
   const prevLengthRef = useRef(0);
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export function useStateMirror(messages: GameMessage[]): void {
       if (prevLengthRef.current > 0) {
         prevLengthRef.current = 0;
         setState({ ...EMPTY_GAME_STATE });
+        setStreamingNarration(initialStreamingState);
       }
       return;
     }
@@ -61,8 +65,25 @@ export function useStateMirror(messages: GameMessage[]): void {
     const resourceAlerts: ResourceAlert[] = [];
     let myPlayerId = '';
     let turnCounter = 0;
+    // Streaming narration: rebuilt from scratch on every replay (same idempotency
+    // contract as `current` above — full replace, no incremental accumulation).
+    let streamingState = initialStreamingState;
 
     for (const msg of messages) {
+      // narration.delta arrives with `kind` (not `type`) and is NOT a GameMessage
+      // variant — it falls through handleMessage's guards and lands in the messages
+      // array unmodified. isNarrationDelta checks for the `kind` field explicitly.
+      if (isNarrationDelta(msg)) {
+        if (!msg.payload.turn_id) {
+          console.error(
+            '[useStateMirror] narration.delta arrived without turn_id — cannot route',
+            msg,
+          );
+          continue;
+        }
+        streamingState = reduceStreamingNarration(streamingState, msg);
+        continue;
+      }
       // Detect handout IMAGE messages
       if (msg.type === MessageType.IMAGE && msg.payload.handout === true) {
         const renderId = msg.payload.render_id as string;
@@ -175,6 +196,18 @@ export function useStateMirror(messages: GameMessage[]): void {
             learned_turn: turnCounter,
           });
         }
+
+        // Route canonical NARRATION through the streaming reducer so the
+        // active streaming turn gets its canonical text (closes the turn).
+        // Only route when there is an active streaming turn — a NARRATION
+        // that arrives with no prior delta is a non-streaming narration and
+        // does not need to touch the streaming slice.
+        if (streamingState.activeTurnId !== null) {
+          streamingState = reduceStreamingNarration(
+            streamingState,
+            msg as unknown as NarrationMessage,
+          );
+        }
       }
 
       // In multiplayer, only apply state_delta from our own narrations
@@ -218,8 +251,9 @@ export function useStateMirror(messages: GameMessage[]): void {
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;
       setState(current);
+      setStreamingNarration(streamingState);
     }
-  }, [messages, setState, setLocalPlayerId]);
+  }, [messages, setState, setLocalPlayerId, setStreamingNarration]);
 }
 
 function normalizeCharacter(c: CharacterState): CharacterState {
