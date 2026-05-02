@@ -17,6 +17,7 @@ import { useSlashCommands } from "@/hooks/useSlashCommands";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
+import { makeRequestId } from "@/lib/utils";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
@@ -765,10 +766,19 @@ function AppInner() {
     // Pause-on-drop (MP-02) — server broadcasts these when seated-player
     // presence changes. The banner is advisory only; PLAYER_ACTION is
     // still blocked server-side while paused, so the UI just mirrors state.
+    //
+    // Playtest 2026-05-02: when GAME_PAUSED arrives in response to a
+    // submitted PLAYER_ACTION (server short-circuits the dispatch), the
+    // optimistic input-lock from handleSend leaves the textbox disabled
+    // and the thinking pulse stuck on. Roll those back so the user can
+    // edit and resubmit once the server resumes — the server is the
+    // authority on whether the action ran, and the action did NOT run.
     if (msg.type === MessageType.GAME_PAUSED) {
       const waitingFor = (msg.payload.waiting_for as string[] | undefined) ?? [];
       setPaused(true);
       setPauseWaitingFor(waitingFor);
+      setThinking(false);
+      setCanType(true);
       return;
     }
     if (msg.type === MessageType.GAME_RESUMED) {
@@ -1038,7 +1048,7 @@ function AppInner() {
       const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.base ?? 1) * 2));
       const charName = characterSheet?.name ?? character?.name ?? "Unknown";
       const localReq: DiceRequestPayload = {
-        request_id: crypto.randomUUID(),
+        request_id: makeRequestId(),
         rolling_player_id: currentPlayerId ?? "",
         character_name: charName,
         dice: [{ sides: "d20", count: 1 }],
