@@ -6,9 +6,14 @@
  * 2. Swaps to canonical when NarrationMessage lands
  * 3. Discards late deltas after canonical is set
  * 4. displayTextForTurn helper returns canonical ?? chunks.join("")
+ *
+ * Task 18 additions:
+ * 5. activeTurnStartedAt is set on the first delta for a new turn
+ * 6. activeTurnStartedAt is NOT re-stamped on subsequent deltas for the same turn
+ * 7. activeTurnStartedAt is cleared to null when canonical lands
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   reduceStreamingNarration,
   displayTextForTurn,
@@ -129,5 +134,57 @@ describe("displayTextForTurn", () => {
 
   it("returns null for unknown turn_id", () => {
     expect(displayTextForTurn(initialStreamingState, "unknown")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 18: activeTurnStartedAt lifecycle
+// ---------------------------------------------------------------------------
+
+describe("reduceStreamingNarration — activeTurnStartedAt (Task 18)", () => {
+  const FAKE_NOW = 2_000_000;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("sets activeTurnStartedAt to Date.now() on the first delta for a new turn", () => {
+    let state = initialStreamingState;
+    state = reduceStreamingNarration(state, delta("t-1", "Hello ", 0));
+
+    expect(state.activeTurnStartedAt).toBe(FAKE_NOW);
+  });
+
+  it("does NOT re-stamp activeTurnStartedAt on subsequent deltas for the same turn", () => {
+    let state = initialStreamingState;
+    state = reduceStreamingNarration(state, delta("t-1", "Hello ", 0));
+    const firstStamp = state.activeTurnStartedAt;
+
+    // Advance time and send another chunk — timestamp must not change
+    vi.setSystemTime(FAKE_NOW + 3000);
+    state = reduceStreamingNarration(state, delta("t-1", "world.", 1));
+
+    expect(state.activeTurnStartedAt).toBe(firstStamp);
+    expect(state.activeTurnStartedAt).toBe(FAKE_NOW);
+  });
+
+  it("clears activeTurnStartedAt to null when canonical lands", () => {
+    let state = initialStreamingState;
+    state = reduceStreamingNarration(state, delta("t-1", "Hello ", 0));
+    expect(state.activeTurnStartedAt).not.toBeNull();
+
+    state = reduceStreamingNarration(state, canonical("FINAL CANONICAL TEXT"));
+
+    expect(state.activeTurnStartedAt).toBeNull();
+    expect(state.activeTurnId).toBeNull();
+  });
+
+  it("initialStreamingState has activeTurnStartedAt: null", () => {
+    expect(initialStreamingState.activeTurnStartedAt).toBeNull();
   });
 });

@@ -12,7 +12,7 @@
  */
 
 import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import type { StreamingNarrationState } from "@/providers/streamingNarration";
 import { MessageType, type GameMessage } from "@/types/protocol";
@@ -182,5 +182,125 @@ describe("NarrationScroll — streaming display", () => {
     });
 
     expect(screen.queryByTestId("narration-streaming-text")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 18 — Stall fallback interstitial after 5 seconds of no content
+// ---------------------------------------------------------------------------
+//
+// If a streaming turn is "open" (activeTurnId set, activeTurnStartedAt set)
+// AND no delta chunks have arrived AND no canonical has arrived AND 5+ seconds
+// have elapsed, a "narrator considers" interstitial must be shown.
+//
+// The interstitial disappears the moment any content arrives (chunk or canonical)
+// or the active turn ends (activeTurnId → null).
+// ---------------------------------------------------------------------------
+
+describe("NarrationScroll — stall interstitial (Task 18)", () => {
+  const FAKE_NOW = 1_000_000;
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // -------------------------------------------------------------------------
+  // Case 6: interstitial appears after 5s with no chunks and no canonical
+  // -------------------------------------------------------------------------
+
+  it("shows narrator-considers interstitial after 5s with no chunks and no canonical", async () => {
+    const streaming: StreamingNarrationState = {
+      turns: new Map([
+        [
+          "t-1",
+          { chunks: [], nextExpectedSeq: 0, canonical: null },
+        ],
+      ]),
+      activeTurnId: "t-1",
+      activeTurnStartedAt: FAKE_NOW,
+    };
+
+    await act(async () => {
+      renderWithStreamingState([], streaming);
+    });
+
+    // Before 5 seconds: no interstitial
+    expect(screen.queryByTestId("narrator-considers")).not.toBeInTheDocument();
+
+    // Advance past 5 second threshold
+    await act(async () => {
+      vi.advanceTimersByTime(5500);
+    });
+
+    // Interstitial must now be visible
+    expect(screen.getByTestId("narrator-considers")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // Case 7: interstitial does NOT appear when chunks are present
+  // -------------------------------------------------------------------------
+
+  it("does not show interstitial when chunks have arrived (live text takes over)", async () => {
+    // turnStartedAt 6 seconds in the past
+    const streaming: StreamingNarrationState = {
+      turns: new Map([
+        [
+          "t-1",
+          { chunks: ["First chunk."], nextExpectedSeq: 1, canonical: null },
+        ],
+      ]),
+      activeTurnId: "t-1",
+      activeTurnStartedAt: FAKE_NOW - 6000,
+    };
+
+    await act(async () => {
+      renderWithStreamingState([], streaming);
+    });
+
+    // Advance past threshold — live text present so interstitial must NOT appear
+    await act(async () => {
+      vi.advanceTimersByTime(5500);
+    });
+
+    expect(screen.queryByTestId("narrator-considers")).not.toBeInTheDocument();
+    // Live streaming text should be visible instead
+    expect(screen.getByTestId("narration-streaming-text")).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // Case 8: interstitial does NOT appear when canonical text has arrived
+  // -------------------------------------------------------------------------
+
+  it("does not show interstitial when canonical NARRATION is present for the active turn", async () => {
+    const msgs: GameMessage[] = [narration("CANONICAL TEXT")];
+    // activeTurnId is null (canonical closed the turn per reducer rules)
+    const streaming: StreamingNarrationState = {
+      turns: new Map([
+        [
+          "t-1",
+          { chunks: [], nextExpectedSeq: 0, canonical: "CANONICAL TEXT" },
+        ],
+      ]),
+      activeTurnId: null,
+      activeTurnStartedAt: null,
+    };
+
+    await act(async () => {
+      renderWithStreamingState(msgs, streaming);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5500);
+    });
+
+    // Canonical is displayed, no interstitial
+    expect(screen.getByText(/CANONICAL TEXT/)).toBeInTheDocument();
+    expect(screen.queryByTestId("narrator-considers")).not.toBeInTheDocument();
   });
 });

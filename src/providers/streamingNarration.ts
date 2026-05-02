@@ -32,11 +32,17 @@ export type StreamingNarrationState = {
   /** The turn_id that most recently received a delta — used to route the
    *  canonical NarrationMessage which carries no turn_id. */
   activeTurnId: string | null;
+  /** Timestamp (Date.now()) recorded when activeTurnId first transitioned from
+   *  null/different to the current value. Used by the stall-fallback interstitial
+   *  to detect when no content has arrived for 5+ seconds. Cleared to null when
+   *  canonical lands (alongside activeTurnId). */
+  activeTurnStartedAt: number | null;
 };
 
 export const initialStreamingState: StreamingNarrationState = {
   turns: new Map(),
   activeTurnId: null,
+  activeTurnStartedAt: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -73,9 +79,18 @@ export function reduceStreamingNarration(
     const newTurns = new Map(state.turns);
     newTurns.set(turn_id, updated);
 
+    // Stamp activeTurnStartedAt only on the transition into a new active turn.
+    // If this turn is already the active one (same turn_id), preserve the existing
+    // timestamp so it reflects when the turn first opened, not each chunk arrival.
+    const activeTurnStartedAt =
+      state.activeTurnId === turn_id
+        ? state.activeTurnStartedAt
+        : Date.now();
+
     return {
       turns: newTurns,
       activeTurnId: turn_id,
+      activeTurnStartedAt,
     };
   }
 
@@ -102,6 +117,7 @@ export function reduceStreamingNarration(
     return {
       turns: newTurns,
       activeTurnId: null, // canonical closes the active turn
+      activeTurnStartedAt: null, // clear the stall timer
     };
   }
 

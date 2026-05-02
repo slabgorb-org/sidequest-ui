@@ -20,3 +20,19 @@ export function EmptyNarrationState() {
     </div>
   );
 }
+
+export function NarratorConsidersInterstitial({ className }: { className?: string }) {
+  return (
+    <div
+      data-testid="narrator-considers"
+      className={`flex items-center justify-center gap-3 text-muted-foreground/30 ${className ?? "py-2"}`}
+    >
+      <span className="text-sm animate-pulse">◇</span>
+      <span className="text-sm animate-pulse [animation-delay:200ms]">◇</span>
+      <span className="text-sm animate-pulse [animation-delay:400ms]">◇</span>
+      <span className="text-sm italic text-muted-foreground/40">
+        The narrator considers...
+      </span>
+    </div>
+  );
+}
