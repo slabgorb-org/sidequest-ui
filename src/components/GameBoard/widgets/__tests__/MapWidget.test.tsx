@@ -185,6 +185,7 @@ describe("MapWidget", () => {
         epoch_days: 0,
         party_at: "turning_hub",
         next_conjunction: null,
+        plotted_course: null,
       };
       const { getByTestId } = render(
         <MapWidget
