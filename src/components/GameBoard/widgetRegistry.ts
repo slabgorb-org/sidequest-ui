@@ -15,6 +15,7 @@ export type WidgetId =
   | "character"
   | "inventory"
   | "map"
+  | "ship"
   | "knowledge"
   | "gallery"
   | "confrontation"
@@ -70,6 +71,17 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     id: "map",
     label: "Map",
     hotkey: "m",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
+    closable: true,
+    dataGated: true,
+  },
+  ship: {
+    id: "ship",
+    label: "Ship",
+    hotkey: "s",
     minW: 3,
     minH: 3,
     defaultW: 4,
