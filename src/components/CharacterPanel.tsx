@@ -5,6 +5,7 @@ import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "@/types/party";
 import type { MagicState } from "@/types/magic";
+import { SensitivitiesSection } from "./SensitivitiesSection";
 type TabId = "stats" | "abilities" | "status";
 
 export interface ResourcePool {
@@ -168,7 +169,13 @@ export function CharacterPanel({
 
       <div role="tabpanel" className="flex-1 overflow-auto p-4">
         {activeTab === "stats" && <StatsContent stats={character.stats} />}
-        {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
+        {activeTab === "abilities" && (
+          <AbilitiesContent
+            abilities={character.abilities}
+            magicState={magicState}
+            characterId={character.name}
+          />
+        )}
         {activeTab === "status" && hasResources && (
           <StatusContent
             resources={resources!}
@@ -341,17 +348,29 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
   );
 }
 
-function AbilitiesContent({ abilities }: { abilities: string[] }) {
+function AbilitiesContent({
+  abilities,
+  magicState,
+  characterId,
+}: {
+  abilities: string[];
+  magicState: MagicState | null;
+  characterId: string;
+}) {
   const real = abilities.filter((a) => !a.includes("auto-filled"));
-  if (real.length === 0) {
-    return <p className="text-sm text-muted-foreground/60">No abilities.</p>;
-  }
   return (
-    <ul className="list-disc list-inside text-sm space-y-1">
-      {real.map((ability) => (
-        <li key={ability}>{ability}</li>
-      ))}
-    </ul>
+    <div>
+      {real.length === 0 ? (
+        <p className="text-sm text-muted-foreground/60">No abilities.</p>
+      ) : (
+        <ul className="list-disc list-inside text-sm space-y-1">
+          {real.map((ability) => (
+            <li key={ability}>{ability}</li>
+          ))}
+        </ul>
+      )}
+      <SensitivitiesSection magicState={magicState} characterId={characterId} />
+    </div>
   );
 }
 
