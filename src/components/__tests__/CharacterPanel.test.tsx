@@ -552,6 +552,67 @@ describe("CharacterPanel — S2-UX: turn-state badges are legible and unambiguou
     expect(screen.queryByTestId("party-member-acting-badge-p1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("party-member-acting-badge-p2")).not.toBeInTheDocument();
   });
+
+  // Playtest 2026-05-03 [BUG] floor/turn-status inconsistent across tabs.
+  // Simultaneous-action MP: ``submittedPlayerIds`` overrides
+  // ``activePlayerId``-based logic. A player IN the set has submitted
+  // (badge = WAITING); one NOT in the set still has the floor (badge =
+  // ACTING). Pre-fix the labels inverted on whichever tab last submitted
+  // because activePlayerId pointed at "the player who just acted."
+  it("submittedPlayerIds: submitted player → WAITING, unsubmitted → ACTING", () => {
+    // Repro: Scratchy submitted; Itchy still composing.
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        // activePlayerId intentionally stale to prove submittedPlayerIds wins.
+        activePlayerId="p1"
+        submittedPlayerIds={new Set(["p1"])}
+      />,
+    );
+    // p1 (submitted) gets the WAITING badge, NOT ACTING.
+    expect(screen.getByTestId("party-member-waiting-badge-p1")).toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-acting-badge-p1")).not.toBeInTheDocument();
+    // p2 (not submitted, still composing) gets ACTING, NOT WAITING.
+    expect(screen.getByTestId("party-member-acting-badge-p2")).toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-waiting-badge-p2")).not.toBeInTheDocument();
+    // p3 (not submitted) also gets ACTING.
+    expect(screen.getByTestId("party-member-acting-badge-p3")).toBeInTheDocument();
+  });
+
+  it("submittedPlayerIds empty → every PC shows ACTING (round just started)", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId={null}
+        submittedPlayerIds={new Set()}
+      />,
+    );
+    // No one has submitted yet — every PC has the floor.
+    expect(screen.getByTestId("party-member-acting-badge-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-acting-badge-p2")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-acting-badge-p3")).toBeInTheDocument();
+  });
+
+  it("submittedPlayerIds undefined → falls back to activePlayerId (back-compat)", () => {
+    // Sequential / pre-MP / solo callers must keep the prior behavior:
+    // the player named in activePlayerId is ACTING; everyone else is WAITING.
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId="p2"
+        // submittedPlayerIds intentionally absent.
+      />,
+    );
+    expect(screen.getByTestId("party-member-acting-badge-p2")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-waiting-badge-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-waiting-badge-p3")).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -300,6 +300,21 @@ export function GameBoard({
 
   const { chapterTitle } = useRunningHeader(messages, characters, currentPlayerId);
 
+  // Per-player submission state for the simultaneous-action MP model.
+  // Drives CharacterPanel's ACTING/WAITING badges (playtest 2026-05-03 [BUG]
+  // floor/turn-status inconsistent across tabs). Empty in solo / single-
+  // player; CharacterPanel falls back to activePlayerId-based logic when
+  // ``submittedPlayerIds`` is undefined, so we only thread it through in
+  // genuine MP. Mirrors the App-level ``submittedPlayerIds`` derivation
+  // so a future move into a shared hook is a single-site refactor.
+  const submittedPlayerIdSet = useMemo<ReadonlySet<string> | undefined>(
+    () =>
+      (characters?.length ?? 0) > 1
+        ? new Set(turnStatusEntries.map((e) => e.player_id))
+        : undefined,
+    [characters?.length, turnStatusEntries],
+  );
+
   // Story 33-11: content signals drive the mobile tab notification badges.
   // Each entry is a change-detection scalar for a tab's visible content —
   // when the value changes while that tab is inactive, MobileTabView
@@ -344,6 +359,7 @@ export function GameBoard({
             characters={characters}
             currentPlayerId={currentPlayerId}
             activePlayerId={activePlayerId}
+            submittedPlayerIds={submittedPlayerIdSet}
             magicState={magicState}
           />
         ) : null;
@@ -399,7 +415,7 @@ export function GameBoard({
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId, magicState, lastOrbitalChart, sendOrbitalIntent]);
+      activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
   const isMultiplayer =
