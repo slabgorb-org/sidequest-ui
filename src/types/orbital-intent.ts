@@ -19,6 +19,15 @@ export interface ConjunctionEventPayload {
   t_hours_until: number;
 }
 
+export interface PlottedCourseWire {
+  to_body_id: string;
+  label: string | null;
+  eta_hours: number;
+  delta_v: number;
+  plotted_at_t_hours: number;
+  source: "in_scope" | "recent_mention" | "quest_objective";
+}
+
 export interface OrbitalIntentResponse {
   scope_center: string;
   svg: string;
@@ -28,4 +37,11 @@ export interface OrbitalIntentResponse {
   party_at: string | null;
   /** Soonest watched alignment event, or null if none configured / in horizon. */
   next_conjunction: ConjunctionEventPayload | null;
+  /**
+   * Course plotted by the narrator, drawn on the chart as a curved
+   * Bezier overlay. Null when no course is plotted.
+   * Cleared on the server by cancel_course intent, replacement plot,
+   * or arrival at the destination body.
+   */
+  plotted_course: PlottedCourseWire | null;
 }
