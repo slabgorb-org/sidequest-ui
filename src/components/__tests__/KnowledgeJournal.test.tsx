@@ -397,4 +397,39 @@ describe('AC-9: Keyword filter', () => {
     expect(input.value).toBe('');
     expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
   });
+
+  it('stacks with the active category tab (intersection, not replace)', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // Activate Person tab — should show f2 (Elder Mirova) and f6 (hooded figure).
+    fireEvent.click(screen.getByRole('tab', { name: /person/i }));
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(2);
+
+    // Type 'well' — both f2 (...beneath the well) and f6 (...near the well...)
+    // contain 'well'. With Person tab still active, both should remain.
+    fireEvent.change(input, { target: { value: 'well' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(2);
+
+    // Type 'midnight' — only f6 contains 'midnight'. Person tab still active.
+    fireEvent.change(input, { target: { value: 'midnight' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/hooded figure/i)).toBeInTheDocument();
+
+    // Verify no Lore entries (e.g. f3 ancient runes) leak in despite matching nothing.
+    expect(screen.queryByText(/ancient runes/i)).not.toBeInTheDocument();
+  });
+
+  it('KnowledgeWidget (the dock wrapper) renders KnowledgeJournal with the keyword filter', async () => {
+    // Wiring guard: per CLAUDE.md "Every Test Suite Needs a Wiring Test" —
+    // unit tests prove KnowledgeJournal works in isolation; this confirms
+    // it's mounted from the production dock path so the keyword filter is
+    // actually reachable by players.
+    const mod = await import('@/components/GameBoard/widgets/KnowledgeWidget');
+    expect(typeof mod.KnowledgeWidget).toBe('function');
+
+    const sample: KnowledgeEntry[] = [ENTRIES[0]];
+    render(<mod.KnowledgeWidget entries={sample} />);
+    expect(screen.getByTestId('keyword-filter')).toBeInTheDocument();
+  });
 });
