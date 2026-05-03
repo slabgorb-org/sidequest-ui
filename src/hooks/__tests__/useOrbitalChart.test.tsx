@@ -7,7 +7,9 @@ const stubResponse = (svg: string, scope = "coyote"): OrbitalIntentResponse => (
   scope_center: scope,
   svg,
   t_hours: 0,
+  epoch_days: 0,
   party_at: null,
+  next_conjunction: null,
 });
 
 describe("useOrbitalChart", () => {

@@ -83,6 +83,9 @@ export function MapWidget({
         <OrbitalChartView
           svg={chart.svg}
           scopeCenter={chart.scope_center}
+          tHours={chart.t_hours}
+          epochDays={chart.epoch_days}
+          nextConjunction={chart.next_conjunction}
           onIntent={onIntent}
         />
       </div>
