@@ -41,7 +41,28 @@ export function SensitivitiesSection({
       <h3 className="text-sm italic font-semibold mb-2 text-muted-foreground">
         Sensitivities
       </h3>
-      {drifted ? null : (
+      {drifted ? (
+        <div className="space-y-2 text-sm text-foreground/85">
+          <p>Something stirred. You felt it.</p>
+          <p>
+            The substrate has weight — the hum behind the hum, the thing
+            the dust profile carries that isn't dust. You can answer. You
+            can refuse. You can push deeper. You can sit with it.
+          </p>
+          <p>
+            <strong>Sanity</strong> is the price of staying open.{" "}
+            <strong>Notice</strong> measures what you catch.{" "}
+            <strong>Vitality</strong> decides whether you can carry it back.
+          </p>
+          <p>
+            No one taught you the shape of this. You learn by reaching, or
+            by flinching.
+          </p>
+          <p className="italic text-muted-foreground/80">
+            Your own words, in the input bar.
+          </p>
+        </div>
+      ) : (
         <p className="text-sm italic text-muted-foreground/80">{PRE_BLEED_COPY}</p>
       )}
     </section>

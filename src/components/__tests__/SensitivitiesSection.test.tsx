@@ -66,7 +66,20 @@ describe("SensitivitiesSection", () => {
 
     expect(screen.getByRole("heading", { name: /sensitivities/i })).toBeInTheDocument();
     expect(screen.getByText(/something stirred\. you felt it\./i)).toBeInTheDocument();
-    expect(screen.getByText(/sanity is the price of staying open/i)).toBeInTheDocument();
+    // Cost-vocabulary line spans inline <strong> tags; narrow to the <p>
+    // that contains all three labels (Sanity / Notice / Vitality) so the
+    // match is unambiguous and proves the bold structure is intact.
+    expect(
+      screen.getByText((_, node) => {
+        if (node?.tagName !== "P") return false;
+        const t = node.textContent ?? "";
+        return (
+          t.includes("Sanity is the price of staying open") &&
+          t.includes("Notice measures what you catch") &&
+          t.includes("Vitality decides whether you can carry it back")
+        );
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/your own words, in the input bar/i)).toBeInTheDocument();
     expect(
       screen.queryByText(/you hear what the others don't\. sometimes\./i),
