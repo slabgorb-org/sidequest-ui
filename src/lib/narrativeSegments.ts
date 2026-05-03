@@ -1,11 +1,11 @@
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
-import type { FootnoteData, ActionRevealEntry } from "@/types/payloads";
+import type { FootnoteData } from "@/types/payloads";
 
-export type { FootnoteData, ActionRevealEntry };
+export type { FootnoteData };
 
 export interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal" | "render-pending" | "gallery-notice";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "render-pending" | "gallery-notice";
   html?: string;
   url?: string;
   alt?: string;
@@ -18,8 +18,6 @@ export interface NarrativeSegment {
   footnotes?: FootnoteData[];
   portraitImage?: NarrativeSegment;
   adjacentText?: NarrativeSegment;
-  actions?: ActionRevealEntry[];
-  autoResolved?: string[];
 }
 
 export function markdownToHtml(text: string): string {
@@ -41,7 +39,6 @@ export function markdownToHtml(text: string): string {
 export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   const segments: NarrativeSegment[] = [];
 
-  const seenRevealTurns = new Set<number>();
   const seenNarrationTexts = new Set<string>();
   let lastChapterLocation = "";
 
@@ -143,7 +140,7 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         // of "narration-flowy" segments — text, separator, gallery-notice,
         // render-pending, image, portrait-group. We stop at any
         // structural segment that delimits the previous turn:
-        // player-action, player-aside, system, error, action-reveal,
+        // player-action, player-aside, system, error,
         // turn-status, or another chapter-marker.
         const location = msg.payload.location as string;
         if (location && location !== lastChapterLocation) {
@@ -169,17 +166,11 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         }
         break;
       }
-      case MessageType.ACTION_REVEAL: {
-        const turnNumber = msg.payload.turn_number as number;
-        if (seenRevealTurns.has(turnNumber)) break;
-        seenRevealTurns.add(turnNumber);
-        const actions = (msg.payload.actions as ActionRevealEntry[] | undefined) ?? [];
-        const autoResolved = (msg.payload.auto_resolved as string[] | undefined) ?? [];
-        if (actions.length > 0 || autoResolved.length > 0) {
-          segments.push({ kind: "action-reveal", actions, autoResolved });
-        }
-        break;
-      }
+      // ACTION_REVEAL is intentionally NOT a narrative-scroll segment.
+      // Peer reveals are ephemeral UI surfaced via PeerRevealList /
+      // usePeerReveals, not persistent narration. Any handling here would
+      // resurrect the dead batch-shape pipeline that ADR-082's port left
+      // unwired.
       default:
         break;
     }
@@ -210,10 +201,10 @@ export function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSe
  *   - all narrator text paragraphs produced in response
  *   - inline side-effects (gallery notices, chapter markers, system messages)
  *
- * Boundaries: each `player-action`, `player-aside`, or `action-reveal` segment
- * starts a new page. Everything before the first boundary (opening narration)
- * collapses into a single page. `separator` segments (emitted by NARRATION_END)
- * are discarded — we use player action boundaries, not narration-end boundaries,
+ * Boundaries: each `player-action` or `player-aside` segment starts a new
+ * page. Everything before the first boundary (opening narration) collapses
+ * into a single page. `separator` segments (emitted by NARRATION_END) are
+ * discarded — we use player action boundaries, not narration-end boundaries,
  * so that the player's action stays visually attached to the narrator's response.
  *
  * This replaces the old "one segment = one page" behavior that exposed the
@@ -226,8 +217,7 @@ export function buildTurnPages(segments: NarrativeSegment[]): NarrativeSegment[]
 
   const isTurnStarter = (s: NarrativeSegment): boolean =>
     s.kind === "player-action" ||
-    s.kind === "player-aside" ||
-    s.kind === "action-reveal";
+    s.kind === "player-aside";
 
   for (const seg of segments) {
     if (seg.kind === "separator") continue;
