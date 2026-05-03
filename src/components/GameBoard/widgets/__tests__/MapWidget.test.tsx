@@ -180,9 +180,11 @@ describe("MapWidget", () => {
       const sendOrbitalIntent = vi.fn();
       const chart: OrbitalIntentResponse = {
         scope_center: "coyote",
-        svg: '<svg data-testid="orbital-svg"><circle data-body-id="red_prospect"/></svg>',
+        svg: '<svg data-testid="orbital-svg"><g id="viewport"><circle data-body-id="red_prospect"/></g></svg>',
         t_hours: 0,
+        epoch_days: 0,
         party_at: "turning_hub",
+        next_conjunction: null,
       };
       const { getByTestId } = render(
         <MapWidget

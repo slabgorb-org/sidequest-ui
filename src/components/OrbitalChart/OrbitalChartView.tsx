@@ -1,40 +1,78 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
-import type { OrbitalIntent } from "@/types/orbital-intent";
+import type {
+  ConjunctionEventPayload,
+  OrbitalIntent,
+} from "@/types/orbital-intent";
+import { HudBottomStrip } from "./HudBottomStrip";
+import { HudTopStrip } from "./HudTopStrip";
 
 interface OrbitalChartViewProps {
   svg: string;
   scopeCenter: string;
+  tHours: number;
+  epochDays: number;
+  nextConjunction: ConjunctionEventPayload | null;
   onIntent: (intent: OrbitalIntent) => void;
 }
 
+const BRASS = "#f5d020";
+
 /**
- * Thin SVG host. Mounts server-rendered SVG, listens at root for clicks,
- * routes data-action and data-body-id attributes to intent messages.
- * Pan/zoom is pure CSS transform on the container.
+ * Server-rendered SVG host with chart-as-calendar HUD overlays.
  *
- * Per spec §6.4: pan/zoom is client-only and never round-trips. Only
- * scope changes (drill_in / drill_out) trigger server requests.
+ * Outer wrapper exists only to key the inner impl by `svg` — when the
+ * server pushes a fresh render (e.g. drill_in changes scope), the impl
+ * remounts with fresh state. Cleaner than reset-state-in-effect.
  */
-export function OrbitalChartView({
+export function OrbitalChartView(props: OrbitalChartViewProps) {
+  return <OrbitalChartImpl {...props} key={props.svg} />;
+}
+
+/**
+ * Stateful chart impl. Pan/zoom is imperative on the inner `<g id="viewport">`
+ * group's transform attribute (spec §10) — this is what render.py wraps the
+ * three SVG layers in. Doing it on the inner group instead of the outer host
+ * div means SVG geometry scales but click targets stay hit-testable, and
+ * lets us do scale-aware label sizing in a future pass.
+ *
+ * Click events bubble; we walk parent chain looking for data-action attrs
+ * to fire ORBITAL_INTENT messages back to the server (drill_in:* / drill_out).
+ */
+function OrbitalChartImpl({
   svg,
   scopeCenter,
+  tHours,
+  epochDays,
+  nextConjunction,
   onIntent,
 }: OrbitalChartViewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<SVGGElement | null>(null);
   const [scale, setScale] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panRef = useRef({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Inject SVG markup directly. Server is the only producer; sanitization
-  // happens server-side via svgwrite. Per project policy, server output is
-  // trusted; UI does not parse or modify SVG content.
+  // Inject server SVG and capture the viewport-group ref. Runs once per
+  // mount; outer wrapper keys this impl by svg so a new push remounts.
   useEffect(() => {
-    if (hostRef.current) {
-      hostRef.current.innerHTML = svg;
-    }
+    if (!hostRef.current) return;
+    hostRef.current.innerHTML = svg;
+    viewportRef.current = hostRef.current.querySelector<SVGGElement>("#viewport");
   }, [svg]);
+
+  const applyTransform = useCallback(
+    (nextScale: number, nextPan: { x: number; y: number }) => {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      vp.setAttribute(
+        "transform",
+        `translate(${nextPan.x} ${nextPan.y}) scale(${nextScale})`
+      );
+    },
+    []
+  );
 
   function onClick(e: React.MouseEvent<HTMLDivElement>) {
     let el: HTMLElement | null = e.target as HTMLElement;
@@ -57,21 +95,25 @@ export function OrbitalChartView({
 
   function onWheel(e: React.WheelEvent<HTMLDivElement>) {
     e.preventDefault();
-    setScale((s) =>
-      Math.max(0.25, Math.min(8, s * (e.deltaY < 0 ? 1.1 : 0.9)))
-    );
+    const next = Math.max(0.25, Math.min(8, scale * (e.deltaY < 0 ? 1.1 : 0.9)));
+    setScale(next);
+    applyTransform(next, panRef.current);
   }
 
   function onMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    dragRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    dragRef.current = {
+      startX: e.clientX - panRef.current.x,
+      startY: e.clientY - panRef.current.y,
+    };
     setIsDragging(true);
   }
   function onMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     if (!dragRef.current) return;
-    setPan({
-      x: e.clientX - dragRef.current.x,
-      y: e.clientY - dragRef.current.y,
-    });
+    panRef.current = {
+      x: e.clientX - dragRef.current.startX,
+      y: e.clientY - dragRef.current.startY,
+    };
+    applyTransform(scale, panRef.current);
   }
   function onMouseUp() {
     dragRef.current = null;
@@ -79,8 +121,9 @@ export function OrbitalChartView({
   }
 
   function onReset() {
+    panRef.current = { x: 0, y: 0 };
     setScale(1);
-    setPan({ x: 0, y: 0 });
+    applyTransform(1, panRef.current);
   }
 
   return (
@@ -90,28 +133,41 @@ export function OrbitalChartView({
         height: "100%",
         position: "relative",
         overflow: "hidden",
+        background: "#000000",
       }}
       data-testid="orbital-chart-container"
       data-scope-center={scopeCenter}
     >
+      {/* CSS for drillable cluster hover state. Spec §10 drill affordance. */}
+      <style>{`
+        [data-testid="orbital-chart-host"] g.drillable { cursor: pointer; }
+        [data-testid="orbital-chart-host"] g.drillable:hover {
+          filter: drop-shadow(0 0 3px ${BRASS});
+        }
+      `}</style>
+
+      <HudTopStrip tHours={tHours} epochDays={epochDays} />
+
       <button
         onClick={onReset}
         style={{
           position: "absolute",
-          top: 6,
+          top: 4,
           right: 6,
-          zIndex: 1,
+          zIndex: 3,
           background: "transparent",
-          color: "yellow",
-          border: "1px solid yellow",
-          fontFamily: "monospace",
-          fontSize: 10,
-          padding: "2px 6px",
+          color: BRASS,
+          border: `1px solid ${BRASS}`,
+          fontFamily: "Orbitron, monospace",
+          fontSize: 9,
+          letterSpacing: 1,
+          padding: "2px 8px",
           cursor: "pointer",
         }}
       >
         RESET
       </button>
+
       <div
         ref={hostRef}
         data-testid="orbital-chart-host"
@@ -122,13 +178,16 @@ export function OrbitalChartView({
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
         style={{
-          width: "100%",
-          height: "100%",
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-          transformOrigin: "center",
+          position: "absolute",
+          top: 28,
+          bottom: 36,
+          left: 0,
+          right: 0,
           cursor: isDragging ? "grabbing" : "grab",
         }}
       />
+
+      <HudBottomStrip nextConjunction={nextConjunction} zoom={scale} />
     </div>
   );
 }
