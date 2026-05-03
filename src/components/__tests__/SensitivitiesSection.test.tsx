@@ -1,0 +1,55 @@
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { SensitivitiesSection } from "../SensitivitiesSection";
+import type { MagicState, LedgerBar, LedgerBarSpec } from "../../types/magic";
+
+function makeBar(
+  id: string,
+  scope: "character" | "world",
+  value: number,
+  startsAtChargen: number,
+): [string, LedgerBar] {
+  const spec: LedgerBarSpec = {
+    id,
+    scope,
+    direction: scope === "world" ? "up" : "down",
+    range: [0.0, 1.0],
+    decay_per_session: 0.0,
+    starts_at_chargen: startsAtChargen,
+  };
+  const owner = scope === "world" ? "coyote_star" : "Itchy";
+  return [`${scope}|${owner}|${id}`, { spec, value }];
+}
+
+const baseConfig = {
+  world_slug: "coyote_star",
+  genre_slug: "space_opera",
+  allowed_sources: ["innate", "item_based"],
+  active_plugins: ["innate_v1", "item_legacy_v1"],
+  intensity: 0.25,
+  world_knowledge: { primary: "classified" as const, local_register: "folkloric" as const },
+  visibility: {},
+  hard_limits: [],
+  cost_types: ["sanity", "notice"],
+  ledger_bars: [],
+  can_build_caster: false,
+  can_build_item_user: true,
+  narrator_register: "",
+};
+
+describe("SensitivitiesSection", () => {
+  it("renders cryptic pre-bleed copy when all character bars are at starts_at_chargen", () => {
+    const ledger = Object.fromEntries([
+      makeBar("sanity", "character", 1.0, 1.0),
+      makeBar("notice", "character", 0.0, 0.0),
+      makeBar("vitality", "character", 0.5, 0.5),
+    ]);
+    const state: MagicState = { config: baseConfig, ledger, working_log: [] };
+
+    render(<SensitivitiesSection magicState={state} characterId="Itchy" />);
+
+    expect(screen.getByRole("heading", { name: /sensitivities/i })).toBeInTheDocument();
+    expect(screen.getByText(/you hear what the others don't\. sometimes\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/something stirred/i)).not.toBeInTheDocument();
+  });
+});
