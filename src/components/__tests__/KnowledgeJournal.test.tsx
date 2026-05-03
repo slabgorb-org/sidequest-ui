@@ -332,4 +332,29 @@ describe('AC-9: Keyword filter', () => {
 
     expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
   });
+
+  it('narrows by AND across multiple tokens', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // "corruption sense" should match only f5 (Root-bonding allows you to
+    // sense corruption) — both tokens present in content. f1 has corruption
+    // but not sense; f4 has corruption but not sense.
+    fireEvent.change(input, { target: { value: 'corruption sense' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/Root-bonding/i)).toBeInTheDocument();
+  });
+
+  it('treats each whitespace-separated token as an independent substring', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // f6 ("hooded figure was seen near the well at midnight") contains
+    // both "well" and "midnight". Token order does not matter.
+    fireEvent.change(input, { target: { value: 'midnight well' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/hooded figure/i)).toBeInTheDocument();
+  });
 });
