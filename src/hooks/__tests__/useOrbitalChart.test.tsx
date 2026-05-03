@@ -10,13 +10,19 @@ const stubResponse = (svg: string, scope = "coyote"): OrbitalIntentResponse => (
   epoch_days: 0,
   party_at: null,
   next_conjunction: null,
+  plotted_course: null,
 });
 
 describe("useOrbitalChart", () => {
   it("fires view_map on enable when no chart cached", () => {
     const sendIntent = vi.fn();
     renderHook(() =>
-      useOrbitalChart({ enabled: true, sendIntent, lastResponse: null })
+      useOrbitalChart({
+        enabled: true,
+        sendIntent,
+        lastResponse: null,
+        plottedCourseRevision: 0,
+      })
     );
     expect(sendIntent).toHaveBeenCalledWith({
       kind: "view_map",
@@ -27,7 +33,12 @@ describe("useOrbitalChart", () => {
   it("does not fire view_map when disabled", () => {
     const sendIntent = vi.fn();
     renderHook(() =>
-      useOrbitalChart({ enabled: false, sendIntent, lastResponse: null })
+      useOrbitalChart({
+        enabled: false,
+        sendIntent,
+        lastResponse: null,
+        plottedCourseRevision: 0,
+      })
     );
     expect(sendIntent).not.toHaveBeenCalled();
   });
@@ -36,7 +47,12 @@ describe("useOrbitalChart", () => {
     const sendIntent = vi.fn();
     const { result, rerender } = renderHook(
       ({ lastResponse }) =>
-        useOrbitalChart({ enabled: true, sendIntent, lastResponse }),
+        useOrbitalChart({
+          enabled: true,
+          sendIntent,
+          lastResponse,
+          plottedCourseRevision: 0,
+        }),
       { initialProps: { lastResponse: null as OrbitalIntentResponse | null } }
     );
     expect(result.current.chart).toBeNull();
@@ -49,7 +65,12 @@ describe("useOrbitalChart", () => {
     const sendIntent = vi.fn();
     const { result, rerender } = renderHook(
       ({ enabled, lastResponse }) =>
-        useOrbitalChart({ enabled, sendIntent, lastResponse }),
+        useOrbitalChart({
+          enabled,
+          sendIntent,
+          lastResponse,
+          plottedCourseRevision: 0,
+        }),
       {
         initialProps: {
           enabled: true,
@@ -66,7 +87,12 @@ describe("useOrbitalChart", () => {
   it("forwards onIntent calls through sendIntent", () => {
     const sendIntent = vi.fn();
     const { result } = renderHook(() =>
-      useOrbitalChart({ enabled: true, sendIntent, lastResponse: null })
+      useOrbitalChart({
+        enabled: true,
+        sendIntent,
+        lastResponse: null,
+        plottedCourseRevision: 0,
+      })
     );
     sendIntent.mockClear();
 
