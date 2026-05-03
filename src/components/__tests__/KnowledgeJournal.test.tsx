@@ -373,4 +373,28 @@ describe('AC-9: Keyword filter', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     expect(screen.queryByTestId('keyword-filter-empty')).not.toBeInTheDocument();
   });
+
+  it('renders a clear button when the input has text', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    expect(screen.queryByTestId('keyword-filter-clear')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+
+    expect(screen.getByTestId('keyword-filter-clear')).toBeInTheDocument();
+  });
+
+  it('clears the keyword when the clear button is clicked', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(3);
+
+    fireEvent.click(screen.getByTestId('keyword-filter-clear'));
+
+    expect(input.value).toBe('');
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
 });

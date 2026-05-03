@@ -62,18 +62,31 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
 
   return (
     <div data-testid="knowledge-journal" className="p-4">
-      <div className="mb-3">
+      <div className="mb-3 relative">
         <input
           type="text"
           data-testid="keyword-filter"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="Filter by keyword"
-          className="w-full text-sm px-2 py-1 rounded
+          className="w-full text-sm px-2 py-1 pr-7 rounded
                      border border-border/40 bg-transparent
                      text-foreground placeholder:text-muted-foreground/50
                      focus:outline-none focus:border-border/70 transition-colors"
         />
+        {keyword.length > 0 && (
+          <button
+            type="button"
+            data-testid="keyword-filter-clear"
+            onClick={() => setKeyword('')}
+            aria-label="Clear keyword filter"
+            className="absolute right-1 top-1/2 -translate-y-1/2
+                       text-muted-foreground/60 hover:text-foreground
+                       text-sm leading-none px-1"
+          >
+            ×
+          </button>
+        )}
       </div>
       <div role="tablist" className="flex gap-1 mb-3 flex-wrap">
         <button
