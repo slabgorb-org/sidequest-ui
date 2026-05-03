@@ -356,10 +356,11 @@ describe("ConnectScreen", () => {
 
       // Only one call to /api/games should have been made.
       const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
-      const gameCalls = fetchMock.mock.calls.filter(
-        ([url, opts]: [string, RequestInit]) =>
-          url === "/api/games" && opts?.method === "POST",
-      );
+      const gameCalls = fetchMock.mock.calls.filter((call) => {
+        const url = call[0] as string;
+        const opts = call[1] as RequestInit | undefined;
+        return url === "/api/games" && opts?.method === "POST";
+      });
       expect(gameCalls).toHaveLength(1);
 
       resolveStart(
@@ -656,8 +657,8 @@ describe("ConnectScreen", () => {
       // Navigation must land on the NEW slug returned by the server, not
       // on the past-journey slug. The pre-fix behavior would have either
       // never POSTed at all, or used the past-journey slug regardless.
-      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
-        /^\/(solo|play)\//.test(path),
+      const slugCalls = onPathChange.mock.calls.filter((call) =>
+        /^\/(solo|play)\//.test(call[0] as string),
       );
       expect(slugCalls.length).toBeGreaterThan(0);
       const lastSlugPath = slugCalls[slugCalls.length - 1][0];
@@ -741,8 +742,8 @@ describe("ConnectScreen", () => {
       await user.click(screen.getByRole("button", { name: /start/i }));
 
       expect(postSpy).not.toHaveBeenCalled();
-      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
-        /^\/(solo|play)\//.test(path),
+      const slugCalls = onPathChange.mock.calls.filter((call) =>
+        /^\/(solo|play)\//.test(call[0] as string),
       );
       expect(slugCalls.length).toBeGreaterThan(0);
       expect(slugCalls[slugCalls.length - 1][0]).toBe(`/play/${PAST_SLUG}`);
@@ -779,8 +780,8 @@ describe("ConnectScreen", () => {
       expect(screen.getByLabelText(/what name shall be yours/i)).toHaveValue(
         "OldEntry",
       );
-      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
-        /^\/(solo|play)\//.test(path),
+      const slugCalls = onPathChange.mock.calls.filter((call) =>
+        /^\/(solo|play)\//.test(call[0] as string),
       );
       expect(slugCalls).toHaveLength(0);
     });
