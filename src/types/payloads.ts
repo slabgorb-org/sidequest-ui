@@ -23,10 +23,16 @@ export interface FootnoteData {
   is_new?: boolean;
 }
 
+export type ActionRevealStatus = "composing" | "submitted" | "cleared";
+
 export interface ActionRevealEntry {
-  character_name: string;
   player_id: string;
+  character_name: string;
+  status: ActionRevealStatus;
   action: string;
+  aside: boolean;
+  seq: number;
+  round: number;
 }
 
 export interface TurnStatusEntry {
