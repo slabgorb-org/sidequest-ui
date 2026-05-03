@@ -85,4 +85,24 @@ describe("SensitivitiesSection", () => {
       screen.queryByText(/you hear what the others don't\. sometimes\./i),
     ).not.toBeInTheDocument();
   });
+
+  it("renders nothing when magicState is null (other genres / pre-magic worlds)", () => {
+    const { container } = render(
+      <SensitivitiesSection magicState={null} characterId="Itchy" />,
+    );
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByRole("heading", { name: /sensitivities/i })).not.toBeInTheDocument();
+  });
+
+  it("renders nothing when the character has no ledger bars", () => {
+    // magicState present but only world bars — character has not been added
+    // to the ledger yet.
+    const ledger = Object.fromEntries([makeBar("hegemony_heat", "world", 0.3, 0.3)]);
+    const state: MagicState = { config: baseConfig, ledger, working_log: [] };
+
+    const { container } = render(
+      <SensitivitiesSection magicState={state} characterId="Itchy" />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
 });
