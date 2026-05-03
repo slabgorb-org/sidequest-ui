@@ -282,7 +282,11 @@ function ScrapbookCard({
         aria-label={
           hasImage
             ? `Enlarge: ${title ?? "Scrapbook scene"}`
-            : `Open: ${title ?? "Scrapbook scene"} (metadata only)`
+            : entry.render_status === "skipped_policy"
+              ? `Open: ${title ?? "Scrapbook scene"} (skipped — no narrative weight)`
+              : entry.render_status === "failed"
+                ? `Open: ${title ?? "Scrapbook scene"} (render failed)`
+                : `Open: ${title ?? "Scrapbook scene"} (metadata only)`
         }
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(entry); } }}
       >
@@ -293,6 +297,31 @@ function ScrapbookCard({
             loading="lazy"
             className="w-full h-full object-cover"
           />
+        ) : entry.render_status === "skipped_policy" ? (
+          // Story 45-30: the trigger policy returned NONE_POLICY for this
+          // turn — banter or no narrative weight. Distinct from "no image
+          // yet" (which would imply we expected one); this turn EARNED
+          // having no image. The a11y label names the state aloud so a
+          // non-sighted player learns WHY it's imageless.
+          <div
+            data-testid={`scrapbook-entry-${id}-render-status-skipped`}
+            aria-label="Skipped: no narrative weight on this turn"
+            className="w-full h-full flex items-center justify-center text-muted-foreground/40 text-[10px] italic"
+          >
+            • skipped
+          </div>
+        ) : entry.render_status === "failed" ? (
+          // Story 45-30: the policy fired but the daemon refused
+          // synchronously (offline, error). Distinct affordance — the GM
+          // panel and the gallery agree this turn EXPECTED an image but
+          // didn't get one (the OTEL render.failed event carries the why).
+          <div
+            data-testid={`scrapbook-entry-${id}-render-status-failed`}
+            aria-label="Render failed: image was requested but did not arrive"
+            className="w-full h-full flex items-center justify-center text-destructive/60 text-[10px] italic"
+          >
+            ⚠ render failed
+          </div>
         ) : (
           // Metadata-only placeholder. We deliberately do NOT show a broken
           // image icon, a "loading…" spinner, or any pretense that an image
@@ -301,6 +330,11 @@ function ScrapbookCard({
           // glyph echoes the empty-state language ("the world will fill
           // these pages") so the affordance reads as "scene captured, no
           // illustration yet" instead of as broken.
+          //
+          // This branch fires when render_status is undefined or "rendered"
+          // but no image URL has arrived yet (the policy fired and dispatch
+          // is pending). Distinct from skipped/failed above by virtue of
+          // *not* having a render_status that names a terminal absence.
           <div
             data-testid={`scrapbook-entry-${id}-no-image`}
             className="w-full h-full flex items-center justify-center text-muted-foreground/50 text-[10px] italic"

@@ -27,6 +27,10 @@ interface ScrapbookEntry {
   narrative_excerpt: string;
   world_facts: string[];
   npcs_present: ScrapbookEntryNpcRef[];
+  // Story 45-30: render trigger policy outcome.
+  // 'rendered' (policy fired and dispatch proceeded), 'skipped_policy'
+  // (banter / no narrative weight), 'failed' (daemon refused).
+  render_status?: "rendered" | "skipped_policy" | "failed";
 }
 
 export interface GalleryImage {
@@ -52,6 +56,13 @@ export interface GalleryImage {
   location?: string;
   world_facts?: string[];
   npcs?: ScrapbookNpc[];
+  // Story 45-30: render trigger policy outcome — sourced from the
+  // server's ScrapbookEntryPayload.render_status. 'rendered' means the
+  // policy fired and dispatch proceeded (image may or may not have
+  // arrived yet). 'skipped_policy' means a banter turn — the gallery
+  // renders an eligible-but-skipped indicator. 'failed' means the
+  // policy fired but the daemon refused — distinct failure indicator.
+  render_status?: "rendered" | "skipped_policy" | "failed";
 }
 
 interface ImageBusContextValue {
@@ -138,6 +149,14 @@ function parseScrapbookEntry(payload: Record<string, unknown>): ScrapbookEntry |
     typeof payload.image_url === "string" ? payload.image_url : undefined;
   const worldFacts = readStringArray(payload.world_facts) ?? [];
   const npcsPresent = readScrapbookNpcRefs(payload.npcs_present);
+  // Story 45-30: render trigger policy outcome. Three known values; any
+  // other string drops to undefined so the gallery falls back to legacy
+  // hasImage-only branching (no silent assumptions about new states).
+  const rs = payload.render_status;
+  const renderStatus: ScrapbookEntry["render_status"] =
+    rs === "rendered" || rs === "skipped_policy" || rs === "failed"
+      ? rs
+      : undefined;
   return {
     turn_id: turnId,
     scene_title: sceneTitle,
@@ -147,6 +166,7 @@ function parseScrapbookEntry(payload: Record<string, unknown>): ScrapbookEntry |
     narrative_excerpt: excerpt,
     world_facts: worldFacts,
     npcs_present: npcsPresent,
+    render_status: renderStatus,
   };
 }
 
@@ -246,6 +266,7 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
           entry && entry.npcs_present.length > 0
             ? projectNpcRefsToLegacy(entry.npcs_present)
             : readNpcArray(payload.npcs),
+        render_status: entry?.render_status,
       });
     }
 
@@ -277,6 +298,7 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
           entry.npcs_present.length > 0
             ? projectNpcRefsToLegacy(entry.npcs_present)
             : undefined,
+        render_status: entry.render_status,
       });
     }
 
