@@ -23,7 +23,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
         sendIntent,
         lastResponse: null,
         plottedCourseRevision: 0,
-      } as any),
+      }),
     );
     expect(sendIntent).toHaveBeenCalledWith({
       kind: "view_map",
@@ -40,7 +40,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
           sendIntent,
           lastResponse: baseResponse,
           plottedCourseRevision: rev,
-        } as any),
+        }),
       { initialProps: { rev: 0 } },
     );
     sendIntent.mockClear();
@@ -60,7 +60,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
           sendIntent,
           lastResponse: baseResponse,
           plottedCourseRevision: rev,
-        } as any),
+        }),
       { initialProps: { rev: 5 } },
     );
     sendIntent.mockClear();

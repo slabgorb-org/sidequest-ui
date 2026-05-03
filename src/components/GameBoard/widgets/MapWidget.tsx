@@ -53,10 +53,26 @@ export function MapWidget({
 }: MapWidgetProps) {
   const orbitalEnabled = worldSlug !== undefined && ORBITAL_WORLD_SLUGS.has(worldSlug);
   const noopIntent = useMemo(() => () => {}, []);
+
+  // Plot-a-course: bump a counter every time the server-side plotted_course
+  // changes so the chart re-fetches with the new overlay (or without it
+  // on cancel). Hash on (to_body_id, plotted_at_t_hours) — both change on
+  // every plot, neither changes on incidental snapshot updates.
+  const plottedCourseRevision = useMemo(() => {
+    const pc = lastOrbitalChart?.plotted_course;
+    if (!pc) return 0;
+    // Rolling hash; collisions are harmless (worst case: spurious extra fetch).
+    return (
+      (pc.to_body_id.charCodeAt(0) ?? 0) +
+      Math.floor(pc.plotted_at_t_hours * 1000)
+    );
+  }, [lastOrbitalChart?.plotted_course]);
+
   const { chart, onIntent } = useOrbitalChart({
     enabled: orbitalEnabled && sendOrbitalIntent !== undefined,
     sendIntent: sendOrbitalIntent ?? noopIntent,
     lastResponse: lastOrbitalChart,
+    plottedCourseRevision,
   });
 
   const roomGraph = useMemo(
