@@ -34,25 +34,37 @@ function reducer(state: State, action: ReducerAction): State {
       const { entry, selfPlayerId } = action;
 
       if (entry.player_id === selfPlayerId) return state;
-      if (entry.round !== state.round) return state;
 
-      if (entry.status === "cleared") {
-        if (!state.reveals.has(entry.player_id)) return state;
-        const reveals = new Map(state.reveals);
-        reveals.delete(entry.player_id);
-        const lastSeq = new Map(state.lastSeq);
-        lastSeq.delete(entry.player_id);
-        return { ...state, reveals, lastSeq };
+      // Self-advance: an entry from a future round implicitly flushes
+      // prior state. Mirrors the round-flush failsafe but is driven by
+      // the entry itself, not by an external round prop. This avoids the
+      // race where the screen's round counter lags behind the entry that
+      // triggered its update.
+      let working: State = state;
+      if (entry.round > state.round) {
+        working = { round: entry.round, lastSeq: new Map(), reveals: new Map() };
+      } else if (entry.round < state.round) {
+        // Prior-round entry — drop.
+        return state;
       }
 
-      const prevSeq = state.lastSeq.get(entry.player_id);
-      if (prevSeq !== undefined && entry.seq <= prevSeq) return state;
+      if (entry.status === "cleared") {
+        if (!working.reveals.has(entry.player_id)) return working;
+        const reveals = new Map(working.reveals);
+        reveals.delete(entry.player_id);
+        const lastSeq = new Map(working.lastSeq);
+        lastSeq.delete(entry.player_id);
+        return { ...working, reveals, lastSeq };
+      }
 
-      const lastSeq = new Map(state.lastSeq);
+      const prevSeq = working.lastSeq.get(entry.player_id);
+      if (prevSeq !== undefined && entry.seq <= prevSeq) return working;
+
+      const lastSeq = new Map(working.lastSeq);
       lastSeq.set(entry.player_id, entry.seq);
-      const reveals = new Map(state.reveals);
+      const reveals = new Map(working.reveals);
       reveals.set(entry.player_id, { ...entry });
-      return { ...state, reveals, lastSeq };
+      return { ...working, reveals, lastSeq };
     }
   }
 }
@@ -86,8 +98,14 @@ export function usePeerReveals({
   // "derived state reset" pattern (equivalent to getDerivedStateFromProps).
   // We return the flushed map immediately so the caller sees an empty map
   // on this render without waiting for a re-render cycle.
+  //
+  // Only flush when the prop is AHEAD of internal state. When state is
+  // ahead (because APPLY self-advanced for a future-round entry before the
+  // consumer's round prop caught up), we keep the self-advanced state —
+  // flushing back would silently drop the very entry that triggered the
+  // advance. Both paths converge once the prop catches up.
   const activeReveals = useMemo(() => {
-    if (state.round !== round) {
+    if (round > state.round) {
       dispatch({ type: "ADVANCE_ROUND", round });
       return new Map<string, PeerReveal>();
     }

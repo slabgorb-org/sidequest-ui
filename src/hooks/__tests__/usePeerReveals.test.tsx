@@ -80,6 +80,23 @@ describe("usePeerReveals", () => {
     expect(result.current.reveals.size).toBe(0);
   });
 
+  it("entry from a future round auto-advances and is applied", () => {
+    // Race-condition fix: an entry whose round is ahead of the hook's
+    // current round must auto-flush + apply, not be silently dropped.
+    const { result } = renderHook(() =>
+      usePeerReveals({ selfPlayerId: "p1", round: 5 })
+    );
+    // Establish state in round 5
+    act(() => result.current.apply(reveal({ round: 5, seq: 0, action: "x" })));
+    expect(result.current.reveals.size).toBe(1);
+
+    // Now an entry from round 6 arrives BEFORE the round prop updates.
+    // The hook must auto-advance + apply, not drop.
+    act(() => result.current.apply(reveal({ round: 6, seq: 0, action: "future" })));
+    expect(result.current.reveals.size).toBe(1);
+    expect(result.current.reveals.get("p2")?.action).toBe("future");
+  });
+
   it("two peers tracked independently", () => {
     const { result } = renderHook(() =>
       usePeerReveals({ selfPlayerId: "p1", round: 1 })
