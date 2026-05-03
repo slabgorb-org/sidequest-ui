@@ -129,6 +129,14 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
       </div>
 
       <div className="space-y-2">
+        {sorted.length === 0 && tokens.length > 0 && (
+          <p
+            data-testid="keyword-filter-empty"
+            className="text-muted-foreground/60 italic text-sm py-4"
+          >
+            No entries match "{tokens.join(' ')}"
+          </p>
+        )}
         {sorted.map((entry) => (
           <div key={entry.fact_id} data-testid="journal-entry" className="text-sm border-l-2 border-border/30 pl-3 py-1">
             <p className="text-foreground/80">{entry.content}</p>

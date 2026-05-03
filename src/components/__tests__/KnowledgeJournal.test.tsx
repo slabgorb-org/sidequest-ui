@@ -357,4 +357,20 @@ describe('AC-9: Keyword filter', () => {
     expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
     expect(screen.getByText(/hooded figure/i)).toBeInTheDocument();
   });
+
+  it('shows empty-result message when filters yield zero matches', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'xyznomatch' } });
+
+    expect(screen.queryAllByTestId('journal-entry')).toHaveLength(0);
+    expect(screen.getByTestId('keyword-filter-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('keyword-filter-empty')).toHaveTextContent(/xyznomatch/);
+  });
+
+  it('does NOT show empty-result message when filter is empty', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    expect(screen.queryByTestId('keyword-filter-empty')).not.toBeInTheDocument();
+  });
 });
