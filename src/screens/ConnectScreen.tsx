@@ -383,13 +383,14 @@ export function ConnectScreen({
         {/* Genre + World + Preview — two-column on md+, single-column below. */}
         {showGenreError ? (
           <div className="text-center w-full max-w-sm">
-            <p className="text-sm italic text-destructive/70 mb-2">
+            <p id="genre-load-error" className="text-sm italic text-destructive/70 mb-2">
               Could not load worlds. Is the server running?
             </p>
             {onRetryGenres && (
               <button
                 type="button"
                 onClick={onRetryGenres}
+                aria-describedby="genre-load-error"
                 className="text-sm italic text-foreground/60 hover:text-foreground
                            transition-colors bg-transparent border-0 cursor-pointer underline"
               >
