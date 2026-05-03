@@ -48,4 +48,21 @@ describe("ActionReveal types", () => {
     expect(entry.character_name).toBe("Alex");
     expect(entry.action).toBe("I draw my sword");
   });
+
+  it("ActionRevealMessage carries a single ActionRevealEntry as payload", () => {
+    const msg: import("../payloads").ActionRevealMessage = {
+      type: MessageType.ACTION_REVEAL,
+      player_id: "p1",
+      payload: {
+        player_id: "p1",
+        character_name: "Alex",
+        status: "submitted",
+        action: "I draw",
+        aside: false,
+        seq: 0,
+        round: 1,
+      },
+    };
+    expect(msg.payload.action).toBe("I draw");
+  });
 });
