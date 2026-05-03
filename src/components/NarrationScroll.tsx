@@ -39,6 +39,16 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
+  // Track the previous separator index so we can detect "a new turn just
+  // landed" (lastSeparatorIdx grew). New turns ALWAYS scroll to bottom
+  // regardless of autoScroll — without this, a peer player whose mount
+  // happened to coincide with a layout shift (image loading, font swap,
+  // backfilled history sizing) flips autoScroll to false via a stray
+  // scroll event with scrollTop=0, and never auto-scrolls again.
+  // Playtest 2026-05-03 [UX]: P2's tab missed every new turn (scrollH=2247
+  // clientH=1061 scrollTop=0 after new turn) while P1's tab tracked
+  // correctly because P1 was actively engaged and stayed near the bottom.
+  const prevSeparatorIdx = useRef<number>(-1);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -48,10 +58,20 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && autoScroll.current) {
+    if (!el) return;
+    const newTurnLanded = lastSeparatorIdx > prevSeparatorIdx.current;
+    if (newTurnLanded || autoScroll.current) {
       el.scrollTop = el.scrollHeight - el.clientHeight;
+      // A force-scroll on new turn also resets autoScroll so subsequent
+      // streaming chunks keep tracking the bottom (the player is now
+      // looking at the latest beat — reading history mid-turn opts back
+      // out via the scroll-up handler).
+      if (newTurnLanded) {
+        autoScroll.current = true;
+      }
     }
-  }, [segments, thinking]);
+    prevSeparatorIdx.current = lastSeparatorIdx;
+  }, [segments, thinking, lastSeparatorIdx]);
 
   const hasHistory = lastSeparatorIdx >= 0;
   const historySegments = hasHistory ? segments.slice(0, lastSeparatorIdx) : [];

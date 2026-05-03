@@ -125,6 +125,48 @@ describe("NarrativeView", () => {
     expect(scrollEl!.scrollTop).toBe(prevScrollTop);
   });
 
+  // -- new turn force-scrolls past stale "user scrolled up" gate -----------
+  // Playtest 2026-05-03 [UX]: P2's tab missed every new turn because a
+  // mount-time layout shift fired a stray scroll event that flipped
+  // autoScroll to false; new-turn arrivals (NARRATION_END appended a new
+  // separator) were then ignored. Fix forces a scroll-to-bottom whenever a
+  // new separator appears, regardless of the autoScroll flag — non-active
+  // players always see new turn content arrive.
+  it("force-scrolls to bottom when a new turn (separator) lands", () => {
+    const messages = Array.from({ length: 20 }, (_, i) =>
+      narration(`Paragraph ${i + 1}. `.repeat(5)),
+    );
+    const { rerender } = render(<NarrativeView messages={messages} />);
+
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
+    expect(scrollEl).not.toBeNull();
+
+    // Simulate the mount-time layout shift: a stray scroll event fires with
+    // scrollTop=0 before the user has touched anything.
+    Object.defineProperty(scrollEl!, "scrollTop", {
+      value: 0,
+      writable: true,
+    });
+    scrollEl!.dispatchEvent(new Event("scroll", { bubbles: true }));
+
+    // A new turn arrives (NARRATION_END appended → new separator). Even
+    // though autoScroll was flipped false above, the new-turn force-scroll
+    // path must drag the panel to the bottom so the peer player sees it.
+    rerender(
+      <NarrativeView
+        messages={[
+          ...messages,
+          narrationEnd(),
+          narration("New turn — Inspector Volkova fans the manifest."),
+        ]}
+      />,
+    );
+
+    expect(scrollEl!.scrollTop).toBe(
+      scrollEl!.scrollHeight - scrollEl!.clientHeight,
+    );
+  });
+
   // -- resume auto-scroll on scroll to bottom --------------------------------
   it("resumes auto-scroll when user scrolls back to bottom", () => {
     const messages = Array.from({ length: 20 }, (_, i) =>

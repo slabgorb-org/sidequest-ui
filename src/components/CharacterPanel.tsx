@@ -34,6 +34,25 @@ export interface CharacterPanelProps {
   characters?: CharacterSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
+  /**
+   * Per-player submission state for the current round (simultaneous-action
+   * MP model). When provided, drives the ACTING/WAITING badges instead of
+   * ``activePlayerId`` — a player IN this set has submitted (badge =
+   * "Waiting"), one NOT in it still has the floor (badge = "Acting").
+   *
+   * Derived in ``App.tsx`` from ``turnStatusEntries`` (server-emitted, one
+   * entry per submission, cleared on TURN_STATUS{status="resolved"}).
+   *
+   * Pingpong 2026-05-03 [BUG] floor/turn-status inconsistent: the prior
+   * activePlayerId-only logic encodes sequential-turn semantics ("it's
+   * X's turn"). In the simultaneous-action MP model both PCs act per
+   * round, so ``activePlayerId`` is either null or stale-pointing to
+   * whichever PC submitted last — labels then invert (the player who
+   * already submitted shows ACTING, the player still composing shows
+   * WAITING). When ``submittedPlayerIds`` is provided, that source wins
+   * and the badges match the per-player banner truth.
+   */
+  submittedPlayerIds?: ReadonlySet<string>;
   /** Magic ledger state (Coyote Star Phase 4). Null when the world has
    *  no magic configured — LedgerPanel renders nothing. characterId for
    *  ledger lookup is character.name (matches server add_character() contract).
@@ -64,6 +83,7 @@ export function CharacterPanel({
   characters = [],
   currentPlayerId,
   activePlayerId,
+  submittedPlayerIds,
   magicState = null,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
@@ -197,8 +217,25 @@ export function CharacterPanel({
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">Party</h3>
           {characters.map((c) => {
             const isSelf = currentPlayerId !== undefined && c.player_id === currentPlayerId;
-            const isActing = activePlayerId !== undefined && activePlayerId !== null && c.player_id === activePlayerId;
-            const isWaiting = activePlayerId !== undefined && activePlayerId !== null && c.player_id !== activePlayerId;
+            // Per-player submission state wins when present (simultaneous-action
+            // MP). Falls back to single-active-player semantics for sequential
+            // turns / solo / pre-MP. See ``submittedPlayerIds`` prop docstring.
+            let isActing: boolean;
+            let isWaiting: boolean;
+            if (submittedPlayerIds !== undefined) {
+              const submitted = submittedPlayerIds.has(c.player_id);
+              isActing = !submitted;
+              isWaiting = submitted;
+            } else {
+              isActing =
+                activePlayerId !== undefined &&
+                activePlayerId !== null &&
+                c.player_id === activePlayerId;
+              isWaiting =
+                activePlayerId !== undefined &&
+                activePlayerId !== null &&
+                c.player_id !== activePlayerId;
+            }
             return (
               <div
                 key={c.player_id}
