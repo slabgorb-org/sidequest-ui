@@ -242,9 +242,10 @@ export function GameBoard({
     available.add("knowledge");
     available.add("gallery");
     available.add("audio");
+    if (worldSlug === "coyote_star") available.add("ship");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [confrontationData]);
+  }, [confrontationData, worldSlug]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
