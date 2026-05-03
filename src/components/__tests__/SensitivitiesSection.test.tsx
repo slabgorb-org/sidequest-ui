@@ -52,4 +52,24 @@ describe("SensitivitiesSection", () => {
     expect(screen.getByText(/you hear what the others don't\. sometimes\./i)).toBeInTheDocument();
     expect(screen.queryByText(/something stirred/i)).not.toBeInTheDocument();
   });
+
+  it("renders expanded post-bleed copy when any character bar has drifted from starts_at_chargen", () => {
+    const ledger = Object.fromEntries([
+      // sanity drifted: starts at 1.0, now 0.95 (microbleed cost applied)
+      makeBar("sanity", "character", 0.95, 1.0),
+      makeBar("notice", "character", 0.0, 0.0),
+      makeBar("vitality", "character", 0.5, 0.5),
+    ]);
+    const state: MagicState = { config: baseConfig, ledger, working_log: [] };
+
+    render(<SensitivitiesSection magicState={state} characterId="Itchy" />);
+
+    expect(screen.getByRole("heading", { name: /sensitivities/i })).toBeInTheDocument();
+    expect(screen.getByText(/something stirred\. you felt it\./i)).toBeInTheDocument();
+    expect(screen.getByText(/sanity is the price of staying open/i)).toBeInTheDocument();
+    expect(screen.getByText(/your own words, in the input bar/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/you hear what the others don't\. sometimes\./i),
+    ).not.toBeInTheDocument();
+  });
 });
