@@ -48,6 +48,7 @@ import { MobileTabView } from "./MobileTabView";
 import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
 import { MapWidget } from "./widgets/MapWidget";
+import { ShipWidget } from "./widgets/ShipWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
 // JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts comment.
 // JournalView and the journal data pipeline are intentionally retained.
@@ -357,6 +358,12 @@ export function GameBoard({
             sendOrbitalIntent={sendOrbitalIntent}
           />
         );
+      case "ship":
+        // Single-chassis hardcode for v1 — coyote_star -> kestrel.
+        // Multi-chassis support is a follow-on (see spec §"Out of scope").
+        return worldSlug === "coyote_star" ? (
+          <ShipWidget chassisInstanceId="kestrel" />
+        ) : null;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
