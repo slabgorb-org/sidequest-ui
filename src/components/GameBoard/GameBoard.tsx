@@ -19,7 +19,7 @@ import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 
-import InputBar from "@/components/InputBar";
+import InputBar, { type InputBarRevealCall } from "@/components/InputBar";
 import { MultiplayerTurnBanner } from "@/components/MultiplayerTurnBanner";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
@@ -170,6 +170,14 @@ export interface GameBoardProps {
   peerReveals?: Map<string, PeerReveal>;
   /** Stable player_id ordering for PeerRevealList. */
   partyOrder?: string[];
+  /**
+   * ADR-036 outbound: called by InputBar on composing/submitted — App.tsx
+   * constructs the ACTION_REVEAL WS message and calls send(). Optional;
+   * single-player callers omit it.
+   */
+  onReveal?: (call: InputBarRevealCall) => void;
+  /** ADR-051 current round — forwarded to InputBar for seq reset. */
+  round?: number;
 }
 
 export function GameBoard({
@@ -209,6 +217,8 @@ export function GameBoard({
   sendOrbitalIntent,
   peerReveals,
   partyOrder = [],
+  onReveal,
+  round = 0,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -461,6 +471,8 @@ export function GameBoard({
         mobile={isMobile}
         thinking={thinking}
         waitingForPlayer={waitingForPlayer}
+        onReveal={onReveal}
+        round={round}
       />
     </div>
   );

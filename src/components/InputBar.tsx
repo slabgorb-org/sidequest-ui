@@ -1,17 +1,38 @@
-import { useState, useCallback, type KeyboardEvent } from "react";
+import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+export interface InputBarRevealCall {
+  status: "composing" | "submitted";
+  action: string;
+  aside: boolean;
+  seq: number;
+}
+
 export interface InputBarProps {
   onSend: (text: string, aside: boolean) => void;
+  /**
+   * ADR-036 Action Visibility Model: emit composing/submitted action reveal
+   * to peers. Optional — single-player and legacy callers pass nothing.
+   */
+  onReveal?: (call: InputBarRevealCall) => void;
+  /**
+   * Current ADR-051 round counter; passed in so the component can reset its
+   * monotonic seq counter on round transitions. Default 0 (single-player).
+   */
+  round?: number;
   disabled?: boolean;
   mobile?: boolean;
   thinking?: boolean;
   waitingForPlayer?: string;
 }
 
+const COMPOSING_DEBOUNCE_MS = 250;
+
 export default function InputBar({
   onSend,
+  onReveal,
+  round = 0,
   disabled,
   mobile,
   thinking,
@@ -20,9 +41,58 @@ export default function InputBar({
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
 
+  // Monotonic seq per round; resets when round prop changes.
+  // Held in a ref so debounce flushes can read+increment without
+  // re-rendering on every keystroke.
+  const seqRef = useRef(0);
+  useEffect(() => {
+    seqRef.current = 0;
+  }, [round]);
+
+  // Keep a stable ref to onReveal so the debounce timeout closure doesn't
+  // capture a stale value. We do NOT add onReveal to the debounce effect's
+  // dep array — changes to the callback should not restart the debounce timer.
+  const onRevealRef = useRef(onReveal);
+  useEffect(() => {
+    onRevealRef.current = onReveal;
+  });
+
+  // Debounced composing broadcast — fires 250ms after the last keystroke.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!onRevealRef.current) return;
+    if (text.length === 0) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onRevealRef.current?.({
+        status: "composing",
+        action: text,
+        aside,
+        seq: seqRef.current++,
+      });
+    }, COMPOSING_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // aside intentionally included so a toggle re-debounces with the new flag
+  }, [text, aside]);
+
   const submit = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    // Cancel pending composing — submitted supersedes it.
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (onRevealRef.current) {
+      onRevealRef.current({
+        status: "submitted",
+        action: trimmed,
+        aside,
+        seq: seqRef.current++,
+      });
+    }
     onSend(trimmed, aside);
     setText("");
   }, [text, aside, onSend]);
