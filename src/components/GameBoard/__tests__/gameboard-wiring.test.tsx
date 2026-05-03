@@ -67,7 +67,7 @@ describe("GameBoard wiring", () => {
     // `lore` was absorbed into `knowledge` (backstory now renders as a
     // header section inside KnowledgeJournal).
     const requiredIds = [
-      "narrative", "character", "inventory", "map",
+      "narrative", "character", "inventory", "map", "ship",
       // "journal" removed playtest 2026-04-11 — empty Handouts tab.
       "knowledge", "gallery",
       "confrontation", "audio",
@@ -75,6 +75,33 @@ describe("GameBoard wiring", () => {
     for (const id of requiredIds) {
       expect(mod.WIDGET_REGISTRY[id as keyof typeof mod.WIDGET_REGISTRY]).toBeDefined();
     }
+  });
+
+  // Regression guard for sq-playtest 2026-05-03 [BUG] Ship widget registered
+  // but never appears in dockview. The render branch for `ship` already
+  // existed (gated by worldSlug === "coyote_star") and the registry entry
+  // existed, but availableWidgets never added "ship", so the dockview's
+  // initial layout skipped it entirely. Comment in GameBoard.tsx makes the
+  // contract explicit: every widget that should ever appear MUST be added
+  // to availableWidgets at mount.
+  it("availableWidgets adds 'ship' when worldSlug === 'coyote_star'", async () => {
+    const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+      default: string;
+    };
+    expect(src.default).toMatch(
+      /worldSlug\s*===\s*["']coyote_star["']\s*\)\s*available\.add\(\s*["']ship["']\s*\)/,
+    );
+  });
+
+  it("availableWidgets useMemo deps include worldSlug (so ship appears on world bind)", async () => {
+    const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+      default: string;
+    };
+    const memoMatch = src.default.match(
+      /const availableWidgets = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]*)\]\)/,
+    );
+    expect(memoMatch).not.toBeNull();
+    expect(memoMatch![1]).toContain("worldSlug");
   });
 
   // Source-level regression guards for the sq-playtest 2026-04-09 fix:
