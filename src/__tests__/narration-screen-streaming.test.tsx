@@ -75,6 +75,7 @@ describe("NarrationScroll — streaming display", () => {
         ],
       ]),
       activeTurnId: "t-1",
+      activeTurnStartedAt: null,
     };
 
     // messages has NO NARRATION for t-1 (canonical not yet arrived)
@@ -111,6 +112,7 @@ describe("NarrationScroll — streaming display", () => {
       ]),
       // activeTurnId is null because canonical has landed (reducer clears it)
       activeTurnId: null,
+      activeTurnStartedAt: null,
     };
 
     await act(async () => {
@@ -137,6 +139,7 @@ describe("NarrationScroll — streaming display", () => {
         ],
       ]),
       activeTurnId: "wire-1",
+      activeTurnStartedAt: null,
     };
 
     await act(async () => {
@@ -158,6 +161,7 @@ describe("NarrationScroll — streaming display", () => {
     const streaming: StreamingNarrationState = {
       turns: new Map(),
       activeTurnId: null,
+      activeTurnStartedAt: null,
     };
 
     await act(async () => {
@@ -175,6 +179,7 @@ describe("NarrationScroll — streaming display", () => {
     const streaming: StreamingNarrationState = {
       turns: new Map(), // no entry for "orphan-1"
       activeTurnId: "orphan-1",
+      activeTurnStartedAt: null,
     };
 
     await act(async () => {

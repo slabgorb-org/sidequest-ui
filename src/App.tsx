@@ -24,7 +24,7 @@ import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload } from "@/types/payloads";
 import type {
   OrbitalIntent,
   OrbitalIntentResponse,
@@ -874,10 +874,11 @@ function AppInner() {
     // the default; in practice the server emits validation errors with
     // that same default and they were getting wrongly escalated.
     if (msg.type === MessageType.ERROR) {
-      const code = msg.payload.code ?? null;
+      const errorPayload = msg.payload as unknown as ErrorPayload;
+      const code = errorPayload.code ?? null;
       const isFatal = code !== null && FATAL_ERROR_CODES.has(code);
       if (isFatal) {
-        setFatalError({ message: msg.payload.message, code });
+        setFatalError({ message: errorPayload.message, code });
         disconnectRef.current?.();
         return;
       }
@@ -926,7 +927,7 @@ function AppInner() {
       // The raw payload (often a Pydantic dump) goes to the console for
       // dev/OTEL but never to the player surface.
       console.warn("server rejected message", msg.payload);
-      setTransientError(sanitizeErrorMessage(msg.payload.message));
+      setTransientError(sanitizeErrorMessage(errorPayload.message));
       // Server has nothing more to send for this turn — clear thinking
       // so the input bar re-enables and the player can correct.
       setThinking(false);
@@ -1070,12 +1071,16 @@ function AppInner() {
       // server-side default of 1 when absent. Replaces the legacy
       // `metric_delta` field that was removed in the dual-track migration.
       const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.base ?? 1) * 2));
-      const charName = characterSheet?.name ?? character?.name ?? "Unknown";
+      const charSheetName = characterSheet?.name;
+      const charLooseName = character?.name;
+      const charName: string =
+        charSheetName ??
+        (typeof charLooseName === "string" ? charLooseName : "Unknown");
       const localReq: DiceRequestPayload = {
         request_id: makeRequestId(),
         rolling_player_id: currentPlayerId ?? "",
         character_name: charName,
-        dice: [{ sides: "d20", count: 1 }],
+        dice: [{ sides: 20, count: 1 }],
         modifier,
         stat: beat.stat_check,
         difficulty: rawDc,

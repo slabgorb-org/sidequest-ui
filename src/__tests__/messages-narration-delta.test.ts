@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isNarrationDelta, NarrationDelta } from "../types/payloads";
+import { isNarrationDelta, type NarrationDelta } from "../types/payloads";
 
 describe("NarrationDelta type and guard", () => {
   it("isNarrationDelta returns true for a narration.delta message", () => {

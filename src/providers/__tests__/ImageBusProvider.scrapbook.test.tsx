@@ -11,7 +11,8 @@
  * them, the provider passes them through without code change.
  */
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi, type ReactNode } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import type { ReactNode } from "react";
 import {
   ImageBusProvider,
   useImageBus,
@@ -122,14 +123,12 @@ describe("ImageBusProvider — scrapbook field passthrough", () => {
       imageMessage({
         url: "https://example.invalid/a.webp",
         render_id: "r-string-true",
-        // @ts-expect-error — deliberately malformed payload
-        handout: "true",
+        handout: "true", // deliberately malformed payload — verified loosely by Record<string, unknown>
       }),
       imageMessage({
         url: "https://example.invalid/b.webp",
         render_id: "r-number-one",
-        // @ts-expect-error — deliberately malformed payload
-        handout: 1,
+        handout: 1, // deliberately malformed payload
       }),
       imageMessage({
         url: "https://example.invalid/c.webp",

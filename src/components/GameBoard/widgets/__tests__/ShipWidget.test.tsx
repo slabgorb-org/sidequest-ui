@@ -46,7 +46,7 @@ describe("ShipWidget", () => {
 
   it("renders a loading placeholder before the SVG arrives", () => {
     // Block fetch so the SVG never resolves during this assertion.
-    global.fetch = vi.fn(() => new Promise(() => {}));
+    global.fetch = vi.fn(() => new Promise(() => {})) as unknown as typeof fetch;
     const { getByText } = render(<ShipWidget chassisInstanceId="kestrel" />);
     expect(getByText(/loading ship interior/i)).toBeTruthy();
   });
