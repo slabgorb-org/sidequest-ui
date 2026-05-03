@@ -13,6 +13,7 @@ interface KnowledgeJournalProps {
 export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournalProps) {
   const [activeCategory, setActiveCategory] = useState<FactCategory | 'All'>('All');
   const [sortMode, setSortMode] = useState<SortMode>('chronological');
+  const [keyword, setKeyword] = useState('');
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -30,10 +31,23 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
     );
   }
 
-  const filtered =
+  const categoryFiltered =
     activeCategory === 'All'
       ? entries
       : entries.filter((e) => e.category === activeCategory);
+
+  const tokens = keyword
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+
+  const filtered =
+    tokens.length === 0
+      ? categoryFiltered
+      : categoryFiltered.filter((e) => {
+          const content = e.content.toLowerCase();
+          return tokens.every((t) => content.includes(t));
+        });
 
   const sorted = [...filtered];
   if (sortMode === 'chronological') {
@@ -48,6 +62,32 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
 
   return (
     <div data-testid="knowledge-journal" className="p-4">
+      <div className="mb-3 relative">
+        <input
+          type="text"
+          data-testid="keyword-filter"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="Filter by keyword"
+          className="w-full text-sm px-2 py-1 pr-7 rounded
+                     border border-border/40 bg-transparent
+                     text-foreground placeholder:text-muted-foreground/50
+                     focus:outline-none focus:border-border/70 transition-colors"
+        />
+        {keyword.length > 0 && (
+          <button
+            type="button"
+            data-testid="keyword-filter-clear"
+            onClick={() => setKeyword('')}
+            aria-label="Clear keyword filter"
+            className="absolute right-1 top-1/2 -translate-y-1/2
+                       text-muted-foreground/60 hover:text-foreground
+                       text-sm leading-none px-1"
+          >
+            ×
+          </button>
+        )}
+      </div>
       <div role="tablist" className="flex gap-1 mb-3 flex-wrap">
         <button
           role="tab"
@@ -102,6 +142,14 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
       </div>
 
       <div className="space-y-2">
+        {sorted.length === 0 && tokens.length > 0 && (
+          <p
+            data-testid="keyword-filter-empty"
+            className="text-muted-foreground/60 italic text-sm py-4"
+          >
+            No entries match "{tokens.join(' ')}"
+          </p>
+        )}
         {sorted.map((entry) => (
           <div key={entry.fact_id} data-testid="journal-entry" className="text-sm border-l-2 border-border/30 pl-3 py-1">
             <p className="text-foreground/80">{entry.content}</p>

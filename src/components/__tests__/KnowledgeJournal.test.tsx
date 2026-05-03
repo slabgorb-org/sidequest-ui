@@ -270,3 +270,166 @@ describe('Edge cases', () => {
     expect(personTab).toHaveTextContent('2');
   });
 });
+
+// ---------------------------------------------------------------------------
+// AC-9: Keyword filter (spec 2026-05-03)
+// ---------------------------------------------------------------------------
+
+describe('AC-9: Keyword filter', () => {
+  it('renders a keyword filter input', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    expect(screen.getByTestId('keyword-filter')).toBeInTheDocument();
+  });
+
+  it('filters entries to those whose content contains the keyword (case-insensitive)', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+
+    // f1 (grove tree radiates corruption), f4 (find the source of corruption),
+    // f5 (Root-bonding allows you to sense corruption) — three matches.
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(3);
+    expect(screen.queryByText(/Elder Mirova/i)).not.toBeInTheDocument();
+  });
+
+  it('matches case-insensitively', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'MIROVA' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/Elder Mirova/i)).toBeInTheDocument();
+  });
+
+  it('matches substrings, not whole words', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // "rune" is a substring of "runes" (f3)
+    fireEvent.change(input, { target: { value: 'rune' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/ancient runes/i)).toBeInTheDocument();
+  });
+
+  it('shows all entries when input is empty', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+    fireEvent.change(input, { target: { value: '' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
+
+  it('shows all entries when input is whitespace-only', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '   ' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
+
+  it('narrows by AND across multiple tokens', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // "corruption sense" should match only f5 (Root-bonding allows you to
+    // sense corruption) — both tokens present in content. f1 has corruption
+    // but not sense; f4 has corruption but not sense.
+    fireEvent.change(input, { target: { value: 'corruption sense' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/Root-bonding/i)).toBeInTheDocument();
+  });
+
+  it('treats each whitespace-separated token as an independent substring', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // f6 ("hooded figure was seen near the well at midnight") contains
+    // both "well" and "midnight". Token order does not matter.
+    fireEvent.change(input, { target: { value: 'midnight well' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/hooded figure/i)).toBeInTheDocument();
+  });
+
+  it('shows empty-result message when filters yield zero matches', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'xyznomatch' } });
+
+    expect(screen.queryAllByTestId('journal-entry')).toHaveLength(0);
+    expect(screen.getByTestId('keyword-filter-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('keyword-filter-empty')).toHaveTextContent(/xyznomatch/);
+  });
+
+  it('does NOT show empty-result message when filter is empty', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    expect(screen.queryByTestId('keyword-filter-empty')).not.toBeInTheDocument();
+  });
+
+  it('renders a clear button when the input has text', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    expect(screen.queryByTestId('keyword-filter-clear')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+
+    expect(screen.getByTestId('keyword-filter-clear')).toBeInTheDocument();
+  });
+
+  it('clears the keyword when the clear button is clicked', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(3);
+
+    fireEvent.click(screen.getByTestId('keyword-filter-clear'));
+
+    expect(input.value).toBe('');
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
+
+  it('stacks with the active category tab (intersection, not replace)', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // Activate Person tab — should show f2 (Elder Mirova) and f6 (hooded figure).
+    fireEvent.click(screen.getByRole('tab', { name: /person/i }));
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(2);
+
+    // Type 'well' — both f2 (...beneath the well) and f6 (...near the well...)
+    // contain 'well'. With Person tab still active, both should remain.
+    fireEvent.change(input, { target: { value: 'well' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(2);
+
+    // Type 'midnight' — only f6 contains 'midnight'. Person tab still active.
+    fireEvent.change(input, { target: { value: 'midnight' } });
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/hooded figure/i)).toBeInTheDocument();
+
+    // Verify no Lore entries (e.g. f3 ancient runes) leak in despite matching nothing.
+    expect(screen.queryByText(/ancient runes/i)).not.toBeInTheDocument();
+  });
+
+  it('KnowledgeWidget (the dock wrapper) renders KnowledgeJournal with the keyword filter', async () => {
+    // Wiring guard: per CLAUDE.md "Every Test Suite Needs a Wiring Test" —
+    // unit tests prove KnowledgeJournal works in isolation; this confirms
+    // it's mounted from the production dock path so the keyword filter is
+    // actually reachable by players.
+    const mod = await import('@/components/GameBoard/widgets/KnowledgeWidget');
+    expect(typeof mod.KnowledgeWidget).toBe('function');
+
+    const sample: KnowledgeEntry[] = [ENTRIES[0]];
+    render(<mod.KnowledgeWidget entries={sample} />);
+    expect(screen.getByTestId('keyword-filter')).toBeInTheDocument();
+  });
+});
