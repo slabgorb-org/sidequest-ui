@@ -38,6 +38,8 @@ import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type { PeerReveal } from "@/hooks/usePeerReveals";
+import { PeerRevealList } from "@/components/PeerRevealList";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 import type { MagicState } from "@/types/magic";
 import type { OrbitalIntent, OrbitalIntentResponse } from "@/types/orbital-intent";
@@ -164,6 +166,10 @@ export interface GameBoardProps {
   lastOrbitalChart?: OrbitalIntentResponse | null;
   /** Sends an OrbitalIntent over the WebSocket — feeds MapWidget. */
   sendOrbitalIntent?: (intent: OrbitalIntent) => void;
+  /** Peer reveal map — live teammate typing indicators (Task 12). */
+  peerReveals?: Map<string, PeerReveal>;
+  /** Stable player_id ordering for PeerRevealList. */
+  partyOrder?: string[];
 }
 
 export function GameBoard({
@@ -201,6 +207,8 @@ export function GameBoard({
   magicState,
   lastOrbitalChart,
   sendOrbitalIntent,
+  peerReveals,
+  partyOrder = [],
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -429,6 +437,7 @@ export function GameBoard({
     null;
   const inputBar = (
     <div className="flex flex-col">
+      <PeerRevealList reveals={peerReveals ?? new Map()} partyOrder={partyOrder} />
       <MultiplayerTurnBanner
         isMultiplayer={isMultiplayer}
         // ``disabled`` is true when WS is closed *or* input is locked

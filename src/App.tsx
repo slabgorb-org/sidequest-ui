@@ -24,7 +24,8 @@ import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload } from "@/types/payloads";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry } from "@/types/payloads";
+import { usePeerReveals } from "@/hooks/usePeerReveals";
 import type {
   OrbitalIntent,
   OrbitalIntentResponse,
@@ -323,6 +324,9 @@ function AppInner() {
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>("");
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
+  // Current round counter — updated from ACTION_REVEAL payloads. Starts at 0;
+  // first ACTION_REVEAL advances it to the actual round from the server.
+  const [currentRound, setCurrentRound] = useState(0);
 
   // Pause-on-drop (MP-02): server broadcasts GAME_PAUSED when any seated
   // player disconnects and GAME_RESUMED when all seated players are back.
@@ -391,6 +395,11 @@ function AppInner() {
   // Beat ID pending a client-side dice roll — set when user picks a beat,
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
+
+  // Ref bridge: peerReveals.apply is defined after handleMessage (useCallback).
+  // Updated synchronously alongside sendRef so handleMessage always calls the
+  // current closure without the circular dep.
+  const peerRevealsApplyRef = useRef<((entry: ActionRevealEntry) => void) | null>(null);
 
   // Dice overlay persists after result so the table can see "rolled N vs
   // target M → outcome" through the narrator's resolution. Cleared by:
@@ -701,6 +710,16 @@ function AppInner() {
         );
       }
 
+      return;
+    }
+
+    // Live teammate typing — peer action reveals for the current round.
+    // Update the round counter from the payload so the hook receives the
+    // canonical round value emitted by the server.
+    if (msg.type === MessageType.ACTION_REVEAL) {
+      const entry = msg.payload as unknown as ActionRevealEntry;
+      setCurrentRound(entry.round);
+      peerRevealsApplyRef.current?.(entry);
       return;
     }
 
@@ -1027,6 +1046,14 @@ function AppInner() {
   const currentPlayerId = useMemo(
     () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
     [partyMembers, connectedPlayerName],
+  );
+
+  const peerReveals = usePeerReveals({ selfPlayerId: currentPlayerId, round: currentRound });
+  peerRevealsApplyRef.current = peerReveals.apply;
+
+  const partyOrder = useMemo(
+    () => partyMembers.map((m) => m.player_id),
+    [partyMembers],
   );
 
   // Structured beat dispatch via BEAT_SELECTION protocol message.
@@ -1808,6 +1835,8 @@ function AppInner() {
                 magicState={gameState.magicState ?? null}
                 lastOrbitalChart={lastOrbitalChart}
                 sendOrbitalIntent={sendOrbitalIntent}
+                peerReveals={peerReveals.reveals}
+                partyOrder={partyOrder}
               />
             </ImageBusProvider>
             {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
