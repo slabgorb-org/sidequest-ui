@@ -11,6 +11,14 @@ export interface UseOrbitalChartArgs {
   sendIntent: (intent: OrbitalIntent) => void;
   /** Most recent ORBITAL_CHART response, or null if none yet. */
   lastResponse: OrbitalIntentResponse | null;
+  /**
+   * Bumps when the server-side plotted_course changes (via STATE_PATCH).
+   * Drives a re-fetch of the current view so the chart redraws with the
+   * new overlay (or without it on cancel). Caller derives this from the
+   * snapshot mirror — typically ``plotted_course?.to_body_id`` hashed
+   * with ``plotted_course?.plotted_at_t_hours``.
+   */
+  plottedCourseRevision: number;
 }
 
 export interface UseOrbitalChartReturn {
@@ -30,13 +38,20 @@ export interface UseOrbitalChartReturn {
  * enable transition: an internal ref tracks whether we've already kicked
  * the initial view_map for the current enable cycle, so re-renders don't
  * spam additional fetches while the response is in flight.
+ *
+ * ``plottedCourseRevision`` drives a re-fetch whenever the server-side
+ * plotted_course changes. The initial enable suppresses the watcher (the
+ * existing initial-fetch effect handles that), so we don't double-fetch
+ * on mount.
  */
 export function useOrbitalChart({
   enabled,
   sendIntent,
   lastResponse,
+  plottedCourseRevision,
 }: UseOrbitalChartArgs): UseOrbitalChartReturn {
   const fetchedForCycle = useRef(false);
+  const lastPlottedRevision = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) {
@@ -48,6 +63,21 @@ export function useOrbitalChart({
       sendIntent({ kind: "view_map", scope: "system_root" });
     }
   }, [enabled, sendIntent]);
+
+  useEffect(() => {
+    if (!enabled) {
+      lastPlottedRevision.current = null;
+      return;
+    }
+    if (lastPlottedRevision.current === null) {
+      lastPlottedRevision.current = plottedCourseRevision;
+      return; // initial enable handles its own fetch via the existing effect
+    }
+    if (plottedCourseRevision !== lastPlottedRevision.current) {
+      lastPlottedRevision.current = plottedCourseRevision;
+      sendIntent({ kind: "view_map", scope: "system_root" });
+    }
+  }, [enabled, plottedCourseRevision, sendIntent]);
 
   const onIntent = useCallback(
     (intent: OrbitalIntent) => sendIntent(intent),
