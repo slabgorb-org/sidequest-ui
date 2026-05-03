@@ -270,3 +270,66 @@ describe('Edge cases', () => {
     expect(personTab).toHaveTextContent('2');
   });
 });
+
+// ---------------------------------------------------------------------------
+// AC-9: Keyword filter (spec 2026-05-03)
+// ---------------------------------------------------------------------------
+
+describe('AC-9: Keyword filter', () => {
+  it('renders a keyword filter input', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    expect(screen.getByTestId('keyword-filter')).toBeInTheDocument();
+  });
+
+  it('filters entries to those whose content contains the keyword (case-insensitive)', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+
+    // f1 (grove tree radiates corruption), f4 (find the source of corruption),
+    // f5 (Root-bonding allows you to sense corruption) — three matches.
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(3);
+    expect(screen.queryByText(/Elder Mirova/i)).not.toBeInTheDocument();
+  });
+
+  it('matches case-insensitively', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'MIROVA' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/Elder Mirova/i)).toBeInTheDocument();
+  });
+
+  it('matches substrings, not whole words', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    // "rune" is a substring of "runes" (f3)
+    fireEvent.change(input, { target: { value: 'rune' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(1);
+    expect(screen.getByText(/ancient runes/i)).toBeInTheDocument();
+  });
+
+  it('shows all entries when input is empty', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'corruption' } });
+    fireEvent.change(input, { target: { value: '' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
+
+  it('shows all entries when input is whitespace-only', () => {
+    render(<KnowledgeJournal entries={ENTRIES} />);
+    const input = screen.getByTestId('keyword-filter') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '   ' } });
+
+    expect(screen.getAllByTestId('journal-entry')).toHaveLength(ENTRIES.length);
+  });
+});

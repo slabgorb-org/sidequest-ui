@@ -13,6 +13,7 @@ interface KnowledgeJournalProps {
 export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournalProps) {
   const [activeCategory, setActiveCategory] = useState<FactCategory | 'All'>('All');
   const [sortMode, setSortMode] = useState<SortMode>('chronological');
+  const [keyword, setKeyword] = useState('');
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -30,10 +31,23 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
     );
   }
 
-  const filtered =
+  const categoryFiltered =
     activeCategory === 'All'
       ? entries
       : entries.filter((e) => e.category === activeCategory);
+
+  const tokens = keyword
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+
+  const filtered =
+    tokens.length === 0
+      ? categoryFiltered
+      : categoryFiltered.filter((e) => {
+          const content = e.content.toLowerCase();
+          return tokens.every((t) => content.includes(t));
+        });
 
   const sorted = [...filtered];
   if (sortMode === 'chronological') {
@@ -48,6 +62,19 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
 
   return (
     <div data-testid="knowledge-journal" className="p-4">
+      <div className="mb-3">
+        <input
+          type="text"
+          data-testid="keyword-filter"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="Filter by keyword"
+          className="w-full text-sm px-2 py-1 rounded
+                     border border-border/40 bg-transparent
+                     text-foreground placeholder:text-muted-foreground/50
+                     focus:outline-none focus:border-border/70 transition-colors"
+        />
+      </div>
       <div role="tablist" className="flex gap-1 mb-3 flex-wrap">
         <button
           role="tab"
