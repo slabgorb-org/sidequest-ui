@@ -164,6 +164,12 @@ export interface GameBoardProps {
   lastOrbitalChart?: OrbitalIntentResponse | null;
   /** Sends an OrbitalIntent over the WebSocket — feeds MapWidget. */
   sendOrbitalIntent?: (intent: OrbitalIntent) => void;
+  /**
+   * Bumps on every SESSION_EVENT{ready}/{connected} so MapWidget's
+   * orbital hook can recover from an ORBITAL_INTENT rejected at
+   * AwaitingConnect (sq-playtest 2026-05-03 fix).
+   */
+  sessionBoundEpoch?: number;
 }
 
 export function GameBoard({
@@ -201,6 +207,7 @@ export function GameBoard({
   magicState,
   lastOrbitalChart,
   sendOrbitalIntent,
+  sessionBoundEpoch = 0,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -373,6 +380,7 @@ export function GameBoard({
             worldSlug={worldSlug}
             lastOrbitalChart={lastOrbitalChart ?? null}
             sendOrbitalIntent={sendOrbitalIntent}
+            sessionBoundEpoch={sessionBoundEpoch}
           />
         );
       case "ship":
@@ -416,7 +424,8 @@ export function GameBoard({
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent]);
+      activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent,
+      sessionBoundEpoch]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
   const isMultiplayer =

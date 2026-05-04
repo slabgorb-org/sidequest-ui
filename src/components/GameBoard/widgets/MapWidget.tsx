@@ -20,6 +20,14 @@ interface MapWidgetProps {
   lastOrbitalChart?: OrbitalIntentResponse | null;
   /** Send an OrbitalIntent over the WebSocket. */
   sendOrbitalIntent?: (intent: OrbitalIntent) => void;
+  /**
+   * Bumps every time SESSION_EVENT{ready}/{connected} arrives so the
+   * orbital hook re-fetches the initial view_map after a fresh bind.
+   * See ``useOrbitalChart`` JSDoc for the AwaitingConnect/zombie-bind
+   * races this unsticks. Defaults to 0 — non-orbital worlds and tests
+   * that don't drive reconnects don't need to thread it.
+   */
+  sessionBoundEpoch?: number;
 }
 
 /**
@@ -50,6 +58,7 @@ export function MapWidget({
   worldSlug,
   lastOrbitalChart = null,
   sendOrbitalIntent,
+  sessionBoundEpoch = 0,
 }: MapWidgetProps) {
   const orbitalEnabled = worldSlug !== undefined && ORBITAL_WORLD_SLUGS.has(worldSlug);
   const noopIntent = useMemo(() => () => {}, []);
@@ -73,6 +82,7 @@ export function MapWidget({
     sendIntent: sendOrbitalIntent ?? noopIntent,
     lastResponse: lastOrbitalChart,
     plottedCourseRevision,
+    sessionBoundEpoch,
   });
 
   const roomGraph = useMemo(

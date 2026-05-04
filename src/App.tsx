@@ -388,6 +388,13 @@ function AppInner() {
   // Orbital chart state from ORBITAL_CHART messages (orbital map Task 15b).
   // The MapWidget's useOrbitalChart hook consumes this as `lastResponse`.
   const [lastOrbitalChart, setLastOrbitalChart] = useState<OrbitalIntentResponse | null>(null);
+  // Bumps every time the server confirms session bind via
+  // SESSION_EVENT{ready} or SESSION_EVENT{connected}. Drives the orbital
+  // hook's re-fetch when its initial ORBITAL_INTENT was rejected at
+  // AwaitingConnect (sq-playtest-pingpong 2026-05-03). Deliberately NOT
+  // restored from HMR — only this page lifecycle's actual bind events
+  // count, otherwise a stale epoch would suppress the recovery fetch.
+  const [sessionBoundEpoch, setSessionBoundEpoch] = useState(0);
   // Beat ID pending a client-side dice roll — set when user picks a beat,
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
@@ -533,6 +540,17 @@ function AppInner() {
       if (event === "connected" || event === "ready") {
         setThinking(false);
         setCanType(true);
+        // sq-playtest-pingpong 2026-05-03 [BUG] Map widget stuck at
+        // "Loading orbital chart…" after WS resume. The server's per-
+        // connection state machine starts in AwaitingConnect; the orbital
+        // hook fires ORBITAL_INTENT on mount. If MapWidget mounts before
+        // the bind handshake completes (HMR-restored sessionPhase or page
+        // reload race), the server rejects with code=session_unbound and
+        // the hook's one-shot fetchedForCycle latch never re-fires. Bump
+        // an epoch on every bind confirmation so useOrbitalChart re-
+        // fetches the initial view_map after the bind lands. Same epoch
+        // covers mid-session uvicorn --reload zombie-bind recovery.
+        setSessionBoundEpoch((n) => n + 1);
       }
       if (event === "waiting") {
         // Server says barrier is active and this player already submitted —
@@ -1808,6 +1826,7 @@ function AppInner() {
                 magicState={gameState.magicState ?? null}
                 lastOrbitalChart={lastOrbitalChart}
                 sendOrbitalIntent={sendOrbitalIntent}
+                sessionBoundEpoch={sessionBoundEpoch}
               />
             </ImageBusProvider>
             {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}

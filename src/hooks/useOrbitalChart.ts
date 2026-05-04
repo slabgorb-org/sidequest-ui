@@ -19,6 +19,27 @@ export interface UseOrbitalChartArgs {
    * with ``plotted_course?.plotted_at_t_hours``.
    */
   plottedCourseRevision: number;
+  /**
+   * Bumps every time the WebSocket session is freshly bound — i.e. the
+   * server emitted SESSION_EVENT{ready} or SESSION_EVENT{connected} in
+   * this page lifecycle. Drives a re-fetch of the initial view_map so
+   * the chart recovers when the widget mounted before the session was
+   * bound. Two real-world races this unsticks (sq-playtest 2026-05-03):
+   *
+   * 1. HMR-restored ``sessionPhase=game`` after a hard reload — GameBoard
+   *    mounts immediately, MapWidget fires ORBITAL_INTENT, but the
+   *    server's per-connection state machine is still in
+   *    ``AwaitingConnect`` and rejects with ``code=session_unbound``.
+   *    The client auto-rebinds via SESSION_EVENT{connect}, the server
+   *    emits SESSION_EVENT{ready}, and this epoch bumps so the hook
+   *    re-fires the view_map after the bind completes.
+   *
+   * 2. uvicorn ``--reload`` zombies session binding mid-game — same
+   *    auto-rebind contract; same epoch bump triggers a fresh fetch so
+   *    the chart reflects post-reconnect state instead of staying
+   *    stuck on the pre-reconnect SVG.
+   */
+  sessionBoundEpoch: number;
 }
 
 export interface UseOrbitalChartReturn {
@@ -49,20 +70,25 @@ export function useOrbitalChart({
   sendIntent,
   lastResponse,
   plottedCourseRevision,
+  sessionBoundEpoch,
 }: UseOrbitalChartArgs): UseOrbitalChartReturn {
   const fetchedForCycle = useRef(false);
+  const lastFetchedEpoch = useRef<number | null>(null);
   const lastPlottedRevision = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       fetchedForCycle.current = false;
+      lastFetchedEpoch.current = null;
       return;
     }
-    if (!fetchedForCycle.current) {
+    const epochChanged = lastFetchedEpoch.current !== sessionBoundEpoch;
+    if (!fetchedForCycle.current || epochChanged) {
       fetchedForCycle.current = true;
+      lastFetchedEpoch.current = sessionBoundEpoch;
       sendIntent({ kind: "view_map", scope: "system_root" });
     }
-  }, [enabled, sendIntent]);
+  }, [enabled, sendIntent, sessionBoundEpoch]);
 
   useEffect(() => {
     if (!enabled) {
