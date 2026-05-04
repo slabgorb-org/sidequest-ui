@@ -23,6 +23,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
         sendIntent,
         lastResponse: null,
         plottedCourseRevision: 0,
+        sessionBoundEpoch: 0,
       }),
     );
     expect(sendIntent).toHaveBeenCalledWith({
@@ -40,6 +41,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
           sendIntent,
           lastResponse: baseResponse,
           plottedCourseRevision: rev,
+          sessionBoundEpoch: 0,
         }),
       { initialProps: { rev: 0 } },
     );
@@ -60,6 +62,7 @@ describe("useOrbitalChart — plotted_course refetch", () => {
           sendIntent,
           lastResponse: baseResponse,
           plottedCourseRevision: rev,
+          sessionBoundEpoch: 0,
         }),
       { initialProps: { rev: 5 } },
     );
