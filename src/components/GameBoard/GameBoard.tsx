@@ -19,7 +19,7 @@ import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 
-import InputBar from "@/components/InputBar";
+import InputBar, { type InputBarRevealCall } from "@/components/InputBar";
 import { MultiplayerTurnBanner } from "@/components/MultiplayerTurnBanner";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
@@ -38,6 +38,8 @@ import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type { PeerReveal } from "@/hooks/usePeerReveals";
+import { PeerRevealList } from "@/components/PeerRevealList";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 import type { MagicState } from "@/types/magic";
 import type { OrbitalIntent, OrbitalIntentResponse } from "@/types/orbital-intent";
@@ -170,6 +172,18 @@ export interface GameBoardProps {
    * AwaitingConnect (sq-playtest 2026-05-03 fix).
    */
   sessionBoundEpoch?: number;
+  /** Peer reveal map — live teammate typing indicators (Task 12). */
+  peerReveals?: Map<string, PeerReveal>;
+  /** Stable player_id ordering for PeerRevealList. */
+  partyOrder?: string[];
+  /**
+   * ADR-036 outbound: called by InputBar on composing/submitted — App.tsx
+   * constructs the ACTION_REVEAL WS message and calls send(). Optional;
+   * single-player callers omit it.
+   */
+  onReveal?: (call: InputBarRevealCall) => void;
+  /** ADR-051 current round — forwarded to InputBar for seq reset. */
+  round?: number;
 }
 
 export function GameBoard({
@@ -208,6 +222,10 @@ export function GameBoard({
   lastOrbitalChart,
   sendOrbitalIntent,
   sessionBoundEpoch = 0,
+  peerReveals,
+  partyOrder = [],
+  onReveal,
+  round = 0,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -438,6 +456,7 @@ export function GameBoard({
     null;
   const inputBar = (
     <div className="flex flex-col">
+      <PeerRevealList reveals={peerReveals ?? new Map()} partyOrder={partyOrder} />
       <MultiplayerTurnBanner
         isMultiplayer={isMultiplayer}
         // ``disabled`` is true when WS is closed *or* input is locked
@@ -461,6 +480,8 @@ export function GameBoard({
         mobile={isMobile}
         thinking={thinking}
         waitingForPlayer={waitingForPlayer}
+        onReveal={onReveal}
+        round={round}
       />
     </div>
   );
