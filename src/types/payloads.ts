@@ -23,10 +23,16 @@ export interface FootnoteData {
   is_new?: boolean;
 }
 
+export type ActionRevealStatus = "composing" | "submitted" | "cleared";
+
 export interface ActionRevealEntry {
-  character_name: string;
   player_id: string;
+  character_name: string;
+  status: ActionRevealStatus;
   action: string;
+  aside: boolean;
+  seq: number;
+  round: number;
 }
 
 export interface TurnStatusEntry {
@@ -210,11 +216,10 @@ export interface ChapterMarkerPayload {
   location: string;
 }
 
-export interface ActionRevealPayload {
-  turn_number: number;
-  actions: ActionRevealEntry[];
-  auto_resolved?: string[];
-}
+// Wire shape: server emits one ACTION_REVEAL message per entry, not a batch.
+// The previous batch-of-entries shape was an unwired stub; collapsed to a
+// single-entry alias so the message matches what the server actually sends.
+export type ActionRevealPayload = ActionRevealEntry;
 
 export interface ItemDepletedPayload {
   item_name: string;

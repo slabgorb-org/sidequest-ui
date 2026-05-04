@@ -20,7 +20,7 @@
  * text/separator/gallery-notice/render-pending/image/portrait-group
  * segments) and INSERT the marker at that boundary. The walk stops at
  * any "structural" segment that delimits the previous turn:
- * player-action, player-aside, system, error, action-reveal,
+ * player-action, player-aside, system, error,
  * turn-status, or another chapter-marker.
  */
 import { describe, it, expect } from "vitest";

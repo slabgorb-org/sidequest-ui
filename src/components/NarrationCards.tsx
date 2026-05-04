@@ -14,15 +14,14 @@ export interface NarrationCardsProps {
 const TURN_STARTERS = new Set<NarrativeSegment["kind"]>([
   "player-action",
   "player-aside",
-  "action-reveal",
 ]);
 
 /**
  * Group segments into turn-based cards.
  *
- * A "turn" starts at a player-action (or action-reveal) and includes everything
- * that follows until the next turn starter. Segments before the first turn
- * starter are kept as individual cards (e.g. initial narration, system msgs).
+ * A "turn" starts at a player-action and includes everything that follows
+ * until the next turn starter. Segments before the first turn starter are
+ * kept as individual cards (e.g. initial narration, system msgs).
  */
 function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
   const turns: NarrativeSegment[][] = [];
