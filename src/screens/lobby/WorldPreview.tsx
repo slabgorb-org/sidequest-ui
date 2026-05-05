@@ -35,12 +35,11 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
   }
 
   if (!pack || !world) {
-    const prompt = !pack
-      ? "Choose a genre to see what awaits."
-      : "Choose a world.";
     return (
       <div className="flex-1 flex items-center justify-center text-center px-6 min-h-[18rem]">
-        <p className="text-base italic text-muted-foreground/50">{prompt}</p>
+        <p className="text-base italic text-muted-foreground/50">
+          Choose a world to see what awaits.
+        </p>
       </div>
     );
   }

@@ -99,44 +99,44 @@ describe("ConnectScreen", () => {
     expect(screen.getByLabelText(/what name shall be yours/i)).toBeInTheDocument();
   });
 
-  it("renders a genre radio group with one row per genre", () => {
+  it("renders a flat world radio group with one row per world across all genres", () => {
     renderConnect({ genres: GENRES });
-    const genreGroup = screen.getByRole("radiogroup", { name: /genre/i });
-    expect(genreGroup).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /low fantasy/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /road warrior/i })).toBeInTheDocument();
-  });
-
-  it("renders the empty-state preview when no genre is selected", () => {
-    renderConnect({ genres: GENRES });
-    expect(screen.getByText(/choose a genre to see what awaits/i)).toBeInTheDocument();
-  });
-
-  it("shows the world radio group only after a genre is picked", async () => {
-    const user = userEvent.setup();
-    renderConnect({ genres: GENRES });
-
-    // No world group yet.
-    expect(screen.queryByRole("radiogroup", { name: /world/i })).toBeNull();
-
-    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
-
-    // World group appears with both worlds from low_fantasy.
-    expect(screen.getByRole("radiogroup", { name: /world/i })).toBeInTheDocument();
+    const worldGroup = screen.getByRole("radiogroup", { name: /world/i });
+    expect(worldGroup).toBeInTheDocument();
+    // All worlds from every genre appear up front — no genre pre-pick.
     expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /forgotten realms/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /wasteland/i })).toBeInTheDocument();
+    // No standalone genre radiogroup — flattened away 2026-05-05.
+    expect(screen.queryByRole("radiogroup", { name: /^genre$/i })).toBeNull();
+  });
+
+  it("renders the empty-state preview when no world is selected", () => {
+    renderConnect({ genres: GENRES });
+    expect(
+      screen.getByText(/choose a world to see what awaits/i),
+    ).toBeInTheDocument();
   });
 
   it("renders the world preview description after a world is picked", async () => {
     const user = userEvent.setup();
     renderConnect({ genres: GENRES });
 
-    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
     await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
 
     expect(
       screen.getByText(/the flanaess, a continent of warring kingdoms/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the genre name as a hint on each world row", () => {
+    renderConnect({ genres: GENRES });
+    // Genre label appears in the same row as the world name. Use the row
+    // accessible-name (button text concatenation) to assert presence.
+    const greyhawkRow = screen.getByRole("radio", { name: /greyhawk/i });
+    expect(greyhawkRow).toHaveTextContent(/low fantasy/i);
+    const wastelandRow = screen.getByRole("radio", { name: /wasteland/i });
+    expect(wastelandRow).toHaveTextContent(/road warrior/i);
   });
 
   // -- validation ------------------------------------------------------------
@@ -145,11 +145,13 @@ describe("ConnectScreen", () => {
     expect(screen.getByRole("button", { name: /start/i })).toBeDisabled();
   });
 
-  it("auto-selects the sole world when a single-world genre is picked", async () => {
-    const user = userEvent.setup();
-    renderConnect({ genres: GENRES });
-
-    await user.click(screen.getByRole("radio", { name: /road warrior/i }));
+  it("auto-selects the sole world when the catalog has exactly one world", () => {
+    const SINGLE: GenresResponse = {
+      road_warrior: {
+        ...GENRES.road_warrior,
+      },
+    };
+    renderConnect({ genres: SINGLE });
 
     const wastelandRadio = screen.getByRole("radio", { name: /wasteland/i });
     expect(wastelandRadio).toHaveAttribute("aria-checked", "true");
@@ -198,7 +200,7 @@ describe("ConnectScreen", () => {
       ).toHaveValue("Rincewind");
     });
 
-    it("pre-selects genre and world from localStorage on mount", () => {
+    it("pre-selects the saved (genre, world) world row from localStorage on mount", () => {
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -210,13 +212,15 @@ describe("ConnectScreen", () => {
 
       renderConnect({ genres: GENRES });
 
-      const lowFantasyRadio = screen.getByRole("radio", {
-        name: /low fantasy/i,
-      });
-      expect(lowFantasyRadio).toHaveAttribute("aria-checked", "true");
-
+      // Flat picker: only the matching world row reads as checked. Other
+      // worlds (including same-name worlds in other genres, if any) stay
+      // unchecked because the row identity is the composite genre/world.
       const greyhawkRadio = screen.getByRole("radio", { name: /greyhawk/i });
       expect(greyhawkRadio).toHaveAttribute("aria-checked", "true");
+      const forgottenRealms = screen.getByRole("radio", {
+        name: /forgotten realms/i,
+      });
+      expect(forgottenRealms).toHaveAttribute("aria-checked", "false");
     });
 
     it("renders with empty fields when localStorage is empty", () => {
@@ -629,8 +633,8 @@ describe("ConnectScreen", () => {
       await user.clear(nameInput);
       await user.type(nameInput, "Lenny");
 
-      // Pick the same genre + world the past journey is bound to.
-      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+      // Pick the same world the past journey is bound to. The flat
+      // picker resolves both genre + world from a single row click.
       await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
 
       // Switch to multiplayer mode — same mode as the past journey, so
@@ -733,7 +737,6 @@ describe("ConnectScreen", () => {
       const nameInput = screen.getByLabelText(/what name shall be yours/i);
       await user.clear(nameInput);
       await user.type(nameInput, "Laverne");
-      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
       await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
       await user.click(
         screen.getByRole("radio", { name: /multiplayer/i }),
@@ -799,9 +802,8 @@ describe("ConnectScreen", () => {
       renderConnect({ genres: GENRES });
 
       // Default mode is solo; pick a world so the button is enabled.
-      await user.click(screen.getByRole("radio", { name: /road warrior/i }));
+      await user.click(screen.getByRole("radio", { name: /wasteland/i }));
 
-      // Wasteland auto-selects in single-world genres.
       const btn = screen.getByTestId("lobby-start-button");
       expect(btn).toHaveTextContent(/^Start Adventure$/);
     });
@@ -810,7 +812,6 @@ describe("ConnectScreen", () => {
       const user = userEvent.setup();
       renderConnect({ genres: GENRES });
 
-      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
       await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
       await user.click(screen.getByRole("radio", { name: /multiplayer/i }));
 
@@ -822,7 +823,6 @@ describe("ConnectScreen", () => {
       const user = userEvent.setup();
       renderConnect({ genres: GENRES });
 
-      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
       await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
 
       const btn = screen.getByTestId("lobby-start-button");
