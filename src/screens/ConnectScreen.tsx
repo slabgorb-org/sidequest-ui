@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioEngine } from "@/audio/AudioEngine";
 import type { GenresResponse, GenreMeta, WorldMeta } from "@/types/genres";
@@ -72,7 +72,6 @@ export function ConnectScreen({
   onRetryGenres,
 }: ConnectScreenProps) {
   const [saved] = useState(loadSavedState);
-  const isInitialMount = useRef(true);
   const [playerName, setPlayerName] = useState(saved.playerName ?? "");
   const [genreSlug, setGenreSlug] = useState<string | null>(
     saved.genre ?? null,
@@ -90,54 +89,58 @@ export function ConnectScreen({
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
   // the preview. Polls /api/sessions every 15s while the lobby is open.
-  const { sessions: activeSessions } = useSessions({
-    pollMs: 15000,
-    genre: genreSlug,
-  });
+  // No genre filter: the flat world picker shows presence across every
+  // genre at once.
+  const { sessions: activeSessions } = useSessions({ pollMs: 15000 });
 
-  // Sorted list of genre slugs for stable rendering.
-  const genreItems: OptionItem[] = useMemo(
-    () =>
-      Object.entries(genres)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([slug, meta]) => ({
-          slug,
-          label: meta.name || prettify(slug),
-        })),
-    [genres],
-  );
+  // Pre-compute "N here" annotations keyed by composite "genre/world"
+  // slug so the flat world list can show at-a-glance presence without
+  // collapsing same-named worlds across genres.
+  const worldPresence: Record<string, number> = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const session of activeSessions) {
+      const key = `${session.genre}/${session.world}`;
+      counts[key] = (counts[key] ?? 0) + session.players.length;
+    }
+    return counts;
+  }, [activeSessions]);
+
+  // Flat list of every world across every genre, sorted by world label.
+  // Composite "genre/world" slug keeps OptionList rows unique even when
+  // two genres ship a world with the same slug. Genre name renders as a
+  // hint so Sebastien-tier players can see which rule pack a world rides.
+  const worldItems: OptionItem[] = useMemo(() => {
+    const items: OptionItem[] = [];
+    for (const [gSlug, gMeta] of Object.entries(genres)) {
+      const genreLabel = gMeta.name || prettify(gSlug);
+      for (const w of gMeta.worlds) {
+        const composite = `${gSlug}/${w.slug}`;
+        const count = worldPresence[composite] ?? 0;
+        items.push({
+          slug: composite,
+          label: w.name || prettify(w.slug),
+          hint: genreLabel,
+          annotation: count > 0 ? `· ${count} here` : undefined,
+        });
+      }
+    }
+    items.sort((a, b) => a.label.localeCompare(b.label));
+    return items;
+  }, [genres, worldPresence]);
+
+  // Composite slug used by the OptionList to track the active row.
+  const selectedComposite =
+    genreSlug && worldSlug ? `${genreSlug}/${worldSlug}` : null;
+
+  const handleSelectWorld = useCallback((composite: string) => {
+    const slash = composite.indexOf("/");
+    if (slash < 0) return;
+    setGenreSlug(composite.slice(0, slash));
+    setWorldSlug(composite.slice(slash + 1));
+  }, []);
 
   const currentPack: GenreMeta | null =
     genreSlug && genres[genreSlug] ? genres[genreSlug] : null;
-
-  // Pre-compute "N here" annotations keyed by world slug so the world
-  // list can show at-a-glance presence without rendering the full panel.
-  // Only counts sessions in the currently-selected genre — a world named
-  // "outpost" in two different genres shouldn't share a count.
-  const worldPresence: Record<string, number> = useMemo(() => {
-    const counts: Record<string, number> = {};
-    if (!genreSlug) return counts;
-    for (const session of activeSessions) {
-      if (session.genre !== genreSlug) continue;
-      counts[session.world] =
-        (counts[session.world] ?? 0) + session.players.length;
-    }
-    return counts;
-  }, [activeSessions, genreSlug]);
-
-  // World list derived from the selected genre, with optional presence
-  // annotations attached to rows that have active players.
-  const worldItems: OptionItem[] = useMemo(() => {
-    if (!currentPack) return [];
-    return currentPack.worlds.map((w) => {
-      const count = worldPresence[w.slug] ?? 0;
-      return {
-        slug: w.slug,
-        label: w.name || prettify(w.slug),
-        annotation: count > 0 ? `· ${count} here` : undefined,
-      };
-    });
-  }, [currentPack, worldPresence]);
 
   // Sessions matching the currently-selected world, for the panel below.
   const sessionsForWorld = useMemo(() => {
@@ -152,43 +155,29 @@ export function ConnectScreen({
     return currentPack.worlds.find((w) => w.slug === worldSlug) ?? null;
   }, [currentPack, worldSlug]);
 
-  // When genres load, auto-select if there is exactly one genre and no genre
-  // is yet selected. Mirrors the world auto-select logic below.
+  // Auto-select if the entire catalog has exactly one world (and the user
+  // has not already chosen one — e.g. from saved state).
   useEffect(() => {
-    const slugs = Object.keys(genres);
-    if (slugs.length === 1 && genreSlug === null) {
-      setGenreSlug(slugs[0]);
+    if (worldItems.length === 1 && selectedComposite === null) {
+      handleSelectWorld(worldItems[0].slug);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genres]);
+  }, [worldItems.length]);
 
-  // When the genre changes, pick a sensible default world:
-  //   1. Respect the saved world if it's valid in this genre (initial mount only).
-  //   2. Otherwise, if there's exactly one world, auto-select it.
-  //   3. Otherwise, clear the selection — the player must pick.
+  // If saved state references a world that no longer exists in the
+  // catalog (pack removed since last visit), clear the stale selection
+  // so the picker doesn't sit in an invalid state.
   useEffect(() => {
-    if (!currentPack) {
-      setWorldSlug(null);
-      return;
-    }
-    const available = currentPack.worlds.map((w) => w.slug);
-
     if (
-      isInitialMount.current &&
-      saved.world &&
-      available.includes(saved.world)
+      selectedComposite &&
+      worldItems.length > 0 &&
+      !worldItems.some((item) => item.slug === selectedComposite)
     ) {
-      setWorldSlug(saved.world);
-    } else if (available.length === 1) {
-      setWorldSlug(available[0]);
-    } else if (worldSlug && !available.includes(worldSlug)) {
+      setGenreSlug(null);
       setWorldSlug(null);
     }
-    isInitialMount.current = false;
-    // We intentionally don't depend on `worldSlug` here — re-running this
-    // effect on every world change would fight the user's selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPack, saved.world]);
+  }, [worldItems]);
 
   // Start requires only a world selection — player name is collected by
   // AppInner's NamePrompt when mounting at the slug route (if not already
@@ -380,7 +369,10 @@ export function ConnectScreen({
           />
         </div>
 
-        {/* Genre + World + Preview — two-column on md+, single-column below. */}
+        {/* World + Preview — two-column on md+, single-column below. The
+            lobby flattened genre→world into a single world list (2026-05-05);
+            genre name renders as a hint on each row so the rules pack is
+            still visible without a second pick step. */}
         {showGenreError ? (
           <div className="text-center w-full max-w-sm">
             <p id="genre-load-error" className="text-sm italic text-destructive/70 mb-2">
@@ -400,49 +392,29 @@ export function ConnectScreen({
           </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-8 w-full">
-            {/* Left column — genre + world radio lists */}
+            {/* Left column — flat world radio list */}
             <div className="flex flex-col gap-6 md:w-64 shrink-0">
               <section className="flex flex-col min-h-0">
                 <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
-                  Genre
+                  World
                   <span className="not-italic text-muted-foreground/40 ml-1">
-                    ({genreItems.length})
+                    ({worldItems.length})
                   </span>
                 </h2>
                 {/* Cap height so the list scrolls inside its frame instead
                     of pushing the page below the fold; ensures Sebastien-
                     type players see all packs without needing to discover
                     that the page itself scrolls. */}
-                <div className="max-h-[40vh] flex flex-col min-h-0">
+                <div className="max-h-[60vh] flex flex-col min-h-0">
                   <OptionList
-                    ariaLabel="Genre"
-                    items={genreItems}
-                    selected={genreSlug}
-                    onSelect={setGenreSlug}
+                    ariaLabel="World"
+                    items={worldItems}
+                    selected={selectedComposite}
+                    onSelect={handleSelectWorld}
                     disabled={isConnecting}
                   />
                 </div>
               </section>
-
-              {currentPack && worldItems.length > 0 && (
-                <section className="flex flex-col min-h-0">
-                  <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
-                    World
-                    <span className="not-italic text-muted-foreground/40 ml-1">
-                      ({worldItems.length})
-                    </span>
-                  </h2>
-                  <div className="max-h-[40vh] flex flex-col min-h-0">
-                    <OptionList
-                      ariaLabel="World"
-                      items={worldItems}
-                      selected={worldSlug}
-                      onSelect={setWorldSlug}
-                      disabled={isConnecting}
-                    />
-                  </div>
-                </section>
-              )}
             </div>
 
             {/* Right column — mode picker + world preview. Mode sits above
@@ -505,7 +477,7 @@ export function ConnectScreen({
             disabled={!canStart || isConnecting || isStarting}
             title={
               !canStart
-                ? "Choose a genre and world to begin"
+                ? "Choose a world to begin"
                 : undefined
             }
             className="text-lg font-semibold uppercase tracking-[0.25em]
