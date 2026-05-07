@@ -198,7 +198,11 @@ describe("AC: Dice tray info display", () => {
     expect(screen.getByText(/The lock resists/)).toBeInTheDocument();
   });
 
-  it("shows 'you need a 12' calculation (DC - modifier)", async () => {
+  it("shows the minimum *passing* die face (DC - modifier + 1)", async () => {
+    // Server resolver: outcome = Success iff total > difficulty (Tie at
+    // total==DC). The first passing face is `difficulty - modifier + 1`,
+    // not `difficulty - modifier` (which only ties). Playtest 2026-05-06
+    // surfaced this as "rolled 12 vs need 12 — Fail".
     const { DiceOverlay } = await import("../DiceOverlay");
     render(
       <DiceOverlay
@@ -208,8 +212,8 @@ describe("AC: Dice tray info display", () => {
         onThrow={vi.fn()}
       />,
     );
-    // DC 15, modifier +3 → need a 12 on the die
-    expect(screen.getByText(/need.*12|12.*need/i)).toBeInTheDocument();
+    // DC 15, modifier +3 → first passing face is 13 (13+3=16>15)
+    expect(screen.getByText(/need.*13|13.*need/i)).toBeInTheDocument();
   });
 });
 
@@ -453,7 +457,7 @@ describe("AC: Edge cases — negative modifier", () => {
         onThrow={vi.fn()}
       />,
     );
-    // DC 15, modifier -2 → need a 17 on the die
-    expect(screen.getByText(/need.*17|17.*need/i)).toBeInTheDocument();
+    // DC 15, modifier -2 → first passing face is 18 (18-2=16>15)
+    expect(screen.getByText(/need.*18|18.*need/i)).toBeInTheDocument();
   });
 });

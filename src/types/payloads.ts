@@ -314,8 +314,10 @@ export interface DiceThrowParams {
   position: [number, number];
 }
 
-/** Outcome classification — feeds narrator tone. */
-export type RollOutcome = "CritSuccess" | "Success" | "Fail" | "CritFail";
+/** Outcome classification — feeds narrator tone. Server has 5 tiers
+ * (sidequest-server/sidequest/protocol/dice.py:RollOutcome); Tie was missing
+ * here, which let UI switches fall through to the default Fail branch. */
+export type RollOutcome = "CritSuccess" | "Success" | "Tie" | "Fail" | "CritFail";
 
 /** Per-group face values paired with the originating DieSpec. */
 export interface DieGroupResult {

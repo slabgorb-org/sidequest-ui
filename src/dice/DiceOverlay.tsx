@@ -38,6 +38,43 @@ function formatModifier(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
+/**
+ * Outcome-aware presentation. Tie is its own band on the resolver
+ * (total == DC); rendering it in the Fail color/label conflates "no movement"
+ * with "you lost." Fix landed alongside the InlineDiceTray fix on 2026-05-06.
+ */
+function overlayOutcomeColor(outcome: DiceResultPayload["outcome"]): string {
+  switch (outcome) {
+    case "CritSuccess":
+      return "#22c55e";
+    case "CritFail":
+      return "#ef4444";
+    case "Success":
+      return "#e8e0d0";
+    case "Tie":
+      return "#fbbf24";
+    case "Fail":
+    default:
+      return "#9ca3af";
+  }
+}
+
+function overlayOutcomeLabel(outcome: DiceResultPayload["outcome"]): string {
+  switch (outcome) {
+    case "CritSuccess":
+      return "Critical Success!";
+    case "CritFail":
+      return "Critical Fail!";
+    case "Success":
+      return "Success";
+    case "Tie":
+      return "Tie";
+    case "Fail":
+    default:
+      return "Fail";
+  }
+}
+
 /** Build the aria-live announcement string per ADR-075. */
 function buildAnnouncement(result: DiceResultPayload): string {
   const faces = result.rolls.flatMap((r) => r.faces).join(", ");
@@ -120,7 +157,10 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
 
   if (!diceRequest) return null;
 
-  const needed = diceRequest.difficulty - diceRequest.modifier;
+  // Minimum d20 face that yields Success — resolver uses `total > difficulty`
+  // (Tie at total==DC, Success at total>DC), so the first passing face is
+  // `difficulty - modifier + 1`. (Playtest 2026-05-06 fix.)
+  const needed = diceRequest.difficulty - diceRequest.modifier + 1;
 
   return (
     <div
@@ -231,14 +271,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
             style={{
               fontSize: diceResult.outcome === "CritSuccess" || diceResult.outcome === "CritFail" ? 48 : 36,
               fontWeight: 700,
-              color:
-                diceResult.outcome === "CritSuccess"
-                  ? "#22c55e"
-                  : diceResult.outcome === "CritFail"
-                    ? "#ef4444"
-                    : diceResult.outcome === "Success"
-                      ? "#e8e0d0"
-                      : "#9ca3af",
+              color: overlayOutcomeColor(diceResult.outcome),
               textShadow: "0 2px 8px rgba(0,0,0,0.6)",
               fontFamily: "serif",
             }}
@@ -254,13 +287,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
               textTransform: "capitalize",
             }}
           >
-            {diceResult.outcome === "CritSuccess"
-              ? "Critical Success!"
-              : diceResult.outcome === "CritFail"
-                ? "Critical Fail!"
-                : diceResult.outcome === "Success"
-                  ? "Success"
-                  : "Fail"}
+            {overlayOutcomeLabel(diceResult.outcome)}
           </div>
         </div>
       )}

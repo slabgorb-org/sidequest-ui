@@ -170,6 +170,42 @@ function formatModifier(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
+// Outcome-aware presentation. Tie is its own band on the resolver
+// (total == DC); rendering it as "Fail" in red lies to the player and made
+// the dial feel arbitrary in the 2026-05-06 playtest. Tie gets a neutral
+// amber so it reads as "no movement" rather than "you lost."
+function outcomeColor(outcome: DiceResultPayload["outcome"]): string {
+  switch (outcome) {
+    case "CritSuccess":
+      return "#22c55e";
+    case "CritFail":
+      return "#ef4444";
+    case "Success":
+      return "#e8e0d0";
+    case "Tie":
+      return "#fbbf24";
+    case "Fail":
+    default:
+      return "#fca5a5";
+  }
+}
+
+function outcomeLabel(outcome: DiceResultPayload["outcome"]): string {
+  switch (outcome) {
+    case "CritSuccess":
+      return "Critical!";
+    case "CritFail":
+      return "Critical Fail!";
+    case "Success":
+      return "Success";
+    case "Tie":
+      return "Tie";
+    case "Fail":
+    default:
+      return "Fail";
+  }
+}
+
 function buildAnnouncement(result: DiceResultPayload): string {
   const faces = result.rolls.flatMap((r) => r.faces).join(", ");
   return `${result.character_name} rolled ${result.total} (${faces} ${formatModifier(result.modifier)}) vs DC ${result.difficulty} — ${result.outcome}`;
@@ -246,7 +282,12 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
   // auto-roll, PickupDie never renders — but we need a no-op to satisfy types.
   const noopThrow = useCallback(() => {}, []);
 
-  const needed = diceRequest ? diceRequest.difficulty - diceRequest.modifier : 0;
+  // Minimum d20 face that yields Success on the server resolver, which uses
+  // `total > difficulty` (Tie at total==DC, Success at total>DC). Display the
+  // first *passing* face — anything less ties or fails. (Playtest 2026-05-06:
+  // Sebastien rolled the displayed minimum and got "Fail" — that was a Tie at
+  // the displayed face. Display now matches what actually passes.)
+  const needed = diceRequest ? diceRequest.difficulty - diceRequest.modifier + 1 : 0;
 
   return (
     <div data-testid="inline-dice-tray" className="mt-3 flex flex-col" style={{ flex: 1 }}>
@@ -352,14 +393,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
               style={{
                 fontSize: 28,
                 fontWeight: 700,
-                color:
-                  diceResult.outcome === "CritSuccess"
-                    ? "#22c55e"
-                    : diceResult.outcome === "CritFail"
-                      ? "#ef4444"
-                      : diceResult.outcome === "Success"
-                        ? "#e8e0d0"
-                        : "#fca5a5",
+                color: outcomeColor(diceResult.outcome),
                 lineHeight: 1,
               }}
             >
@@ -373,23 +407,10 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
                 fontSize: 14,
                 fontWeight: 700,
                 marginLeft: 4,
-                color:
-                  diceResult.outcome === "CritSuccess"
-                    ? "#22c55e"
-                    : diceResult.outcome === "CritFail"
-                      ? "#ef4444"
-                      : diceResult.outcome === "Success"
-                        ? "#e8e0d0"
-                        : "#fca5a5",
+                color: outcomeColor(diceResult.outcome),
               }}
             >
-              {diceResult.outcome === "CritSuccess"
-                ? "Critical!"
-                : diceResult.outcome === "CritFail"
-                  ? "Critical Fail!"
-                  : diceResult.outcome === "Success"
-                    ? "Success"
-                    : "Fail"}
+              {outcomeLabel(diceResult.outcome)}
             </span>
           </div>
         )}

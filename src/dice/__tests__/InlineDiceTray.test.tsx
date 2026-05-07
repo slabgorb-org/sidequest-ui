@@ -109,6 +109,53 @@ describe("InlineDiceTray — target persistence (playtest 2026-04-19)", () => {
     expect(result).toHaveTextContent(/Success/);
   });
 
+  it("renders Tie outcome with its own label, not Fail (playtest 2026-05-06)", () => {
+    // Server resolver: total == DC → Tie (its own band, not Fail). Before
+    // this fix, the UI fell through to "Fail" with red color, conflating
+    // "no movement" with "you lost." Sebastien's first read of the dial.
+    const tieResult: DiceResultPayload = {
+      ...RESULT,
+      total: 12,
+      outcome: "Tie",
+      rolls: [
+        {
+          spec: { sides: "d20", count: 1 } as unknown as DiceResultPayload["rolls"][number]["spec"],
+          faces: [10],
+        },
+      ],
+    };
+    render(
+      <InlineDiceTray
+        diceRequest={REQUEST}
+        diceResult={tieResult}
+        playerId="p1"
+        onThrow={vi.fn()}
+        genreSlug="heavy_metal"
+      />,
+    );
+    const result = screen.getByTestId("dice-result");
+    expect(result).toHaveAttribute("data-outcome", "Tie");
+    expect(result).toHaveTextContent(/Tie/);
+    expect(result).not.toHaveTextContent(/Fail/);
+  });
+
+  it("displays the minimum *passing* face on the target banner, not the Tie face", () => {
+    // Server: outcome = Success iff total > difficulty. With DC=12 and
+    // modifier=+2, the smallest passing face is 11 (11+2=13>12), not 10
+    // (10+2=12 ties). Display now shows the first passing face.
+    render(
+      <InlineDiceTray
+        diceRequest={REQUEST}
+        diceResult={null}
+        playerId="p1"
+        onThrow={vi.fn()}
+        genreSlug="heavy_metal"
+      />,
+    );
+    const banner = screen.getByTestId("dice-target-banner");
+    expect(banner).toHaveTextContent(/need 11 on d20/);
+  });
+
   it("hides the target banner when there is no active request", () => {
     render(
       <InlineDiceTray
