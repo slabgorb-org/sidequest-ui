@@ -33,7 +33,7 @@ import type { MapState } from "@/components/MapOverlay";
 import type { ConfrontationData, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
-import type { CharacterSummary } from "@/types/party";
+import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
@@ -156,6 +156,9 @@ export interface GameBoardProps {
   peersOutstanding?: string[];
   turnStatusEntries?: TurnStatusEntry[];
   resources?: Record<string, ResourcePool> | null;
+  /** Narrator-recruited NPC companions (playtest 2026-05-06). Surfaced in
+   * the Party panel below the PCs so the full active roster is visible. */
+  companions?: CompanionSummary[];
   genreSlug?: string;
   worldSlug?: string;
   depletions?: ItemDepletion[];
@@ -214,6 +217,7 @@ export function GameBoard({
   peersOutstanding = [],
   turnStatusEntries = [],
   resources,
+  companions = [],
   genreSlug,
   worldSlug,
   depletions,
@@ -380,6 +384,7 @@ export function GameBoard({
           <CharacterWidget
             character={characterSheet}
             resources={resources}
+            companions={companions}
             genreSlug={genreSlug}
             onResourceThresholdCrossed={handleResourceThresholdCrossed}
             characters={characters}
@@ -440,7 +445,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       knowledgeEntries, confrontationData, confrontationOutcome, onBeatSelect, onYield, diceRequest, diceResult,
       onDiceThrow, nowPlaying, volumes, muted,
-      handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
+      handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent,
       sessionBoundEpoch]);

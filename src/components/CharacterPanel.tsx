@@ -3,7 +3,7 @@ import type { CharacterSheetData } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
-import type { CharacterSummary } from "@/types/party";
+import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { MagicState } from "@/types/magic";
 import { SensitivitiesSection } from "./SensitivitiesSection";
 type TabId = "stats" | "abilities" | "status";
@@ -32,6 +32,14 @@ export interface CharacterPanelProps {
     threshold: ResourceThreshold;
   }) => void;
   characters?: CharacterSummary[];
+  /**
+   * Narrator-recruited NPC companions on contract with the party
+   * (playtest 2026-05-06 wiring fix). Rendered as a separate "Companions"
+   * subsection below the player roster — companions have no Edge bar
+   * or inventory at this tier, so the row shows only name + role +
+   * notes. Empty array hides the subsection entirely.
+   */
+  companions?: CompanionSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
   /**
@@ -81,6 +89,7 @@ export function CharacterPanel({
   genreSlug,
   onResourceThresholdCrossed,
   characters = [],
+  companions = [],
   currentPlayerId,
   activePlayerId,
   submittedPlayerIds,
@@ -337,6 +346,57 @@ export function CharacterPanel({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Companions section (playtest 2026-05-06): narrator-recruited
+          NPC hirelings. No Edge bar / inventory at this tier — minimum
+          panel-visibility surface so Sebastien can confirm "yes, the
+          hireling exists in game state, not just in prose." */}
+      {companions.length > 0 && (
+        <div
+          data-testid="companions-section"
+          className="border-t border-border/30 p-2 flex flex-col gap-1"
+        >
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">
+            Companions
+          </h3>
+          {companions.map((c) => (
+            <div
+              key={c.name}
+              data-testid={`companion-${c.name}`}
+              className="flex items-center gap-2 p-2 rounded-md bg-card/60 border border-border/40"
+              title={
+                c.notes
+                  ? `${c.description || c.role}\nContract: ${c.notes}`
+                  : c.description || c.role
+              }
+            >
+              <span className="w-8 h-8 rounded-full bg-secondary/40 flex items-center justify-center text-[10px] font-bold text-secondary-foreground/80 flex-shrink-0 border border-border/60">
+                {toAvatarInitials(c.name)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="block text-xs font-semibold text-foreground/90 truncate">
+                  {c.name}
+                  <span
+                    data-testid={`companion-tag-${c.name}`}
+                    className="ml-1 inline-block align-middle rounded-sm border border-muted-foreground/30 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                  >
+                    NPC
+                  </span>
+                </span>
+                <span className="block text-[10px] text-muted-foreground truncate">
+                  {c.role || "companion"}
+                  {c.recruited_by ? ` · w/ ${c.recruited_by}` : ""}
+                </span>
+                {c.notes && (
+                  <span className="block text-[9px] text-muted-foreground/70 italic truncate">
+                    {c.notes}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
