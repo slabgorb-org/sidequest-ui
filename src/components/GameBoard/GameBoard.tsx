@@ -384,6 +384,7 @@ export function GameBoard({
           <CharacterWidget
             character={characterSheet}
             resources={resources}
+            companions={companions}
             genreSlug={genreSlug}
             onResourceThresholdCrossed={handleResourceThresholdCrossed}
             characters={characters}
@@ -444,7 +445,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       knowledgeEntries, confrontationData, confrontationOutcome, onBeatSelect, onYield, diceRequest, diceResult,
       onDiceThrow, nowPlaying, volumes, muted,
-      handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
+      handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent,
       sessionBoundEpoch]);
