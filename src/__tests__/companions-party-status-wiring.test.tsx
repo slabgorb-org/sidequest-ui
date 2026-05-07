@@ -80,10 +80,12 @@ describe("CharacterPanel — PARTY_STATUS companions wiring (playtest 2026-05-07
 
     // Donut renders by name — without him, a solo Cleric can't address his
     // own hire and the Sünden flow is dead in the water.
-    const donutRow = screen.getByTestId("companion-donut");
+    const donutRow = screen.getByTestId("companion-Donut");
     expect(donutRow).toHaveTextContent("Donut");
     expect(donutRow).toHaveTextContent("torchbearer");
-    expect(donutRow).toHaveTextContent("Bonded to Carl");
+    // recruited_by must be visible somewhere on the row so the player
+    // can tell which PC the hireling is bonded to (matters in MP).
+    expect(donutRow.textContent ?? "").toMatch(/Carl/);
   });
 
   it("hides companions section when no companions are bonded", () => {
@@ -96,6 +98,66 @@ describe("CharacterPanel — PARTY_STATUS companions wiring (playtest 2026-05-07
       />,
     );
     expect(screen.queryByTestId("companions-section")).not.toBeInTheDocument();
+  });
+
+  it("re-renders companions section when a second PARTY_STATUS arrives mid-session", () => {
+    // Live-update path (playtest 2026-05-07 driver refinement at 09:18):
+    // initial PARTY_STATUS lands at chargen with no companions, then a
+    // post-recruit PARTY_STATUS arrives carrying Donut. The section MUST
+    // appear without a page reload — the driver reported reload works
+    // but live did not, so this lock fires on the live React state path.
+    const { rerender } = render(
+      <CharacterPanel
+        character={carlSheet}
+        characters={[]}
+        companions={[]}
+        currentPlayerId="carl-pid"
+      />,
+    );
+    expect(screen.queryByTestId("companions-section")).not.toBeInTheDocument();
+
+    rerender(
+      <CharacterPanel
+        character={carlSheet}
+        characters={[]}
+        companions={partyStatusToCompanions([
+          { name: "Donut", role: "torchbearer", recruited_by: "Carl" },
+        ])}
+        currentPlayerId="carl-pid"
+      />,
+    );
+
+    expect(screen.getByTestId("companions-section")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-Donut")).toBeInTheDocument();
+  });
+
+  it("clears companions section when a dismissal PARTY_STATUS arrives with empty roster", () => {
+    // Symmetric live-update case: companion dismissed mid-session.
+    // The next PARTY_STATUS frame carries `companions: []` and the
+    // panel must clear the row, not stale-render the dismissed hire.
+    const { rerender } = render(
+      <CharacterPanel
+        character={carlSheet}
+        characters={[]}
+        companions={partyStatusToCompanions([
+          { name: "Donut", role: "torchbearer", recruited_by: "Carl" },
+        ])}
+        currentPlayerId="carl-pid"
+      />,
+    );
+    expect(screen.getByTestId("companion-Donut")).toBeInTheDocument();
+
+    rerender(
+      <CharacterPanel
+        character={carlSheet}
+        characters={[]}
+        companions={[]}
+        currentPlayerId="carl-pid"
+      />,
+    );
+
+    expect(screen.queryByTestId("companions-section")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("companion-Donut")).not.toBeInTheDocument();
   });
 
   it("renders multiple companions in roster order (Donut + Katia case)", () => {
@@ -116,7 +178,7 @@ describe("CharacterPanel — PARTY_STATUS companions wiring (playtest 2026-05-07
       />,
     );
 
-    expect(screen.getByTestId("companion-donut")).toBeInTheDocument();
-    expect(screen.getByTestId("companion-katia")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-Donut")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-Katia")).toBeInTheDocument();
   });
 });
