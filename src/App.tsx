@@ -21,7 +21,7 @@ import { makeRequestId } from "@/lib/utils";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import type { CharacterSummary } from "@/types/party";
+import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry } from "@/types/payloads";
@@ -317,6 +317,11 @@ function AppInner() {
 
   // Party status — richer than state_delta (includes portrait_url)
   const [partyMembers, setPartyMembers] = useState<CharacterSummary[]>([]);
+
+  // Companion roster — narrator-recruited NPC hirelings (playtest 2026-05-06).
+  // Surfaced into the Party panel so the UI shows the full active roster
+  // (PCs + companions). Empty until the narrator emits companions_added.
+  const [partyCompanions, setPartyCompanions] = useState<CompanionSummary[]>([]);
 
   // Genre resources extracted from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
   const [partyResources, setPartyResources] = useState<Record<string, ResourcePool>>({});
@@ -810,6 +815,25 @@ function AppInner() {
         setPartyResources(resources);
       }
 
+      // Companion roster (playtest 2026-05-06). Always overwrite; the
+      // server payload is the source of truth. Empty array clears the
+      // panel section if every companion was dismissed this turn.
+      const rawCompanions = (msg.payload as { companions?: Array<Record<string, unknown>> })
+        .companions;
+      const mappedCompanions: CompanionSummary[] = Array.isArray(rawCompanions)
+        ? rawCompanions
+            .map((c) => ({
+              name: (c.name as string) ?? "",
+              role: (c.role as string) ?? "",
+              description: (c.description as string) ?? "",
+              notes: (c.notes as string) ?? "",
+              recruited_turn: (c.recruited_turn as number) ?? 0,
+              recruited_by: (c.recruited_by as string) ?? "",
+            }))
+            .filter((c) => c.name)
+        : [];
+      setPartyCompanions(mappedCompanions);
+
       return;
     }
 
@@ -1238,6 +1262,7 @@ function AppInner() {
     setInventoryData(null);
     setMapData(null);
     setPartyMembers([]);
+    setPartyCompanions([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
     setCanType(true);
@@ -1876,6 +1901,7 @@ function AppInner() {
                 mpInputState={mpInputState}
                 peersOutstanding={peersOutstanding}
                 resources={partyResources}
+                companions={partyCompanions}
                 genreSlug={currentGenre ?? undefined}
                 worldSlug={currentWorld ?? undefined}
                 turnStatusEntries={turnStatusEntries}

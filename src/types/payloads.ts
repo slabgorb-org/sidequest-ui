@@ -144,9 +144,19 @@ export interface TurnStatusPayload {
   }>;
 }
 
+export interface CompanionMemberPayload {
+  name: string;
+  role?: string;
+  description?: string;
+  notes?: string;
+  recruited_turn?: number;
+  recruited_by?: string;
+}
+
 export interface PartyStatusPayload {
   members: PartyMemberPayload[];
   resources?: Record<string, ResourcePoolPayload>;
+  companions?: CompanionMemberPayload[];
 }
 
 export interface PlayerActionPayload {
