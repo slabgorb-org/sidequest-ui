@@ -98,7 +98,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
             fontWeight: 400,
             color: FOLIO.ink,
             letterSpacing: 0.5,
-            fontSize: 22,
+            fontSize: 24,
             lineHeight: 1.05,
             margin: 0,
           }}
@@ -111,7 +111,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
             fontFamily: FONT_BODY,
             fontVariantNumeric: "tabular-nums oldstyle-nums",
             color: FOLIO.gold,
-            fontSize: 13,
+            fontSize: 15,
             fontStyle: "italic",
           }}
         >
@@ -139,7 +139,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                   fontFamily: FONT_DISPLAY,
                   fontWeight: 400,
                   color: FOLIO.crimson,
-                  fontSize: 13,
+                  fontSize: 15,
                   letterSpacing: 1.5,
                   margin: 0,
                   textTransform: "uppercase",
@@ -199,7 +199,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                           background: FOLIO.crimson,
                           color: FOLIO.paper,
                           fontFamily: FONT_DISPLAY,
-                          fontSize: 8,
+                          fontSize: 10,
                           letterSpacing: 1.2,
                           textTransform: "uppercase",
                           fontWeight: 400,
@@ -224,7 +224,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                         alignItems: "center",
                         justifyContent: "center",
                         fontFamily: FONT_DISPLAY,
-                        fontSize: 18,
+                        fontSize: 20,
                         color: FOLIO.crimson,
                         lineHeight: 1,
                       }}
@@ -246,7 +246,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                           className="font-medium"
                           style={{
                             fontFamily: FONT_BODY,
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: 500,
                             color: FOLIO.ink,
                             overflow: "hidden",
@@ -277,7 +277,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                         style={{
                           fontFamily: FONT_BODY,
                           fontStyle: "italic",
-                          fontSize: 12,
+                          fontSize: 14,
                           lineHeight: 1.4,
                           color: FOLIO.inkSoft,
                           margin: "2px 0 0",

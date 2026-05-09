@@ -35,7 +35,7 @@ function pillStyle(active: boolean): CSSProperties {
     color: active ? FOLIO.crimson : FOLIO.inkSoft,
     border: `1px solid ${active ? FOLIO.crimson : FOLIO.rule}`,
     fontFamily: FONT_DISPLAY,
-    fontSize: 11,
+    fontSize: 13,
     letterSpacing: 1,
     padding: '3px 8px',
     borderRadius: 2,
@@ -82,7 +82,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
             color: FOLIO.inkSoft,
             padding: '24px 16px',
             margin: 0,
-            fontSize: 13,
+            fontSize: 15,
             lineHeight: 1.4,
           }}
         >
@@ -151,7 +151,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
             style={{
               width: '100%',
               fontFamily: FONT_BODY,
-              fontSize: 13,
+              fontSize: 15,
               color: FOLIO.ink,
               background: FOLIO.paper2,
               border: `1px solid ${FOLIO.rule}`,
@@ -179,7 +179,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                 cursor: 'pointer',
                 color: FOLIO.crimson,
                 fontFamily: FONT_DISPLAY,
-                fontSize: 14,
+                fontSize: 16,
                 lineHeight: 1,
                 padding: '2px 4px',
               }}
@@ -221,7 +221,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                     style={{
                       fontFamily: FONT_BODY,
                       fontStyle: 'italic',
-                      fontSize: 10,
+                      fontSize: 12,
                       color: FOLIO.gold,
                       fontVariantNumeric: 'tabular-nums',
                     }}
@@ -255,14 +255,14 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
               ...pillStyle(false),
               fontFamily: FONT_BODY,
               fontStyle: 'italic',
-              fontSize: 12,
+              fontSize: 14,
               letterSpacing: 0.3,
               color: FOLIO.ink,
               background: FOLIO.paper2,
             }}
           >
             <span>{sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}</span>
-            <span aria-hidden="true" style={{ color: FOLIO.crimson, fontSize: 13 }}>⇅</span>
+            <span aria-hidden="true" style={{ color: FOLIO.crimson, fontSize: 15 }}>⇅</span>
           </button>
           {onRequestJournal && (
             <button
@@ -275,7 +275,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                 ...pillStyle(false),
                 fontFamily: FONT_BODY,
                 fontStyle: 'italic',
-                fontSize: 12,
+                fontSize: 14,
                 letterSpacing: 0.3,
                 color: FOLIO.ink,
                 background: FOLIO.paper2,
@@ -299,7 +299,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                 fontFamily: FONT_BODY,
                 fontStyle: 'italic',
                 color: FOLIO.inkSoft,
-                fontSize: 13,
+                fontSize: 15,
                 padding: '16px 0',
                 textAlign: 'center',
                 margin: 0,
@@ -335,7 +335,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                     background: FOLIO.crimson,
                     color: FOLIO.paper,
                     fontFamily: FONT_DISPLAY,
-                    fontSize: 8,
+                    fontSize: 10,
                     letterSpacing: 1.2,
                     textTransform: 'uppercase',
                     fontWeight: 400,
@@ -350,7 +350,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                 className="text-foreground/80"
                 style={{
                   fontFamily: FONT_BODY,
-                  fontSize: 13,
+                  fontSize: 15,
                   lineHeight: 1.45,
                   color: FOLIO.ink,
                   margin: 0,
@@ -365,7 +365,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                   flexWrap: 'wrap',
                   gap: 8,
                   marginTop: 4,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontFamily: FONT_BODY,
                   fontStyle: 'italic',
                   color: FOLIO.inkSoft,
@@ -376,7 +376,7 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                   style={{
                     fontFamily: FONT_DISPLAY,
                     fontStyle: 'normal',
-                    fontSize: 10,
+                    fontSize: 12,
                     color: FOLIO.crimson,
                     letterSpacing: 1,
                     textTransform: 'uppercase',
@@ -418,7 +418,7 @@ function FolioJournalHeader({ total }: { total: number }) {
         style={{
           fontFamily: FONT_DISPLAY,
           fontWeight: 400,
-          fontSize: 22,
+          fontSize: 24,
           color: FOLIO.ink,
           letterSpacing: 0.5,
           lineHeight: 1.05,
@@ -431,7 +431,7 @@ function FolioJournalHeader({ total }: { total: number }) {
         style={{
           fontFamily: FONT_BODY,
           fontStyle: 'italic',
-          fontSize: 12,
+          fontSize: 14,
           color: FOLIO.gold,
           fontVariantNumeric: 'tabular-nums',
         }}
