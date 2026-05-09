@@ -9,6 +9,10 @@ import {
 interface LedgerPanelProps {
   magicState: MagicState | null;
   characterId: string;
+  // Story 47-10 — when set, the prepared-spells list pulses to surface
+  // a recent unprepared-cast rejection (pulse-not-popup UX). Cleared
+  // by the parent ~600ms after the pulse fires.
+  rejectedSpellId?: string | null;
 }
 
 const NEAR_THRESHOLD_RATIO = 0.10;  // within 10% of threshold = highlight
@@ -76,13 +80,121 @@ function BarRow({ bar }: { bar: LedgerBar }) {
   );
 }
 
-export function LedgerPanel({ magicState, characterId }: LedgerPanelProps) {
+// Story 47-10 — MagicBlock renders the learned_v1 surface (known spells,
+// prepared spells per level with slot indicator, spent spells struck-through-
+// but-visible until rest). Hidden when the actor has no prepared_spells
+// entry (non-caster or fresh-rest pre-prepare state).
+function MagicBlock({
+  magicState,
+  characterId,
+  rejectedSpellId,
+}: {
+  magicState: MagicState;
+  characterId: string;
+  rejectedSpellId: string | null | undefined;
+}) {
+  const known = magicState.known_spells?.[characterId] ?? [];
+  const prepared = magicState.prepared_spells?.[characterId] ?? {};
+  const spent = magicState.spent_spells?.[characterId] ?? {};
+
+  const hasPrepared = Object.values(prepared).some((spells) => spells.length > 0);
+  if (!hasPrepared) return null;
+
+  // Per-level slot bars are stored on the ledger as `slots_l<N>`.
+  const slotForLevel = (level: number): { value: number; max: number } | null => {
+    const key = `character|${characterId}|slots_l${level}`;
+    const bar = magicState.ledger[key];
+    if (!bar) return null;
+    return { value: bar.value, max: bar.spec.range[1] };
+  };
+
+  const sortedLevels = Object.keys(prepared)
+    .map((k) => Number(k))
+    .filter((n) => prepared[n]?.length > 0)
+    .sort((a, b) => a - b);
+
+  const pulseClass = rejectedSpellId ? "pulse" : "";
+
+  return (
+    <section className="ledger-magic-block space-y-2" data-testid="magic-block">
+      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        Memorized magic
+      </h4>
+      {known.length > 0 && (
+        <details className="known-spells text-xs">
+          <summary className="cursor-pointer text-muted-foreground">
+            Known spells ({known.length})
+          </summary>
+          <ul className="pl-4 pt-1 space-y-0.5 font-mono text-[11px]">
+            {known.map((sid) => (
+              <li key={sid}>{sid}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div
+        className={`prepared-spells-list space-y-1 ${pulseClass}`}
+        data-testid="magic-block-prepared"
+        data-pulse={rejectedSpellId ? "true" : undefined}
+      >
+        {sortedLevels.map((level) => {
+          const slots = slotForLevel(level);
+          const spentAtLevel = spent[level] ?? [];
+          return (
+            <div key={`l${level}`} className="prepared-level text-xs">
+              <span className="level-label font-mono mr-2">L{level}</span>
+              {slots && (
+                <span className="slot-indicator font-mono mr-2">
+                  {slots.value.toFixed(0)}/{slots.max.toFixed(0)} slots
+                </span>
+              )}
+              <span className="spell-list">
+                {prepared[level].map((sid, i) => {
+                  const isSpent = spentAtLevel.includes(sid);
+                  const isRejected = rejectedSpellId === sid;
+                  const className = [
+                    "spell-name",
+                    isSpent ? "spent" : "",
+                    isRejected ? "struck rejected" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <span key={`${sid}-${i}`}>
+                      {i > 0 && ", "}
+                      {isSpent ? (
+                        <s className={className}>{sid}</s>
+                      ) : (
+                        <span className={className}>{sid}</span>
+                      )}
+                    </span>
+                  );
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function LedgerPanel({
+  magicState,
+  characterId,
+  rejectedSpellId,
+}: LedgerPanelProps) {
   if (magicState == null) return null;
 
   const characterBars = getCharacterBars(magicState, characterId);
   const worldBars = getWorldBars(magicState);
+  const hasPrepared = Object.values(
+    magicState.prepared_spells?.[characterId] ?? {},
+  ).some((spells) => spells.length > 0);
 
-  if (characterBars.length === 0 && worldBars.length === 0) return null;
+  if (characterBars.length === 0 && worldBars.length === 0 && !hasPrepared) {
+    return null;
+  }
 
   return (
     <div className="ledger-panel space-y-3 p-3 border-t border-border/30">
@@ -96,6 +208,11 @@ export function LedgerPanel({ magicState, characterId }: LedgerPanelProps) {
           ))}
         </section>
       )}
+      <MagicBlock
+        magicState={magicState}
+        characterId={characterId}
+        rejectedSpellId={rejectedSpellId ?? null}
+      />
       {worldBars.length > 0 && (
         <section className="ledger-world-bars space-y-2">
           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
