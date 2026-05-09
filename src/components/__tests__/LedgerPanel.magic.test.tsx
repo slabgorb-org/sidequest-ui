@@ -41,9 +41,9 @@ function mageMagicState(): MagicState {
   return {
     config: baseConfig,
     ledger: {
-      "character|rux|spell_slots_l1": {
+      "character|rux|slots_l1": {
         spec: {
-          id: "spell_slots_l1",
+          id: "slots_l1",
           scope: "character",
           direction: "down",
           range: [0.0, 2.0],
@@ -75,14 +75,21 @@ function mageMagicState(): MagicState {
 
 describe("LedgerPanel — magic block (AC8)", () => {
   it("renders the prepared spells list for a Mage", () => {
-    render(<LedgerPanel magicState={mageMagicState()} actorId="rux" />);
-    // Both prepared spells visible. Magic Missile is still ready; Sleep is spent.
-    expect(screen.getByText(/magic.?missile/i)).toBeTruthy();
-    expect(screen.getByText(/sleep/i)).toBeTruthy();
+    const { container } = render(
+      <LedgerPanel magicState={mageMagicState()} characterId="rux" />,
+    );
+    // Both prepared spells visible (in the Memorized magic section).
+    // Use getAllByText since spells appear in both Known list and Prepared list.
+    const preparedSection = container.querySelector(
+      "[data-testid='magic-block-prepared']",
+    ) as HTMLElement;
+    expect(preparedSection).toBeTruthy();
+    expect(preparedSection.textContent).toMatch(/magic_missile/);
+    expect(preparedSection.textContent).toMatch(/sleep/i);
   });
 
   it("renders an L1 slot indicator showing 1 of 2 remaining", () => {
-    render(<LedgerPanel magicState={mageMagicState()} actorId="rux" />);
+    render(<LedgerPanel magicState={mageMagicState()} characterId="rux" />);
     // Slot count rendering — exact format up to the component author, but
     // "1/2" or "1 of 2" or two dots-with-one-empty must be visible.
     const text = document.body.textContent ?? "";
@@ -92,32 +99,19 @@ describe("LedgerPanel — magic block (AC8)", () => {
 
   it("marks spent spells as struck-through-but-visible", () => {
     const { container } = render(
-      <LedgerPanel magicState={mageMagicState()} actorId="rux" />,
+      <LedgerPanel magicState={mageMagicState()} characterId="rux" />,
     );
-    // Sleep was cast; should appear with a strikethrough class or <s>/<del> tag.
-    // The CSS class is up to the author; the test asserts "Sleep" is NOT
-    // hidden but DOES carry a 'spent' or 'struck' marker (via class, tag,
-    // or aria attribute).
-    const sleepEl = Array.from(container.querySelectorAll("*")).find((el) =>
+    // Sleep was cast; should appear inside the prepared section with a
+    // strikethrough class or <s>/<del> tag. We look for an <s>/<del>
+    // element OR an element with a 'spent' / 'struck' class containing
+    // 'sleep'.
+    const struckCandidates = Array.from(
+      container.querySelectorAll("s, del, .spent, .struck, [class*='spent']"),
+    );
+    const struckSleep = struckCandidates.find((el) =>
       (el.textContent ?? "").toLowerCase().includes("sleep"),
     );
-    expect(sleepEl).toBeTruthy();
-    // Walk up to find a strikethrough indicator.
-    let cursor: Element | null = sleepEl ?? null;
-    let foundStrike = false;
-    while (cursor && cursor !== container) {
-      const cls = cursor.getAttribute("class") ?? "";
-      if (
-        /spent|struck|cast/i.test(cls) ||
-        cursor.tagName === "S" ||
-        cursor.tagName === "DEL"
-      ) {
-        foundStrike = true;
-        break;
-      }
-      cursor = cursor.parentElement;
-    }
-    expect(foundStrike).toBe(true);
+    expect(struckSleep).toBeTruthy();
   });
 
   it("does not render magic block for non-casters", () => {
@@ -128,7 +122,7 @@ describe("LedgerPanel — magic block (AC8)", () => {
       spent_spells: {},
     } as unknown as MagicState;
     const { container } = render(
-      <LedgerPanel magicState={fighterState} actorId="sam" />,
+      <LedgerPanel magicState={fighterState} characterId="sam" />,
     );
     // No prepared/known section text should appear.
     const text = (container.textContent ?? "").toLowerCase();
@@ -145,7 +139,7 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
     const { container, rerender } = render(
       <LedgerPanel
         magicState={mageMagicState()}
-        actorId="rux"
+        characterId="rux"
         // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId={null}
       />,
@@ -153,7 +147,7 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
     rerender(
       <LedgerPanel
         magicState={mageMagicState()}
-        actorId="rux"
+        characterId="rux"
         // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId="fireball"
       />,
@@ -166,7 +160,7 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
     const { container } = render(
       <LedgerPanel
         magicState={mageMagicState()}
-        actorId="rux"
+        characterId="rux"
         // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId="fireball"
       />,

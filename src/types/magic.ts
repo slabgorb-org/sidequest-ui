@@ -129,6 +129,15 @@ export interface MagicState {
   // Server serializes ledger as Record<string, LedgerBar> with key = "scope|owner|bar".
   ledger: Record<string, LedgerBar>;
   working_log: WorkingRecord[];
+  // Story 47-10 — learned_v1 data layer. Populated by seed_learned_v1_state
+  // for actors whose ClassDef declares magic_config (Mage, Cleric in C&C).
+  known_spells?: Record<string, string[]>;            // actor_id -> spell IDs
+  prepared_spells?: Record<string, Record<number, string[]>>;  // actor_id -> level -> spell IDs
+  // Spent spells per actor per level — struck-through-but-visible until
+  // rest. The server populates this from working_log entries; the UI
+  // reads it directly so the MagicBlock can render the strikethrough
+  // without recomputing.
+  spent_spells?: Record<string, Record<number, string[]>>;
 }
 
 export function barKeyToString(k: BarKey): string {
