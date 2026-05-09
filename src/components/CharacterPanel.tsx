@@ -189,7 +189,7 @@ export function CharacterPanel({
               borderColor: FOLIO.gold,
               color: FOLIO.crimson,
               fontFamily: FONT_DISPLAY,
-              fontSize: 26,
+              fontSize: 28,
             }}
           >
             {toAvatarInitials(character.name)}
@@ -304,14 +304,14 @@ export function CharacterPanel({
                   : "2px solid transparent",
                 marginBottom: -1,
                 fontFamily: FONT_DISPLAY,
-                fontSize: 13,
+                fontSize: 15,
                 letterSpacing: 1,
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
               }}
             >
-              <span aria-hidden="true" style={{ color: FOLIO.gold, fontSize: 11 }}>
+              <span aria-hidden="true" style={{ color: FOLIO.gold, fontSize: 13 }}>
                 {tab.glyph}
               </span>
               {tab.label}
@@ -413,7 +413,7 @@ export function CharacterPanel({
                       color: FOLIO.crimson,
                       borderColor: FOLIO.gold,
                       fontFamily: FONT_DISPLAY,
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: 400,
                     }}
                   >
@@ -583,7 +583,7 @@ export function CharacterPanel({
                   color: FOLIO.gold,
                   borderColor: FOLIO.rule,
                   fontFamily: FONT_DISPLAY,
-                  fontSize: 12,
+                  fontSize: 14,
                   fontWeight: 400,
                 }}
               >
@@ -688,7 +688,7 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
       <span
         style={{
           fontFamily: FONT_DISPLAY,
-          fontSize: 12,
+          fontSize: 14,
           color: FOLIO.crimson,
           letterSpacing: 1,
         }}
@@ -712,7 +712,7 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
               style={{
                 flex: "1 1 0",
                 textAlign: "center",
-                fontSize: 11,
+                fontSize: 13,
                 lineHeight: 1,
                 color: filled ? fill : FOLIO.rule,
                 textShadow: filled ? `0 0 0 ${fill}` : "none",
@@ -773,7 +773,7 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
                 className="text-[var(--primary)] text-sm"
                 style={{
                   fontFamily: FONT_DISPLAY,
-                  fontSize: 12,
+                  fontSize: 14,
                   color: FOLIO.ink,
                   letterSpacing: 0.5,
                   overflow: "hidden",
@@ -787,7 +787,7 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
               <span
                 style={{
                   fontFamily: FONT_BODY,
-                  fontSize: 11,
+                  fontSize: 13,
                   color: FOLIO.gold,
                   fontStyle: "italic",
                   fontVariantNumeric: "tabular-nums",
@@ -801,7 +801,7 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
               className="font-mono"
               style={{
                 fontFamily: FONT_BODY,
-                fontSize: 22,
+                fontSize: 24,
                 color: FOLIO.ink,
                 lineHeight: 1.1,
                 marginTop: 2,
@@ -879,7 +879,7 @@ function AbilitiesContent({
                   alignItems: "center",
                   justifyContent: "center",
                   fontFamily: FONT_DISPLAY,
-                  fontSize: 18,
+                  fontSize: 20,
                   color: FOLIO.crimson,
                   lineHeight: 1,
                 }}
@@ -889,7 +889,7 @@ function AbilitiesContent({
               <span
                 style={{
                   fontFamily: FONT_BODY,
-                  fontSize: 13,
+                  fontSize: 15,
                   color: FOLIO.ink,
                   lineHeight: 1.3,
                   overflow: "hidden",
