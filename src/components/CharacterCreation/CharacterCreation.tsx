@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Pencil } from "lucide-react";
 import { toRoman } from "@/lib/utils";
 import { parseStatLine } from "./parseStatLine";
+import { StatArrangePanel } from "./StatArrangePanel";
+import { StoryPanel } from "./StoryPanel";
 
 interface CreationChoice {
   label: string;
@@ -28,6 +29,19 @@ export interface CreationScene {
   rolled_stats?: RolledStat[];
   previous_choice?: number;
   previous_input?: string;
+  // --- the_arrangement (stat_arrange input_type) ---
+  pool?: number[];
+  assignment?: Record<string, number | null>;
+  class_requirements?: { name: string; requirement_label: string }[];
+  qualifying_classes?: string[];
+  confirm_enabled?: boolean;
+  // --- the_story (story input_type) ---
+  pronouns_options?: string[];
+  pronouns_allow_freeform?: boolean;
+  background_optional?: boolean;
+  description_optional?: boolean;
+  autogen_available?: boolean;
+  autogen_result?: { background: string; description: string };
 }
 
 export interface CharacterCreationProps {
@@ -130,7 +144,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
         <div data-testid="character-review" className="bg-card/80 border border-border/50 rounded-lg p-6 w-full max-w-lg space-y-3">
           <div className="text-xs tracking-widest uppercase text-muted-foreground/60 mb-4">Character Sheet</div>
           {previewEntries.length > 0 ? (
-            previewEntries.map(([key, value], index) => {
+            previewEntries.map(([key, value]) => {
               // Stats arrive from the server as a flat string like
               // "STR 10  DEX 7  CON 12  INT 17  WIS 5  CHA 11" — built in
               // sidequest-server/sidequest/server/dispatch/chargen_summary.py
@@ -145,7 +159,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
                 <div
                   key={key}
                   data-testid={`review-section-${key}`}
-                  className="group/edit-row flex items-start justify-between py-2 px-2 -mx-2 rounded-md border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors"
+                  className="flex items-start py-2 px-2 -mx-2 rounded-md border-b border-border/20 last:border-0"
                 >
                   <div className="flex-1 min-w-0">
                     <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{key}</span>
@@ -173,15 +187,6 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
                       <p className="text-sm text-card-foreground">{String(value)}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => onRespond({ action: "edit", target_step: index })}
-                    data-testid={`review-edit-${key}`}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 group-hover/edit-row:text-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border/30 group-hover/edit-row:border-border/70 hover:border-border bg-transparent group-hover/edit-row:bg-card/40 ml-2 shrink-0"
-                    aria-label={`Edit ${key}`}
-                  >
-                    <Pencil aria-hidden="true" className="w-3 h-3" data-testid={`review-edit-icon-${key}`} />
-                    <span>Edit</span>
-                  </button>
                 </div>
               );
             })
@@ -204,6 +209,52 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Go Back
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (scene.input_type === "stat_arrange") {
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">
+          {scene.prompt}
+        </p>
+        <StatArrangePanel
+          pool={scene.pool ?? []}
+          assignment={scene.assignment ?? {}}
+          classRequirements={
+            (scene.class_requirements ?? []).map((r) => ({
+              name: r.name,
+              requirementLabel: r.requirement_label,
+            }))
+          }
+          qualifyingClasses={scene.qualifying_classes ?? []}
+          confirmEnabled={scene.confirm_enabled ?? false}
+          onAssign={({ stat, value }) => onRespond({ phase: "arrange_assign", stat, value })}
+          onClear={({ stat }) => onRespond({ phase: "arrange_clear", stat })}
+          onConfirm={() => onRespond({ phase: "arrange_confirm" })}
+          onReject={() => onRespond({ phase: "arrange_reject" })}
+        />
+      </div>
+    );
+  }
+
+  if (scene.input_type === "story") {
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">
+          {scene.prompt}
+        </p>
+        <StoryPanel
+          pronounsOptions={scene.pronouns_options ?? []}
+          pronounsAllowFreeform={scene.pronouns_allow_freeform ?? true}
+          backgroundOptional={scene.background_optional ?? true}
+          descriptionOptional={scene.description_optional ?? true}
+          autogenAvailable={scene.autogen_available ?? false}
+          autogenResult={scene.autogen_result}
+          onAutogen={() => onRespond({ phase: "story_autogen" })}
+          onConfirm={(payload) => onRespond({ phase: "story_confirm", ...payload })}
+        />
       </div>
     );
   }

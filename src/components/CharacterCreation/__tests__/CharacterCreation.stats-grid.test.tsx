@@ -124,10 +124,6 @@ describe("CharacterCreation confirmation preview — stats grid", () => {
     expect(
       screen.queryByText(/STR 10\s+DEX 7\s+CON 12/),
     ).not.toBeInTheDocument();
-
-    // The Stats row's Edit button is still wired — the grid swap must
-    // not break the existing affordance from Bug #1's fix.
-    expect(screen.getByLabelText(/Edit Stats/i)).toBeInTheDocument();
   });
 
   it("falls back to plain text for non-stat rows in the same preview", () => {
