@@ -140,7 +140,6 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
       <LedgerPanel
         magicState={mageMagicState()}
         characterId="rux"
-        // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId={null}
       />,
     );
@@ -148,7 +147,6 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
       <LedgerPanel
         magicState={mageMagicState()}
         characterId="rux"
-        // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId="fireball"
       />,
     );
@@ -161,7 +159,6 @@ describe("LedgerPanel — pulse-not-popup rejection (AC9)", () => {
       <LedgerPanel
         magicState={mageMagicState()}
         characterId="rux"
-        // @ts-expect-error — new prop introduced by 47-10
         rejectedSpellId="fireball"
       />,
     );
