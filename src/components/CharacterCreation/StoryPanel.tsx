@@ -18,6 +18,8 @@ export interface StoryPanelProps {
 export function StoryPanel({
   pronounsOptions,
   pronounsAllowFreeform,
+  backgroundOptional,
+  descriptionOptional,
   autogenAvailable,
   autogenResult,
   onAutogen,
@@ -96,8 +98,13 @@ export function StoryPanel({
 
       {/* Background */}
       <div>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground/60 mb-1">
-          Background
+        <div className="text-xs uppercase tracking-widest text-muted-foreground/60 mb-1 flex items-baseline gap-2">
+          <span>Background</span>
+          {backgroundOptional && (
+            <span className="normal-case tracking-normal text-[10px] text-muted-foreground/45 italic">
+              optional
+            </span>
+          )}
         </div>
         <textarea
           data-testid="story-background"
@@ -111,8 +118,13 @@ export function StoryPanel({
 
       {/* Description */}
       <div>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground/60 mb-1">
-          Description
+        <div className="text-xs uppercase tracking-widest text-muted-foreground/60 mb-1 flex items-baseline gap-2">
+          <span>Description</span>
+          {descriptionOptional && (
+            <span className="normal-case tracking-normal text-[10px] text-muted-foreground/45 italic">
+              optional
+            </span>
+          )}
         </div>
         <textarea
           data-testid="story-description"
@@ -125,30 +137,40 @@ export function StoryPanel({
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-3 justify-between border-t border-border/40 pt-3">
-        {autogenAvailable && (
+      <div className="flex flex-col gap-2 border-t border-border/40 pt-3">
+        <div className="flex gap-3 justify-between">
+          {autogenAvailable && (
+            <button
+              data-testid="story-autogen"
+              onClick={onAutogen}
+              className="text-sm px-4 py-2 rounded border border-border/50 hover:border-border text-muted-foreground hover:text-foreground"
+            >
+              Let Brecca tell my story
+            </button>
+          )}
           <button
-            data-testid="story-autogen"
-            onClick={onAutogen}
-            className="text-sm px-4 py-2 rounded border border-border/50 hover:border-border text-muted-foreground hover:text-foreground"
+            data-testid="story-confirm"
+            onClick={() =>
+              onConfirm({
+                pronouns: effectivePronouns,
+                background: background.trim(),
+                description: description.trim(),
+              })
+            }
+            disabled={!confirmEnabled}
+            className="text-sm px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
           >
-            Let Brecca tell my story
+            Confirm
           </button>
+        </div>
+        {!confirmEnabled && (
+          <div
+            data-testid="story-confirm-hint"
+            className="text-xs text-muted-foreground/60 italic self-end"
+          >
+            Choose pronouns to confirm.
+          </div>
         )}
-        <button
-          data-testid="story-confirm"
-          onClick={() =>
-            onConfirm({
-              pronouns: effectivePronouns,
-              background: background.trim(),
-              description: description.trim(),
-            })
-          }
-          disabled={!confirmEnabled}
-          className="text-sm px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
-        >
-          Confirm
-        </button>
       </div>
     </div>
   );
