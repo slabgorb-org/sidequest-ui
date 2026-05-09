@@ -170,62 +170,13 @@ describe("AC-2: review screen displays every choice made", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-3: Edit from review — each section has an "Edit" button
+// AC-3 (removed 2026-05-09): Per-section "Edit" buttons on review screen.
+// The Pencil edit affordance was dropped server-side as part of the chargen
+// big-improvements pass — characters now evolve through play rather than
+// pre-creation re-edits. The "Go Back" button on the review screen plus
+// the per-step "← Back" links remain. See plan
+// docs/superpowers/plans/2026-05-09-cnc-chargen-big-improvements.md task 6.4.
 // ---------------------------------------------------------------------------
-describe("AC-3: edit buttons on review screen", () => {
-  it("shows an Edit button for each choice section on the review screen", () => {
-    const props = defaultProps({
-      scene: makeConfirmationScene({
-        character_preview: {
-          name: "Aldric",
-          origin: "Noble birth",
-          class: "Warrior",
-        },
-      }),
-    });
-    render(<CharacterCreation {...props} />);
-
-    const editButtons = screen.getAllByRole("button", { name: /edit/i });
-    // At least one edit button per choice section
-    expect(editButtons.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("navigates to the specific step when its Edit button is clicked", async () => {
-    const user = userEvent.setup();
-    const onRespond = vi.fn();
-    const props = defaultProps({
-      scene: makeConfirmationScene({
-        character_preview: {
-          name: "Aldric",
-          origin: "Noble birth",
-          class: "Warrior",
-        },
-      }),
-      onRespond,
-    });
-    render(<CharacterCreation {...props} />);
-
-    const editButtons = screen.getAllByRole("button", { name: /edit/i });
-    // Click the first edit button (should navigate to that step)
-    await user.click(editButtons[0]);
-
-    // Should signal navigation to a specific step, not submission.
-    // Wire format must be snake_case (`target_step`) to match the server's
-    // pydantic schema — playtest 2026-04-26 caught the camelCase regression.
-    const calls = onRespond.mock.calls;
-    const editCall = calls.find((call) => {
-      const payload = call[0] as Record<string, unknown>;
-      return payload.action === "edit";
-    });
-    expect(editCall).toBeDefined();
-    const editPayload = editCall![0] as Record<string, unknown>;
-    expect(editPayload.action).toBe("edit");
-    expect(typeof editPayload.target_step).toBe("number");
-    // Lock the fix: must NOT use camelCase. Server's pydantic config has
-    // `extra: forbid` and would reject `targetStep` outright.
-    expect(editPayload.targetStep).toBeUndefined();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // AC-4: No accidental submit — only "Create Character" button submits
