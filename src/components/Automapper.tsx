@@ -328,10 +328,7 @@ export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
   if (currentRoom?.grid) {
     return (
       <div style={{ maxWidth: "100%" }}>
-        <TacticalGridRenderer
-          grid={currentRoom.grid}
-          theme={DEFAULT_TACTICAL_THEME}
-        />
+        <TacticalGridRenderer grid={currentRoom.grid} />
       </div>
     );
   }
