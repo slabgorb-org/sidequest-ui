@@ -179,10 +179,14 @@ function toExploredRooms(mapData: MapState): ExploredRoom[] {
       // ExploredRoom.id we just assigned above via `keyFor`.
       to_room_id: ex.target,
     })),
-    // Story 35-7 + 2026-04-10 playtest fix: translate the wire-format
-    // tactical grid (string cells + features sidecar) into the renderer's
-    // typed-cell shape. Without this adapter every cell rendered with
-    // fill=undefined and the panel was solid black.
-    grid: loc.tactical_grid ? tacticalGridFromWire(loc.tactical_grid) : undefined,
+    // ADR-096 Task 20b: prefer the TACTICAL_GRID message payload (cavern_payload)
+    // when present — it carries the image-mode cavern data delivered on room
+    // entry. Fall back to the legacy SVG-mode tactical_grid for worlds that
+    // still send it via MAP_UPDATE.
+    grid: loc.cavern_payload
+      ? tacticalGridFromWire(loc.cavern_payload) ?? undefined
+      : loc.tactical_grid
+        ? tacticalGridFromWire(loc.tactical_grid as Parameters<typeof tacticalGridFromWire>[0])
+        : undefined,
   }));
 }
