@@ -106,6 +106,13 @@ export interface RenderSegmentOpts {
    * "past vs present" hierarchy without sacrificing body legibility.
    */
   isHistory?: boolean;
+  /**
+   * When true, this is the first text segment of the current (most recent)
+   * turn — the opening paragraph gets a per-archetype drop cap. See the
+   * `narr-text-current.has-dropcap > p:first-child::first-letter` rules in
+   * `styles/archetype-chrome.css`.
+   */
+  isFirstCurrentText?: boolean;
 }
 
 export function renderSegment(
@@ -118,6 +125,7 @@ export function renderSegment(
     chapterTitle = null,
     dinkusGlyph = "◇",
     isHistory = false,
+    isFirstCurrentText = false,
   } = opts;
 
   switch (seg.kind) {
@@ -125,13 +133,15 @@ export function renderSegment(
       // Current turn gets larger, looser type for serif body legibility.
       // History uses base size + relaxed leading — still readable, visually
       // recessed via the wrapper's opacity (see NarrationScroll).
-      const textClass = isHistory
-        ? "prose dark:prose-invert text-lg leading-relaxed"
-        : "prose dark:prose-invert text-2xl leading-loose";
+      const sizeClass = isHistory
+        ? "text-lg leading-relaxed"
+        : "text-2xl leading-loose";
+      const variantClass = isHistory ? "narr-text-history" : "narr-text-current";
+      const dropcapClass = isFirstCurrentText && !isHistory ? " has-dropcap" : "";
       return (
         <div key={i} className={`${maxTextWidth} mx-auto mb-6`}>
           <div
-            className={textClass}
+            className={`narr-text ${variantClass}${dropcapClass} prose dark:prose-invert ${sizeClass}`}
             dangerouslySetInnerHTML={{ __html: seg.html! }}
           />
           <FootnoteList footnotes={seg.footnotes} />
@@ -195,7 +205,7 @@ export function renderSegment(
         <div
           key={i}
           data-testid="player-action"
-          className="text-base text-muted-foreground/70 italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20"
+          className="player-action text-base text-muted-foreground/70 italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20"
         >
           {seg.text}
         </div>

@@ -392,3 +392,146 @@
       color-mix(in srgb, var(--surface, var(--card)) 95%, transparent)
     );
 }
+
+
+/* ── Narration Pane Typography ────────────────────────────────────────────
+   Per-archetype overrides for narration body text, drop caps, player-action
+   treatments, and the streaming cursor block. Sourced from the Narration
+   Pane design handoff (claude.ai/design — May 2026). The Tailwind size
+   classes on the prose div (text-2xl / text-lg) provide the cross-archetype
+   default; these rules tighten font-size, leading, and accent treatment per
+   archetype so each genre family reads in its own voice.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Streaming cursor — shared blink animation. Color overridden per archetype. */
+@keyframes narration-cursor-blink {
+  50% { opacity: 0; }
+}
+.streaming-cursor {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.18em;
+  background: var(--primary);
+  animation: narration-cursor-blink 1s steps(2, start) infinite;
+}
+
+/* Parchment narration — Garamond, 21px, 1.7 leading, gold drop cap. */
+[data-archetype="parchment"] .narr-text-current p {
+  font-family: var(--font-body);
+  font-size: 21px;
+  line-height: 1.7;
+}
+[data-archetype="parchment"] .narr-text-history p {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+}
+[data-archetype="parchment"] .narr-text em {
+  color: var(--accent);
+  font-style: italic;
+}
+[data-archetype="parchment"] .narr-text strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+[data-archetype="parchment"] .narr-text-current.has-dropcap > p:first-child::first-letter {
+  font-family: var(--font-display, var(--font-body));
+  float: left;
+  font-size: 4.2em;
+  line-height: 0.9;
+  padding: 0.05em 0.12em 0 0;
+  color: var(--primary);
+  font-weight: 600;
+}
+[data-archetype="parchment"] .player-action {
+  border-left-width: 2px;
+  font-style: italic;
+}
+
+/* Terminal narration — Share Tech Mono, 17px, 1.65 leading, glow accents,
+   cursor in accent green. */
+[data-archetype="terminal"] .narr-text-current p {
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+}
+[data-archetype="terminal"] .narr-text-history p {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+[data-archetype="terminal"] .narr-text em {
+  color: var(--accent);
+  font-style: normal;
+  text-shadow: 0 0 6px var(--glow-accent);
+}
+[data-archetype="terminal"] .narr-text strong {
+  color: var(--primary);
+  font-weight: 600;
+  text-shadow: 0 0 4px var(--glow-primary);
+}
+[data-archetype="terminal"] .narr-text-current.has-dropcap > p:first-child::first-letter {
+  font-family: var(--font-ui);
+  float: left;
+  font-size: 4.2em;
+  line-height: 0.9;
+  padding: 0.05em 0.12em 0 0;
+  color: var(--primary);
+  font-weight: 700;
+  text-shadow: 0 0 16px var(--glow-primary);
+}
+[data-archetype="terminal"] .streaming-cursor {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--glow-accent);
+}
+/* Terminal player-action: prefix with `> ` and accent the line. */
+[data-archetype="terminal"] .player-action {
+  font-style: normal;
+  letter-spacing: 0.02em;
+  border-left-color: var(--accent);
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--glow-accent);
+}
+[data-archetype="terminal"] .player-action::before {
+  content: "> ";
+  opacity: 0.6;
+}
+
+/* Rugged narration — Source Sans 3, 19px, 1.65 leading, accent drop cap. */
+[data-archetype="rugged"] .narr-text-current p {
+  font-family: var(--font-body);
+  font-size: 19px;
+  line-height: 1.65;
+}
+[data-archetype="rugged"] .narr-text-history p {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+}
+[data-archetype="rugged"] .narr-text em {
+  color: var(--accent);
+  font-style: italic;
+}
+[data-archetype="rugged"] .narr-text strong {
+  color: var(--foreground);
+  font-weight: 700;
+}
+[data-archetype="rugged"] .narr-text-current.has-dropcap > p:first-child::first-letter {
+  font-family: var(--font-ui);
+  float: left;
+  font-size: 4.2em;
+  line-height: 0.9;
+  padding: 0.05em 0.12em 0 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+/* Rugged player-action: heavy 3px primary rule, weight 500 italic. */
+[data-archetype="rugged"] .player-action {
+  border-left-width: 3px;
+  border-left-color: var(--primary);
+  font-style: italic;
+  font-weight: 500;
+}

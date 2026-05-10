@@ -53,18 +53,29 @@ export function NarrationCards({ messages, thinking }: NarrationCardsProps) {
 
   const turns = useMemo(() => groupIntoTurns(segments), [segments]);
 
+  const lastTurnIdx = turns.length - 1;
+
   return (
     <div data-testid="narration-cards" className="flex-1 min-h-0 overflow-y-auto px-6 py-8">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {turns.map((turnSegs, ti) => (
-          <div
-            key={ti}
-            data-testid="narration-card"
-            className="rounded-lg border border-border/30 bg-card/50 p-4 shadow-sm space-y-2"
-          >
-            {turnSegs.map((seg, si) => renderSegment(seg, ti * 1000 + si, { maxTextWidth: "" }))}
-          </div>
-        ))}
+        {turns.map((turnSegs, ti) => {
+          // Drop cap goes on the opening paragraph of the *current* (last) card.
+          const firstTextIdx = ti === lastTurnIdx ? turnSegs.findIndex((s) => s.kind === "text") : -1;
+          return (
+            <div
+              key={ti}
+              data-testid="narration-card"
+              className="rounded-lg border border-border/30 bg-card/50 p-4 shadow-sm space-y-2"
+            >
+              {turnSegs.map((seg, si) =>
+                renderSegment(seg, ti * 1000 + si, {
+                  maxTextWidth: "",
+                  isFirstCurrentText: si === firstTextIdx,
+                }),
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {turns.length === 0 && <EmptyNarrationState />}

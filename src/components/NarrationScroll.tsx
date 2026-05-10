@@ -77,6 +77,12 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
   const historySegments = hasHistory ? segments.slice(0, lastSeparatorIdx) : [];
   const currentSegments = hasHistory ? segments.slice(lastSeparatorIdx + 1) : segments;
 
+  // First text segment in the current block gets the drop-cap class. The
+  // archetype-chrome.css rules render an oversized initial in the display
+  // font, matching the "chapter-opening paragraph" treatment from the
+  // narration design handoff (see styles/archetype-chrome.css).
+  const firstCurrentTextIdx = currentSegments.findIndex((s) => s.kind === "text");
+
   // Streaming segment: rendered as a live suffix when the current turn is
   // in-flight (delta chunks arrived, canonical not yet landed).
   // Rules (per task spec):
@@ -168,22 +174,29 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
                 )}
               </div>
             )}
-            {/* Current turn — full opacity, larger leading for serif body */}
+            {/* Current turn — full opacity, larger leading for serif body.
+                The first text segment receives `has-dropcap` so the
+                archetype-chrome.css rule can render the per-archetype
+                oversized initial. */}
             {currentSegments.map((seg, i) =>
-              renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
+              renderSegment(seg, historySegments.length + 1 + i, {
+                maxTextWidth: "max-w-[85ch]",
+                isFirstCurrentText: i === firstCurrentTextIdx,
+              }),
             )}
             {/* Live streaming segment — rendered only while canonical has not
                 yet arrived for the active turn. Reuses current-turn typography
                 (text-2xl leading-loose) to match canonical narration styling.
-                Appears as a suffix after any canonical segments that may already
-                exist in the current turn block. */}
+                Trailing `streaming-cursor` is decorative — a blinking block
+                rendered by archetype-chrome.css (per the narration design). */}
             {liveText && (
               <div
                 data-testid="narration-streaming-text"
                 className="max-w-[85ch] mx-auto mb-6"
               >
-                <div className="prose dark:prose-invert text-2xl leading-loose">
+                <div className="narr-text narr-text-current narration-streaming-text prose dark:prose-invert text-2xl leading-loose">
                   {liveText}
+                  <span aria-hidden="true" className="streaming-cursor" />
                 </div>
               </div>
             )}

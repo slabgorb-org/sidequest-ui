@@ -42,13 +42,20 @@ export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
   const isLast = index >= pages.length - 1;
   const currentPage = hasPages ? pages[Math.min(index, pages.length - 1)] : [];
 
+  // Drop cap is reserved for the *current* turn's opening paragraph — only
+  // when the viewer is parked on the latest page.
+  const firstTextIdx = isLast ? currentPage.findIndex((s) => s.kind === "text") : -1;
+
   return (
     <div data-testid="narration-focus" className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto px-6 py-8">
         {currentPage.length > 0 && (
           <div className="max-w-[85ch] w-full mx-auto">
             {currentPage.map((seg, i) =>
-              renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
+              renderSegment(seg, i, {
+                maxTextWidth: "max-w-[85ch]",
+                isFirstCurrentText: i === firstTextIdx,
+              }),
             )}
           </div>
         )}
