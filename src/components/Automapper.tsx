@@ -5,6 +5,7 @@ import { DungeonMapRenderer } from "@/components/DungeonMapRenderer";
 import { TacticalGridRenderer } from "@/components/TacticalGridRenderer";
 import { SettlementRoomView } from "@/components/SettlementRoomView";
 import type {
+  LegacyTacticalGridData,
   TacticalGridData,
   TacticalThemeConfig,
   DungeonLayoutData,
@@ -24,7 +25,10 @@ export interface ExploredRoom {
   size: string;
   is_current: boolean;
   exits: ExitInfo[];
-  grid?: TacticalGridData;
+  /** SVG-mode grid for DungeonMapRenderer (multi-room dungeon layout). */
+  grid?: LegacyTacticalGridData;
+  /** Image-mode cavern grid for TacticalGridRenderer (single-room cavern view, ADR-096). */
+  cavernGrid?: TacticalGridData;
   settlement?: {
     description: string;
     exits: { to: string; label: string }[];
@@ -213,7 +217,7 @@ const EXIT_ICONS: Record<string, string> = {
 
 function buildDungeonLayout(rooms: ExploredRoom[]): DungeonLayoutData {
   const gridRooms = rooms.filter(
-    (r): r is ExploredRoom & { grid: TacticalGridData } => !!r.grid
+    (r): r is ExploredRoom & { grid: LegacyTacticalGridData } => !!r.grid
   );
   if (gridRooms.length === 0)
     return { rooms: [], globalWidth: 0, globalHeight: 0 };
@@ -340,11 +344,11 @@ export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
     );
   }
 
-  // 2. Single room with grid → TacticalGridRenderer (single-room tactical view)
-  if (currentRoom?.grid) {
+  // 2. Single cavern room → TacticalGridRenderer (image-mode, ADR-096)
+  if (currentRoom?.cavernGrid) {
     return (
       <div style={{ maxWidth: "100%" }}>
-        <TacticalGridRenderer grid={currentRoom.grid} />
+        <TacticalGridRenderer grid={currentRoom.cavernGrid} />
       </div>
     );
   }
