@@ -383,4 +383,34 @@ describe("Automapper", () => {
       expect(document.querySelector(".current-room")).not.toBeInTheDocument();
     });
   });
+
+  // ============================================================================
+  // AC-8: Settlement branch routing (ADR-096)
+  // ============================================================================
+
+  describe("AC-8: settlement routing", () => {
+    it("routes settlement rooms to SettlementRoomView", () => {
+      const { getByTestId, queryByTestId } = render(
+        <Automapper
+          rooms={[
+            {
+              id: "confessional",
+              name: "The Confessional",
+              room_type: "settlement",
+              size: "small",
+              is_current: true,
+              exits: [],
+              settlement: {
+                description: "A small house keyed to humility, against pride.",
+                exits: [{ to: "sunden_square", label: "out to the square" }],
+              },
+            },
+          ]}
+          currentRoomId="confessional"
+        />
+      );
+      expect(getByTestId("settlement-room-view")).toBeInTheDocument();
+      expect(queryByTestId("tactical-grid-renderer")).not.toBeInTheDocument();
+    });
+  });
 });
