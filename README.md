@@ -1,8 +1,9 @@
 # SideQuest UI
 
 React/TypeScript game client for the SideQuest AI Narrator. Connects to the
-[Rust API](https://github.com/slabgorb/sidequest-api) via WebSocket for
-real-time game sessions.
+Python [sidequest-server](https://github.com/slabgorb/sidequest-server) via
+WebSocket for real-time game sessions (the Rust prototype `sidequest-api` is
+archived read-only per ADR-082).
 
 ## Quick Start
 
@@ -14,7 +15,7 @@ npm run build     # Type-check + production build
 npm run lint      # ESLint
 ```
 
-The dev server proxies four paths to the Rust API at `localhost:8765`:
+The dev server proxies four paths to the Python server at `localhost:8765`:
 
 | Path       | Target                    |
 |------------|---------------------------|
@@ -137,6 +138,8 @@ npx vitest run --ui   # Browser UI
 
 ## Related Repos
 
-- [orc-quest](https://github.com/slabgorb/orc-quest) — Orchestrator (sprint tracking, ADRs, genre packs)
-- [sidequest-api](https://github.com/slabgorb/sidequest-api) — Rust backend
-- [sidequest-daemon](https://github.com/slabgorb/sidequest-daemon) — Python media services
+- [orc-quest](https://github.com/slabgorb/orc-quest) — Orchestrator (sprint tracking, ADRs)
+- [sidequest-server](https://github.com/slabgorb/sidequest-server) — Python FastAPI backend
+- [sidequest-daemon](https://github.com/slabgorb/sidequest-daemon) — Python media services (Z-Image, ACE-Step)
+- [sidequest-content](https://github.com/slabgorb/sidequest-content) — Genre packs
+- [sidequest-api](https://github.com/slabgorb/sidequest-api) — Archived Rust prototype (read-only, ADR-082)
