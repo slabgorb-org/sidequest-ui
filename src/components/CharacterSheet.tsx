@@ -1,3 +1,13 @@
+export type AbilitySource = "Race" | "Class" | "Item" | "Play";
+
+export interface AbilityDefinition {
+  name: string;
+  genre_description: string;
+  mechanical_effect: string;
+  involuntary: boolean;
+  source: AbilitySource;
+}
+
 export interface CharacterSheetData {
   name: string;
   class: string;
@@ -18,7 +28,8 @@ export interface CharacterSheetData {
    *  members[].max_hp. See `hp` field doc for the legacy-name caveat. */
   hp_max?: number;
   stats: Record<string, number>;
-  abilities: string[];
+  abilities: AbilityDefinition[];
+  class_moves: string[];
   backstory: string;
   portrait_url?: string;
   current_location?: string;
