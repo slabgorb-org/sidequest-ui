@@ -1,13 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { CharacterSheet } from '../CharacterSheet';
+import type { AbilityDefinition } from '../CharacterSheet';
+
+const makeAbility = (name: string): AbilityDefinition => ({
+  name,
+  genre_description: `${name} description.`,
+  mechanical_effect: `${name} effect.`,
+  involuntary: false,
+  source: "Class",
+});
 
 const BASE_DATA = {
   name: 'Kael',
   class: 'Ranger',
   level: 3,
   stats: { strength: 14, dexterity: 18, constitution: 12, intelligence: 10, wisdom: 15, charisma: 8 },
-  abilities: ['Tracker', 'Beast Companion'],
+  abilities: [makeAbility('Tracker'), makeAbility('Beast Companion')],
+  class_moves: [] as string[],
   backstory: 'Born in the Ashwood, raised by wolves.',
   portrait_url: '/renders/kael.png',
 };

@@ -18,7 +18,7 @@ import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
-import type { CharacterSheetData } from "@/components/CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
@@ -796,7 +796,8 @@ function AppInner() {
             hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
             hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
             stats: (sheetFacet.stats as Record<string, number>) ?? {},
-            abilities: (sheetFacet.abilities as string[]) ?? [],
+            abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
+            class_moves: (sheetFacet.class_moves as string[]) ?? [],
             backstory: (sheetFacet.backstory as string) ?? "",
             portrait_url: (rawLocal.portrait_url as string) || undefined,
             current_location: (rawLocal.current_location as string) ?? "",

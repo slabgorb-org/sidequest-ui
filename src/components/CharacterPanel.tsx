@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { CSSProperties } from "react";
-import type { CharacterSheetData } from "./CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
@@ -325,6 +325,7 @@ export function CharacterPanel({
         {activeTab === "abilities" && (
           <AbilitiesContent
             abilities={character.abilities}
+            class_moves={character.class_moves ?? []}
             magicState={magicState}
             characterId={character.name}
           />
@@ -817,93 +818,141 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
   );
 }
 
-function AbilitiesContent({
+export function AbilitiesContent({
   abilities,
+  class_moves,
   magicState,
   characterId,
 }: {
-  abilities: string[];
+  abilities: AbilityDefinition[];
+  class_moves: string[];
   magicState: MagicState | null;
   characterId: string;
 }) {
-  // The 'auto-filled' suffix is server-side scaffolding noise from genres
-  // where missing fields are stubbed during chargen — don't surface it.
-  const real = abilities.filter((a) => !a.includes("auto-filled"));
+  // Filter scaffolding leaks (server-side filter is the source of truth, but
+  // a client guard prevents regressions if a future server change forgets).
+  const real = abilities.filter((a) => !a.name.includes("auto-filled"));
+
+  const classAbilities = real.filter((a) => a.source === "Class");
+  const itemAbilities = real.filter((a) => a.source === "Item");
+  const playAbilities = real.filter((a) => a.source === "Play");
+
+  const showClassSig = classAbilities.length > 0;
+  const showClassMoves = class_moves.length > 0;
+  const showItem = itemAbilities.length > 0;
+  const showEarned = playAbilities.length > 0;
+
   return (
-    <div>
-      {real.length === 0 ? (
-        <p
-          className="text-sm text-muted-foreground/60"
-          style={{
-            color: FOLIO.inkSoft,
-            fontFamily: FONT_BODY,
-            fontStyle: "italic",
-          }}
-        >
-          No abilities.
-        </p>
-      ) : (
-        <ul
-          className="list-disc list-inside text-sm space-y-1"
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-          }}
-        >
-          {real.map((ability) => (
-            <li
-              key={ability}
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                padding: "6px 10px",
-                background: FOLIO.paper2,
-                border: `1px solid ${FOLIO.rule}`,
-                minWidth: 0,
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  flexShrink: 0,
-                  width: 26,
-                  height: 26,
-                  border: `1px solid ${FOLIO.gold}`,
-                  background: FOLIO.paper,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: FONT_DISPLAY,
-                  fontSize: 20,
-                  color: FOLIO.crimson,
-                  lineHeight: 1,
-                }}
-              >
-                {ability.charAt(0).toUpperCase()}
-              </span>
-              <span
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: 15,
-                  color: FOLIO.ink,
-                  lineHeight: 1.3,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  minWidth: 0,
-                }}
-              >
-                {ability}
-              </span>
-            </li>
-          ))}
-        </ul>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {showClassSig && (
+        <section>
+          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+            Class signature
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {classAbilities.map((a) => (
+              <AbilityCard key={a.name} ability={a} />
+            ))}
+          </div>
+        </section>
       )}
+
+      {showClassMoves && (
+        <section>
+          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+            Class moves
+          </h4>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {class_moves.map((m) => (
+              <span
+                key={m}
+                style={{
+                  padding: "2px 8px",
+                  background: FOLIO.paper2,
+                  border: `1px solid ${FOLIO.rule}`,
+                  fontFamily: FONT_BODY,
+                  fontSize: 13,
+                  color: FOLIO.ink,
+                }}
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showItem && (
+        <section>
+          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+            From inventory
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {itemAbilities.map((a) => (
+              <AbilityCard key={a.name} ability={a} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showEarned && (
+        <section>
+          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+            Earned
+          </h4>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {playAbilities.map((a) => (
+              <AbilityCard key={a.name} ability={a} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <SensitivitiesSection magicState={magicState} characterId={characterId} />
+    </div>
+  );
+}
+
+function AbilityCard({ ability }: { ability: AbilityDefinition }) {
+  return (
+    <div
+      style={{
+        padding: 10,
+        background: FOLIO.paper2,
+        border: `1px solid ${FOLIO.gold}`,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontSize: 17,
+          color: FOLIO.ink,
+          marginBottom: 4,
+        }}
+      >
+        {ability.name}
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 14,
+          color: FOLIO.ink,
+          marginBottom: 6,
+          lineHeight: 1.4,
+        }}
+      >
+        {ability.genre_description}
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_BODY,
+          fontSize: 12,
+          fontStyle: "italic",
+          color: FOLIO.inkSoft,
+        }}
+      >
+        {ability.mechanical_effect}
+      </div>
     </div>
   );
 }

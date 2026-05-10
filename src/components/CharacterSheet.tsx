@@ -1,3 +1,13 @@
+export type AbilitySource = "Race" | "Class" | "Item" | "Play";
+
+export interface AbilityDefinition {
+  name: string;
+  genre_description: string;
+  mechanical_effect: string;
+  involuntary: boolean;
+  source: AbilitySource;
+}
+
 export interface CharacterSheetData {
   name: string;
   class: string;
@@ -18,7 +28,8 @@ export interface CharacterSheetData {
    *  members[].max_hp. See `hp` field doc for the legacy-name caveat. */
   hp_max?: number;
   stats: Record<string, number>;
-  abilities: string[];
+  abilities: AbilityDefinition[];
+  class_moves: string[];
   backstory: string;
   portrait_url?: string;
   current_location?: string;
@@ -75,7 +86,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           <h3 className="text-sm font-semibold mb-1">Abilities</h3>
           <ul className="list-disc list-inside text-sm">
             {data.abilities.map((ability) => (
-              <li key={ability}>{toDisplayName(ability)}</li>
+              <li key={ability.name}>{toDisplayName(ability.name)}</li>
             ))}
           </ul>
         </div>
