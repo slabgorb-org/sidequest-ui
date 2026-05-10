@@ -149,6 +149,7 @@ describe("LedgerPanel wiring into CharacterPanel", () => {
           level: 1,
           stats: {},
           abilities: [],
+          class_moves: [],
           backstory: "x",
         }}
         magicState={magicState}
@@ -170,6 +171,7 @@ describe("LedgerPanel wiring into CharacterPanel", () => {
           level: 1,
           stats: {},
           abilities: [],
+          class_moves: [],
           backstory: "x",
         }}
         magicState={null}

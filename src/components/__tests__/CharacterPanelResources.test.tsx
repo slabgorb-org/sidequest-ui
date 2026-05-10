@@ -13,7 +13,16 @@ const CHARACTER: CharacterSheetData = {
   class: "Ranger",
   level: 3,
   stats: { strength: 14, dexterity: 18 },
-  abilities: ["Tracker"],
+  abilities: [
+    {
+      name: "Tracker",
+      genre_description: "",
+      mechanical_effect: "",
+      involuntary: false,
+      source: "Class",
+    },
+  ],
+  class_moves: [],
   backstory: "Born in the Ashwood.",
   portrait_url: "/renders/kael.png",
   current_location: "The Rusty Cantina",
