@@ -179,14 +179,15 @@ function toExploredRooms(mapData: MapState): ExploredRoom[] {
       // ExploredRoom.id we just assigned above via `keyFor`.
       to_room_id: ex.target,
     })),
-    // ADR-096 Task 20b: prefer the TACTICAL_GRID message payload (cavern_payload)
-    // when present — it carries the image-mode cavern data delivered on room
-    // entry. Fall back to the legacy SVG-mode tactical_grid for worlds that
-    // still send it via MAP_UPDATE.
-    grid: loc.cavern_payload
-      ? tacticalGridFromWire(loc.cavern_payload) ?? undefined
-      : loc.tactical_grid
-        ? tacticalGridFromWire(loc.tactical_grid as Parameters<typeof tacticalGridFromWire>[0])
-        : undefined,
+    // ADR-096 Task 20b: cavern rooms carry their image-mode grid via the
+    // TACTICAL_GRID message (parked under `cavern_payload`); the renderer
+    // takes them through TacticalGridRenderer. Settlement rooms route via
+    // `room_type === "settlement"` and don't populate a grid here. The
+    // legacy `tactical_grid` wire field on MAP_UPDATE has a distinct shape
+    // (width/height/cells/features) that no current world emits — leave it
+    // unconsumed until a wire-to-LegacyTacticalGridData parser lands.
+    cavernGrid: loc.cavern_payload
+      ? (tacticalGridFromWire(loc.cavern_payload) ?? undefined)
+      : undefined,
   }));
 }

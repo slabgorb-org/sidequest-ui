@@ -1,7 +1,7 @@
 import { render, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type {
-  TacticalGridData,
+  LegacyTacticalGridData,
   TacticalThemeConfig,
   TacticalCell,
   DungeonLayoutData,
@@ -27,7 +27,7 @@ const CAVERN_THEME: TacticalThemeConfig = {
 };
 
 /** Simple 3x3 room grid — floor center, walls around. */
-function make3x3Room(): TacticalGridData {
+function make3x3Room(): LegacyTacticalGridData {
   const w: TacticalCell = { type: "wall" };
   const f: TacticalCell = { type: "floor" };
   return {
@@ -44,7 +44,7 @@ function make3x3Room(): TacticalGridData {
 }
 
 /** 3x3 room with an exit on the west wall — connects to make3x3Room via shared wall. */
-function make3x3RoomWestExit(): TacticalGridData {
+function make3x3RoomWestExit(): LegacyTacticalGridData {
   const w: TacticalCell = { type: "wall" };
   const f: TacticalCell = { type: "floor" };
   return {
@@ -704,7 +704,7 @@ describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
         size: "medium",
         is_current: true,
         exits: [],
-        grid: cavernGrid,
+        cavernGrid,
       },
     ];
     const { container } = render(
@@ -942,7 +942,7 @@ describe("DungeonMapRenderer — edge cases", () => {
     const DungeonMapRenderer = await importDungeonMapRenderer();
     const w: TacticalCell = { type: "wall" };
     const f: TacticalCell = { type: "floor" };
-    const bigRoom: TacticalGridData = {
+    const bigRoom: LegacyTacticalGridData = {
       width: 5,
       height: 5,
       cells: [

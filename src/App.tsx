@@ -20,7 +20,7 @@ import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
 import type { CharacterSheetData, AbilityDefinition } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
-import type { MapState } from "@/components/MapOverlay";
+import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
@@ -872,19 +872,12 @@ function AppInner() {
     // ExploredLocation in mapData with the payload so the Automapper can
     // route by room_type and render cavern grids via TacticalGridRenderer.
     if (msg.type === MessageType.TACTICAL_GRID) {
-      const tgPayload = msg.payload as {
-        room_id: string;
-        room_name: string;
-        room_type: "cavern" | "settlement";
-        mask: string | null;
-        cavern_image_url: string | null;
-        cell_size: number | null;
-        cellular: object | null;
-        derived: object | null;
-        tokens: unknown[];
-        settlement_description?: string | null;
-        settlement_exits?: Record<string, unknown>[] | null;
-      };
+      // Shape mirrors ExploredLocation.cavern_payload exactly so the patch
+      // below type-checks. Loosening cellular/derived to ``object | null``
+      // breaks the ExploredLocation contract (TS2345 at the setMapData
+      // call) — the TACTICAL_GRID wire shape and the patched-into shape
+      // must agree at the field level.
+      const tgPayload = msg.payload as NonNullable<ExploredLocation["cavern_payload"]>;
       setMapData((prev) => {
         if (!prev) return prev;
         const explored = prev.explored.map((loc) => {
