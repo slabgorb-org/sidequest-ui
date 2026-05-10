@@ -684,24 +684,37 @@ describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
 
   it("still delegates to TacticalGridRenderer for single grid room", async () => {
     const Automapper = await importAutomapper();
+    // Image-mode fixture (ADR-096) — new TacticalGridData shape.
+    const cavernGrid = {
+      room_id: "lone_room",
+      room_name: "Lone Room",
+      room_type: "cavern" as const,
+      mask: "...\n...\n...",
+      cavern_image_url: "/genre/test/lone_room.cavern.png",
+      cell_size: 24,
+      cellular: { size: [3, 3] as [number, number], seed: 1, density: 0.55, cutoff: 5, passes: 4 },
+      derived: { floor_count: 9, exits: {}, pois: [] as [number, number][] },
+      tokens: [],
+    };
     const rooms = [
       {
         id: "r1",
         name: "Lone Room",
-        room_type: "chamber",
+        room_type: "cavern",
         size: "medium",
         is_current: true,
         exits: [],
-        grid: make3x3Room(),
+        grid: cavernGrid,
       },
     ];
     const { container } = render(
       <Automapper rooms={rooms} currentRoomId="r1" />
     );
 
-    // Single grid room → TacticalGridRenderer, which uses data-cell-type
-    const cellElements = container.querySelectorAll("[data-cell-type]");
-    expect(cellElements.length).toBeGreaterThan(0);
+    // Single cavern grid room → TacticalGridRenderer (image mode),
+    // which renders data-testid="cavern-floor", not SVG data-cell-type cells.
+    const cavernFloor = container.querySelector('[data-testid="cavern-floor"]');
+    expect(cavernFloor).not.toBeNull();
 
     // Should NOT have multi-room data-room-id groups
     const roomGroups = container.querySelectorAll("[data-room-id]");

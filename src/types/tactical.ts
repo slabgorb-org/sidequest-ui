@@ -1,9 +1,10 @@
-// TypeScript equivalents of Rust tactical grid types (ADR-071).
-// Mirrors: sidequest-api/crates/sidequest-game/src/tactical/grid.rs
+// TypeScript types for tactical grid rendering (ADR-096 rewrite).
+
+// ─── SVG-mode legacy types (used by DungeonMapRenderer / PlacedRoomData) ────
 
 /**
- * A single cell in a tactical grid.
- * Matches the Rust TacticalCell enum variants.
+ * A single cell type for SVG-mode dungeon rendering.
+ * Still used by DungeonMapRenderer / PlacedRoomData.
  */
 export type TacticalCellType =
   | "floor"
@@ -16,7 +17,7 @@ export type TacticalCellType =
   | "feature";
 
 /**
- * A cell in the grid with its type and optional feature glyph.
+ * A cell in the SVG grid with its type and optional feature glyph.
  * Feature cells carry the uppercase letter glyph (A-Z) for legend lookup.
  */
 export interface TacticalCell {
@@ -57,11 +58,10 @@ export interface ExitGap {
 }
 
 /**
- * A parsed tactical grid — the data contract from the server.
- * Until TACTICAL_STATE protocol message (29-5), this is constructed
- * from parsed room data.
+ * SVG-mode room grid — used by DungeonMapRenderer and PlacedRoomData.
+ * Renamed from the old TacticalGridData to free the name for image-mode.
  */
-export interface TacticalGridData {
+export interface LegacyTacticalGridData {
   readonly width: number;
   readonly height: number;
   readonly cells: readonly (readonly TacticalCell[])[];
@@ -71,7 +71,7 @@ export interface TacticalGridData {
 
 /**
  * An entity positioned on the tactical grid (player, NPC, creature).
- * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/entity.rs
+ * Used by DungeonMapRenderer.
  */
 export interface TacticalEntity {
   readonly id: string;
@@ -83,19 +83,17 @@ export interface TacticalEntity {
 
 /**
  * A room placed in global dungeon coordinates by the layout engine.
- * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/layout.rs PlacedRoom
  */
 export interface PlacedRoomData {
   readonly roomId: string;
   readonly roomName: string;
-  readonly grid: TacticalGridData;
+  readonly grid: LegacyTacticalGridData;
   readonly globalOffsetX: number;
   readonly globalOffsetY: number;
 }
 
 /**
  * Complete dungeon layout — all rooms positioned in a global coordinate system.
- * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/layout.rs DungeonLayout
  */
 export interface DungeonLayoutData {
   readonly rooms: readonly PlacedRoomData[];
@@ -104,8 +102,8 @@ export interface DungeonLayoutData {
 }
 
 /**
- * Genre-themed palette for tactical grid rendering.
- * Maps cell types to visual styles. Derived from theme.yaml colors section.
+ * Genre-themed palette for tactical grid rendering (DungeonMapRenderer).
+ * Maps cell types to visual styles.
  */
 export interface TacticalThemeConfig {
   /** Color for walkable floor cells. */
@@ -122,4 +120,45 @@ export interface TacticalThemeConfig {
   readonly gridLine: string;
   /** Feature type -> color mapping. */
   readonly features: Readonly<Record<FeatureType, string>>;
+}
+
+// ─── Image-mode types (ADR-096) ─────────────────────────────────────────────
+
+export interface CavernCellularParams {
+  readonly size: readonly [number, number];
+  readonly seed: number;
+  readonly density: number;
+  readonly cutoff: number;
+  readonly passes: number;
+}
+
+export interface CavernDerivedData {
+  readonly floor_count: number;
+  readonly exits: Readonly<Record<string, readonly [number, number] | null>>;
+  readonly pois: ReadonlyArray<readonly [number, number]>;
+}
+
+export interface TacticalToken {
+  readonly id: string;
+  readonly name: string;
+  readonly initial: string;
+  readonly faction: "player" | "ally" | "neutral" | "hostile";
+  readonly cell: { readonly x: number; readonly y: number };
+  readonly hp: { readonly current: number; readonly max: number };
+  readonly ac: number;
+  readonly className?: string;
+  readonly speed?: number;
+}
+
+/** Cavern room data. Settlement rooms route around this entirely. */
+export interface TacticalGridData {
+  readonly room_id: string;
+  readonly room_name: string;
+  readonly room_type: "cavern";
+  readonly mask: string;
+  readonly cavern_image_url: string;
+  readonly cell_size: number;
+  readonly cellular: CavernCellularParams;
+  readonly derived: CavernDerivedData;
+  readonly tokens: readonly TacticalToken[];
 }

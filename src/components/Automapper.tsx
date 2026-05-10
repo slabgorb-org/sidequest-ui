@@ -3,6 +3,7 @@
 
 import { DungeonMapRenderer } from "@/components/DungeonMapRenderer";
 import { TacticalGridRenderer } from "@/components/TacticalGridRenderer";
+import { SettlementRoomView } from "@/components/SettlementRoomView";
 import type {
   TacticalGridData,
   TacticalThemeConfig,
@@ -24,6 +25,10 @@ export interface ExploredRoom {
   is_current: boolean;
   exits: ExitInfo[];
   grid?: TacticalGridData;
+  settlement?: {
+    description: string;
+    exits: { to: string; label: string }[];
+  };
 }
 
 export interface ThemeConfig {
@@ -323,15 +328,23 @@ export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
     );
   }
 
-  // 2. Single room with grid → TacticalGridRenderer (single-room tactical view)
+  // Settlement branch — non-tactical room view (ADR-096)
   const currentRoom = rooms.find((r) => r.id === currentRoomId);
+  if (currentRoom?.room_type === "settlement" && currentRoom.settlement) {
+    return (
+      <SettlementRoomView
+        name={currentRoom.name}
+        description={currentRoom.settlement.description}
+        exits={currentRoom.settlement.exits}
+      />
+    );
+  }
+
+  // 2. Single room with grid → TacticalGridRenderer (single-room tactical view)
   if (currentRoom?.grid) {
     return (
       <div style={{ maxWidth: "100%" }}>
-        <TacticalGridRenderer
-          grid={currentRoom.grid}
-          theme={DEFAULT_TACTICAL_THEME}
-        />
+        <TacticalGridRenderer grid={currentRoom.grid} />
       </div>
     );
   }

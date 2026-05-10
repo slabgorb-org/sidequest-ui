@@ -867,6 +867,38 @@ function AppInner() {
       setMapData(msg.payload as unknown as MapState);
       return;
     }
+    // ADR-096 Task 20b: TACTICAL_GRID arrives on room entry and carries the
+    // cavern/settlement layout for the Automapper. Patch the matching
+    // ExploredLocation in mapData with the payload so the Automapper can
+    // route by room_type and render cavern grids via TacticalGridRenderer.
+    if (msg.type === MessageType.TACTICAL_GRID) {
+      const tgPayload = msg.payload as {
+        room_id: string;
+        room_name: string;
+        room_type: "cavern" | "settlement";
+        mask: string | null;
+        cavern_image_url: string | null;
+        cell_size: number | null;
+        cellular: object | null;
+        derived: object | null;
+        tokens: unknown[];
+        settlement_description?: string | null;
+        settlement_exits?: Record<string, unknown>[] | null;
+      };
+      setMapData((prev) => {
+        if (!prev) return prev;
+        const explored = prev.explored.map((loc) => {
+          const locId = loc.id ?? loc.name;
+          if (locId !== tgPayload.room_id) return loc;
+          return { ...loc, cavern_payload: tgPayload };
+        });
+        // If the room isn't in explored yet (first time seeing it via
+        // TACTICAL_GRID before MAP_UPDATE), skip — MAP_UPDATE is the
+        // authoritative source for the room list; we only patch here.
+        return { ...prev, explored };
+      });
+      return;
+    }
     // COMBAT_EVENT handler removed in story 28-9
     if (msg.type === MessageType.CONFRONTATION) {
       const payload = msg.payload as unknown as ConfrontationData;

@@ -31,6 +31,39 @@ export interface ExploredLocation {
     cells: string[][];
     features: { glyph: string; feature_type: string; label: string; positions: number[][] }[];
   };
+  /**
+   * ADR-096 Task 20b — cavern/settlement payload from a TACTICAL_GRID
+   * WebSocket message. Arrives independently of MAP_UPDATE; App.tsx
+   * patches this into the matching ExploredLocation when the message
+   * arrives. `tacticalGridFromWire` converts it to TacticalGridData for
+   * the Automapper.
+   */
+  cavern_payload?: {
+    room_id: string;
+    room_name: string;
+    room_type: "cavern" | "settlement";
+    mask: string | null;
+    cavern_image_url: string | null;
+    cell_size: number | null;
+    cellular: {
+      size: [number, number]; seed: number; density: number;
+      cutoff: number; passes: number;
+    } | null;
+    derived: {
+      floor_count: number;
+      exits: Record<string, [number, number] | null>;
+      pois: [number, number][];
+    } | null;
+    tokens: {
+      id: string; name: string; initial: string;
+      faction: "player" | "ally" | "neutral" | "hostile";
+      cell: { x: number; y: number };
+      hp: { current: number; max: number };
+      ac: number; class_name?: string; speed?: number;
+    }[];
+    settlement_description?: string | null;
+    settlement_exits?: Record<string, unknown>[] | null;
+  };
 }
 
 export interface CartographyRegion {
