@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { CharacterPanel } from "../components/CharacterPanel";
-import type { CharacterSheetData } from "../components/CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition } from "../components/CharacterSheet";
 import type { MagicState, LedgerBar, LedgerBarSpec } from "../types/magic";
+
+const makeAbility = (name: string): AbilityDefinition => ({
+  name,
+  genre_description: `${name} description.`,
+  mechanical_effect: `${name} effect.`,
+  involuntary: false,
+  source: "Class",
+});
 
 function makeBar(
   id: string,
@@ -43,7 +51,8 @@ const character: CharacterSheetData = {
   class: "smuggler",
   level: 1,
   stats: { Edge: 10 },
-  abilities: ["Read a Manifest at a Glance"],
+  abilities: [makeAbility("Read a Manifest at a Glance")],
+  class_moves: [],
   backstory: "",
 };
 

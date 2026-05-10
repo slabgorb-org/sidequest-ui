@@ -1,7 +1,15 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { CharacterPanel } from "../CharacterPanel";
-import type { CharacterSheetData } from "../CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition } from "../CharacterSheet";
+
+const makeAbility = (name: string): AbilityDefinition => ({
+  name,
+  genre_description: `${name} description.`,
+  mechanical_effect: `${name} effect.`,
+  involuntary: false,
+  source: "Class",
+});
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -20,7 +28,8 @@ const CHARACTER: CharacterSheetData = {
     wisdom: 15,
     charisma: 8,
   },
-  abilities: ["Tracker", "Beast Companion"],
+  abilities: [makeAbility("Tracker"), makeAbility("Beast Companion")],
+  class_moves: [],
   backstory: "Born in the Ashwood, raised by wolves.",
   portrait_url: "/renders/kael.png",
   current_location: "The Rusty Cantina",

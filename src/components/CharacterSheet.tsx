@@ -86,7 +86,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           <h3 className="text-sm font-semibold mb-1">Abilities</h3>
           <ul className="list-disc list-inside text-sm">
             {data.abilities.map((ability) => (
-              <li key={ability}>{toDisplayName(ability)}</li>
+              <li key={ability.name}>{toDisplayName(ability.name)}</li>
             ))}
           </ul>
         </div>
