@@ -46,6 +46,7 @@ const carlSheet: CharacterSheetData = {
   hp_max: 3,
   stats: {},
   abilities: [],
+  class_moves: [],
   backstory: "",
 };
 
