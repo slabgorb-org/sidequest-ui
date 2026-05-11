@@ -9,6 +9,12 @@ interface Props {
 interface PromptFields {
   turn_number?: number;
   agent?: string;
+  agent_name?: string;
+  section_count?: number;
+  prompt_len?: number;
+  system_len?: number;
+  user_len?: number;
+  bounded?: boolean;
   total_tokens?: number;
   zones?: Record<string, { token_count: number; content?: string }>;
   full_prompt?: string;
@@ -37,7 +43,7 @@ export function PromptTab({ promptEvents }: Props) {
             const f = ev.fields as unknown as PromptFields;
             return (
               <option key={i} value={i}>
-                T{f.turn_number || "?"} · {f.agent || "?"} · {f.total_tokens || 0} tokens
+                T{f.turn_number || "?"} · {f.agent_name || f.agent || "?"} · {f.total_tokens || 0} tokens{f.bounded ? " · bounded" : ""}
               </option>
             );
           })}
@@ -70,8 +76,31 @@ export function PromptTab({ promptEvents }: Props) {
                 ))}
             </tbody>
           </table>
-          <div style={{ marginTop: 8, fontSize: 11, color: THEME.muted }}>
-            Total: {fields.total_tokens || 0} tokens · Agent: {fields.agent || "?"}
+          <div style={{ marginTop: 8, fontSize: 11, color: THEME.muted, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <span>Total: {fields.total_tokens || 0} tokens</span>
+            {(fields.system_len != null || fields.user_len != null) && (
+              <span>
+                system: {fields.system_len != null ? `${(fields.system_len / 1024).toFixed(1)}KB` : "—"}
+                {" / "}
+                user: {fields.user_len != null ? `${(fields.user_len / 1024).toFixed(1)}KB` : "—"}
+              </span>
+            )}
+            <span>Agent: {fields.agent_name || fields.agent || "?"}</span>
+            {fields.bounded && (
+              <span
+                style={{
+                  background: THEME.accent,
+                  color: THEME.bg ?? "#000",
+                  borderRadius: 3,
+                  padding: "1px 5px",
+                  fontWeight: "bold",
+                  fontSize: 10,
+                  letterSpacing: 0.5,
+                }}
+              >
+                stateless · bounded
+              </span>
+            )}
           </div>
         </Card>
       )}
