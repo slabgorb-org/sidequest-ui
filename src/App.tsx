@@ -710,16 +710,16 @@ function AppInner() {
       const status = msg.payload.status as string | undefined;
       // Server emits player_id at the *message* top level (BaseMessage
       // wire shape), NOT inside the TurnStatusPayload — sidequest-server's
-      // TurnStatusPayload has only player_name + status + state_delta and
-      // is `extra="forbid"`. Reading msg.payload.player_id left this
-      // undefined for every active/resolved broadcast, so
-      // turnStatusEntries never grew, submittedPlayerIds stayed empty,
-      // and peersOutstanding always reported (party_size - 1) instead of
-      // shrinking as players submitted — the +1 off-by-one in the
-      // multiplayer "Waiting on X + N others" placeholder (playtest
-      // 2026-05-10).
+      // TurnStatusPayload (extra="forbid") only carries player_name +
+      // status + state_delta. Reading msg.payload.player_id left this
+      // undefined for every active/submitted/resolved broadcast, so the
+      // per-player entry push below never fired and the submit-barrier
+      // strip stayed on "Composing… (0/2)" forever — the same wire-shape
+      // bug class as the +1 off-by-one in "Waiting on X + N others"
+      // (playtest 2026-05-10). Fall back to msg.payload.player_id for any
+      // future server schema change.
       const playerId =
-        (msg as { player_id?: string }).player_id ||
+        ((msg as Record<string, unknown>).player_id as string | undefined) ??
         (msg.payload.player_id as string | undefined);
 
       if (name && status === "active") {
