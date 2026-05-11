@@ -330,6 +330,14 @@ function AppInner() {
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>("");
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
+  // Set true on TURN_STATUS{status="resolving"} (server-emitted when the MP
+  // barrier fires and narration dispatch begins), cleared on
+  // TURN_STATUS{status="resolved"}. Bridges the gap where seated-but-offline
+  // players never emit a "submitted" entry, which left peersOutstanding
+  // non-empty for the whole ~30s narration window and pinned the input
+  // banner on "Waiting on <offline player> + N others to act…" (playtest
+  // 2026-05-10).
+  const [narrationInFlight, setNarrationInFlight] = useState(false);
   // Current round counter — updated from ACTION_REVEAL payloads. Starts at 0;
   // first ACTION_REVEAL advances it to the actual round from the server.
   const [currentRound, setCurrentRound] = useState(0);
@@ -700,17 +708,36 @@ function AppInner() {
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
-      const playerId = msg.payload.player_id as string | undefined;
+      // Server emits player_id at the *message* top level (BaseMessage
+      // wire shape), NOT inside the TurnStatusPayload — sidequest-server's
+      // TurnStatusPayload (extra="forbid") only carries player_name +
+      // status + state_delta. Reading msg.payload.player_id left this
+      // undefined for every active/submitted/resolved broadcast, so the
+      // per-player entry push below never fired and the submit-barrier
+      // strip stayed on "Composing… (0/2)" forever — the same wire-shape
+      // bug class as the +1 off-by-one in "Waiting on X + N others"
+      // (playtest 2026-05-10). Fall back to msg.payload.player_id for any
+      // future server schema change.
+      const playerId =
+        ((msg as Record<string, unknown>).player_id as string | undefined) ??
+        (msg.payload.player_id as string | undefined);
 
       if (name && status === "active") {
         setActivePlayerName(name);
+      } else if (status === "resolving") {
+        setNarrationInFlight(true);
       } else if (status === "resolved") {
         setActivePlayerName(null);
         setTurnStatusEntries([]);
+        setNarrationInFlight(false);
       }
 
-      // Update per-player turn status entries for TurnStatusPanel
-      if (playerId && name && status) {
+      // Update per-player turn status entries for TurnStatusPanel.
+      // Skip "resolving" — it's a session-level narration-start signal, not
+      // a per-player submission row, so we don't want to forge a "pending"
+      // entry for the dispatcher (it would re-introduce the false "waiting
+      // on player" status that 2026-05-10 fixed).
+      if (playerId && name && status && status !== "resolving") {
         const mapped: TurnStatusEntry["status"] =
           status === "submitted" ? "submitted" :
           status === "auto_resolved" ? "auto_resolved" :
@@ -1725,8 +1752,12 @@ function AppInner() {
   const mpInputState: "free" | "waiting-on-peers" | "waiting-on-narrator" = useMemo(() => {
     if (canType) return "free";
     if (!isMultiplayer) return "waiting-on-narrator";
+    // Server-emitted narration-start signal trumps peersOutstanding: when
+    // the barrier has fired and the orchestrator is generating prose,
+    // seated-but-offline peers will never close the gap on their own.
+    if (narrationInFlight) return "waiting-on-narrator";
     return peersOutstanding.length > 0 ? "waiting-on-peers" : "waiting-on-narrator";
-  }, [canType, isMultiplayer, peersOutstanding]);
+  }, [canType, isMultiplayer, narrationInFlight, peersOutstanding]);
   // Build the placeholder string the InputBar will render. With a single
   // outstanding peer we name them; with multiple we use a count to keep
   // the placeholder short ("Waiting on Shirley + 1 other to act…").
