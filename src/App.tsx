@@ -700,7 +700,15 @@ function AppInner() {
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
-      const playerId = msg.payload.player_id as string | undefined;
+      // Wire-shape: server's TurnStatusPayload (extra="forbid") only carries
+      // player_name + status + state_delta; the acting player_id is on the
+      // message top level per BaseMessage. Reading msg.payload.player_id
+      // returns undefined, so the per-player entry push below never fires
+      // and the submit-barrier strip is stuck on "Composing…" forever. Fall
+      // back to msg.payload.player_id for any future server schema change.
+      const playerId =
+        ((msg as Record<string, unknown>).player_id as string | undefined) ??
+        (msg.payload.player_id as string | undefined);
 
       if (name && status === "active") {
         setActivePlayerName(name);
