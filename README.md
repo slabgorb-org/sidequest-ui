@@ -47,20 +47,26 @@ All paths are relative to `src/components/` unless noted.
 | Component                  | Purpose                                                       |
 |----------------------------|---------------------------------------------------------------|
 | `GameBoard/GameBoard.tsx`  | Root gameplay layout with widget registry                     |
-| `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback)         |
-| `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), streaming chunks, images |
+| `GameBoard/widgets/`       | Modular widget shell: `AudioWidget`, `CharacterWidget`, `ConfrontationWidget`, `ImageGalleryWidget`, `InventoryWidget`, `KnowledgeWidget`, `MapWidget`, `NarrativeWidget`, `ScrapbookGallery`, `ShipWidget` |
+| `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback); `NarrationScroll` consumes live `NarrationDelta` streaming when `SIDEQUEST_NARRATOR_STREAMING=1` (default) |
+| `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), images |
 | `CharacterPanel.tsx`       | Persistent themed sidebar showing active character            |
-| `PartyPanel.tsx`           | Party portraits, HP bars, status effects                      |
-| `CharacterSheet.tsx`       | Stats grid, abilities, backstory                              |
+| `PartyPanel.tsx`           | Party portraits, Edge bars, status effects, recruited-NPC companions |
+| `CharacterSheet.tsx`       | Stats grid, abilities, backstory, narrative voice (ADR-040). HP is removed (story 45-35); Edge/Composure replaces it (ADR-078) |
+| `AbilitiesContent.tsx`     | Lv1 Abilities tab: signature ability + Sensitivities + class_moves + magic block (ADR-095) |
 | `InventoryPanel.tsx`       | Items grouped by type, equipped state, currency               |
-| `MapOverlay.tsx` + `Automapper.tsx` + `DungeonMapRenderer.tsx` + `TacticalGridRenderer.tsx` | SVG / grid map rendering                     |
-| `JournalView.tsx` + `KnowledgeJournal.tsx` | Handouts and lore journal                             |
-| `ConfrontationOverlay.tsx` | Encounter / combat overlay — enemy HP, turn order, status     |
+| `MapOverlay.tsx` + `Automapper.tsx` + `DungeonMapRenderer.tsx` + `TacticalGridRenderer.tsx` | SVG / grid map rendering. Cavern renderer revival (ADR-096) adds image-mode PNG tactical maps |
+| `JournalView.tsx` + `KnowledgeJournal.tsx` | Handouts and lore journal; keyword filter (token AND match) |
+| `ConfrontationOverlay.tsx` + `InlineDiceTray.tsx` | Encounter / combat overlay; mounts inline 3D dice (ADR-074/075) |
+| `LedgerPanel.tsx` + `MagicBlock` | Magic + Edge ledger bars; reacts to `CONFRONTATION_OUTCOME` |
+| `OrbitalChart/OrbitalChartView.tsx` + `HudTopStrip` + `HudBottomStrip` | Server-rendered orbital chart with chart-as-calendar HUD overlays (ADR-094) |
+| `ShipWidget.tsx` + `useChassisInteriorSVG` | Chassis interior SVG renderer (Kestrel — `voidborn_freighter`) |
+| `PeerRevealList.tsx` + `MultiplayerTurnBanner.tsx` | Live teammate typing reveal (ADR-036 amendment 2026-05-03) — peer drafts + submitted state visible during the wait window |
 | `TurnStatusPanel.tsx`      | Current turn + phase indicator                                |
 | `AudioStatus.tsx`          | 2-channel mixer UI (music/SFX), mute toggles                  |
-| `InputBar.tsx`             | Text input with aside toggle                                  |
-| `Dashboard/DashboardApp.tsx` | Watcher/GM telemetry app (tabs: Timeline, State, Subsystems, Timing, Console) |
-| `GenericResourceBar.tsx`   | Reusable resource bar (HP, stamina, etc.)                     |
+| `InputBar.tsx`             | Text input with aside toggle; debounced `ACTION_REVEAL` broadcast for live teammate typing |
+| `Dashboard/DashboardApp.tsx` | Watcher/GM telemetry app (tabs: Console, Encounter, Lore, Prompt, State, Subsystems, Timeline, Timing) — Prompt tab shows ADR-098 system/user split + bounded marker + expandable section viewer |
+| `GenericResourceBar.tsx`   | Reusable resource bar (Edge, magic ledger, faction pools)     |
 
 > This table is a guided tour, not an exhaustive index. Treat `src/components/` as authoritative.
 
@@ -82,12 +88,12 @@ Custom hooks under `src/hooks/`:
 |------------------------|---------------------------------------------------------|
 | `useWebSocket`         | Low-level WebSocket transport with reconnect            |
 | `useGameSocket`        | Game-message dispatch built on `useWebSocket`           |
-| `useStateMirror`       | Sync local game state from server messages              |
+| `useStateMirror`       | Sync local game state from server messages; dispatches streaming `NarrationDelta` |
 | `useWatcherSocket`     | Telemetry WebSocket for GM mode                         |
 | `useSlashCommands`     | Parse `/inventory`, `/character`, `/quests`, etc.       |
 | `useAudio`             | Core audio context management                           |
 | `useAudioCue`          | Play one-shot audio cues (SFX) from server events       |
-| `useGenreTheme`        | Inject genre pack CSS variables                         |
+| `useGenreTheme`        | Inject genre pack CSS variables (ADR-079)               |
 | `useChromeArchetype`   | Archetype-driven UI chrome styling                      |
 | `useLayoutMode`        | Desktop/mobile layout selection                         |
 | `useBreakpoint`        | Responsive breakpoint detection                         |
@@ -95,6 +101,10 @@ Custom hooks under `src/hooks/`:
 | `useRunningHeader`     | Scroll-aware running header state                       |
 | `useGameBoardLayout`   | Game board panel arrangement                            |
 | `useGameBoardHotkeys`  | Keyboard shortcut bindings for game board panels        |
+| `usePeerReveals` + `usePeerEventCache` | Live teammate typing — per-round peer reveal map fed by `ACTION_REVEAL` (ADR-036 amendment 2026-05-03) |
+| `useOrbitalChart`      | Orbital chart fetch + plotted_course revision refetch (ADR-094) |
+| `useChassisInteriorSVG`| Resolve ship/chassis interior SVG for the active session |
+| `useDiceThrowGesture`  | Click-and-auto-roll gesture for the inline 3D dice tray |
 
 > The full list is authoritative in `src/hooks/`. Former voice hooks
 > (`useVoiceChat`, `useVoicePlayback`, `usePushToTalk`, `useWhisper`) were
@@ -116,14 +126,18 @@ constructions. See `orc-quest/docs/adr/076-narration-protocol-collapse-post-tts.
 
 ## WebSocket Protocol
 
-Client-handled message types include `NARRATION`, `NARRATION_END`, `PARTY_STATUS`,
-`CHARACTER_SHEET`, `INVENTORY`, `MAP_UPDATE`, `IMAGE`, `AUDIO_CUE`, `CHAPTER_MARKER`,
-`SESSION_EVENT`, `TURN_STATUS`, `CHARACTER_CREATION`, `THINKING`, `ERROR`,
-`COMBAT_EVENT`, `ACTION_QUEUE`, and the dice protocol triplet (`DICE_REQUEST`,
-`DICE_THROW`, `DICE_RESULT`).
+Client-handled message types include `NARRATION`, `NARRATION_END`, `NarrationDelta`
+(streaming, default-on), `PARTY_STATUS`, `CHARACTER_SHEET`, `INVENTORY`, `MAP_UPDATE`,
+`IMAGE`, `AUDIO_CUE`, `CHAPTER_MARKER`, `SESSION_EVENT`, `TURN_STATUS`,
+`CHARACTER_CREATION`, `THINKING`, `ERROR`, `ACTION_QUEUE`, `ACTION_REVEAL` (live
+teammate typing per ADR-036 amendment 2026-05-03), `CONFRONTATION`,
+`CONFRONTATION_OUTCOME`, `ORBITAL_CHART`, `SCRAPBOOK_ENTRY`, `SECRET_NOTE`,
+`GAME_PAUSED` / `GAME_RESUMED`, `PLAYER_PRESENCE` / `PLAYER_SEAT` / `SEAT_CONFIRMED`,
+and the dice protocol triplet (`DICE_REQUEST`, `DICE_THROW`, `DICE_RESULT`).
 
 See `src/types/` for the authoritative TypeScript payload definitions and
-`orc-quest/docs/api-contract.md` for the cross-repo protocol reference.
+`orc-quest/docs/api-contract.md` for the cross-repo protocol reference (now includes
+the `ACTION_REVEAL` wire contract).
 
 ## Tests
 
