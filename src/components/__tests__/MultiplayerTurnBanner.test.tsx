@@ -15,7 +15,12 @@ describe("MultiplayerTurnBanner", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows 'you have the floor' when local is the active player", () => {
+  it("shows 'declare your action' when local is the active player", () => {
+    // sq-playtest 2026-05-12 [UX]: the prior copy "you have the floor"
+    // used a one-at-a-time speaking metaphor that confused the playgroup
+    // in sealed-letter (simultaneous) mode. The banner is local-PC
+    // anchored — it prompts the local player to act, not to claim a
+    // speaking slot.
     render(
       <MultiplayerTurnBanner
         isMultiplayer={true}
@@ -28,7 +33,9 @@ describe("MultiplayerTurnBanner", () => {
     );
     const banner = screen.getByTestId("multiplayer-turn-banner");
     expect(banner).toHaveAttribute("data-tone", "you");
-    expect(banner).toHaveTextContent(/you have the floor/i);
+    expect(banner).toHaveTextContent(/laverne — declare your action/i);
+    // Must NOT use the floor metaphor.
+    expect(banner).not.toHaveTextContent(/have the floor/i);
   });
 
   it("shows peer's turn when activePlayer is not local", () => {
@@ -101,7 +108,7 @@ describe("MultiplayerTurnBanner", () => {
     expect(dot.className).toMatch(/animate-pulse/);
   });
 
-  it("falls back to 'You have the floor' when no local character name", () => {
+  it("falls back to 'Declare your action' when no local character name", () => {
     render(
       <MultiplayerTurnBanner
         isMultiplayer={true}
@@ -109,7 +116,8 @@ describe("MultiplayerTurnBanner", () => {
         localPlayerId="p1"
       />,
     );
-    expect(screen.getByText(/you have the floor/i)).toBeInTheDocument();
+    expect(screen.getByText(/declare your action/i)).toBeInTheDocument();
+    expect(screen.queryByText(/have the floor/i)).not.toBeInTheDocument();
   });
 
   // Playtest 2026-04-29 — simultaneous-action banner copy.
@@ -190,7 +198,7 @@ describe("MultiplayerTurnBanner", () => {
       expect(banner).not.toHaveTextContent(/it's shirley's turn/i);
     });
 
-    it("'free' + nobody has acted shows 'you have the floor'", () => {
+    it("'free' + nobody has acted prompts the local player to declare", () => {
       render(
         <MultiplayerTurnBanner
           isMultiplayer={true}
@@ -202,7 +210,9 @@ describe("MultiplayerTurnBanner", () => {
       );
       const banner = screen.getByTestId("multiplayer-turn-banner");
       expect(banner).toHaveAttribute("data-tone", "you");
-      expect(banner).toHaveTextContent(/laverne — you have the floor/i);
+      expect(banner).toHaveTextContent(/laverne — declare your action/i);
+      // Must NOT use the floor metaphor.
+      expect(banner).not.toHaveTextContent(/have the floor/i);
     });
   });
 
