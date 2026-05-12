@@ -16,7 +16,12 @@
  *   - 'free' + peer has acted → "<peer> acted — declare your action"
  *     (NOT "It's <peer>'s turn…", which implied alternating turns and
  *     made Alex think she was holding up the group; playtest 2026-04-29).
- *   - 'free' + nobody has acted → "<local> — you have the floor".
+ *   - 'free' + nobody has acted → "<local> — declare your action".
+ *     (Sealed-letter mode is simultaneous, so "you have the floor" — the
+ *     one-at-a-time speaking metaphor — read as "your turn while others
+ *     wait" and confused the playgroup. The local player is *always* able
+ *     to declare in free state; the prompt is to do it, not to claim a
+ *     speaking slot. sq-playtest 2026-05-12 [UX] floor banner clarity.)
  *   - 'waiting-on-peers' → "Waiting on <peer> to act…" — local submitted
  *     but peers haven't yet. Distinguishes from narrator-pending.
  *   - 'waiting-on-narrator' → "Waiting for the narrator…" — every player
@@ -32,7 +37,7 @@ export interface MultiplayerTurnBannerProps {
   activePlayerId?: string | null;
   /** Local player's id — compares against activePlayerId. */
   localPlayerId?: string | null;
-  /** Local character's display name — used in "You have the floor". */
+  /** Local character's display name — used in "<name> — declare your action". */
   localCharacterName?: string | null;
   /**
    * True after local player submits. Retained for the legacy fallback
@@ -99,8 +104,8 @@ export function MultiplayerTurnBanner({
     tone = "peer";
   } else if (mpInputState === "free") {
     label = localCharacterName
-      ? `${localCharacterName} — you have the floor`
-      : "You have the floor";
+      ? `${localCharacterName} — declare your action`
+      : "Declare your action";
     tone = "you";
   } else if (thinking) {
     // Legacy branch (mpInputState not provided). Retained so existing
@@ -116,8 +121,8 @@ export function MultiplayerTurnBanner({
     tone = "peer";
   } else {
     label = localCharacterName
-      ? `${localCharacterName} — you have the floor`
-      : "You have the floor";
+      ? `${localCharacterName} — declare your action`
+      : "Declare your action";
     tone = "you";
   }
 

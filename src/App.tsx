@@ -1723,7 +1723,7 @@ function AppInner() {
   //
   // The classifier returns one of three states:
   //   - 'free': local hasn't submitted yet — input enabled, banner says
-  //     "you have the floor" or "<peer> acted — declare yours when ready".
+  //     "<name> — declare your action" or "<peer> acted — declare yours when ready".
   //   - 'waiting-on-peers': local submitted, at least one peer hasn't yet —
   //     placeholder names the missing peer(s); banner echoes.
   //   - 'waiting-on-narrator': local submitted AND all peers submitted —
