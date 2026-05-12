@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   loadHistory,
   removeHistory,
@@ -37,6 +37,57 @@ export function JourneyHistory({
   // Local state mirrors localStorage so removals re-render immediately
   // without depending on a parent refetch. Initial load reads from disk.
   const [entries, setEntries] = useState<JourneyEntry[]>(() => loadHistory());
+
+  // Self-evict entries whose save was deleted out from under us. On mount,
+  // ping the server for every entry that carries a `game_slug`; if the
+  // server responds 404 the save is gone (cleaned up between sessions)
+  // and clicking the row would land the player on an error screen. Drop
+  // it from both render state and localStorage so the next render is
+  // clean. Only 404 evicts — other statuses (5xx, network errors) are
+  // transient and the entry is preserved.
+  //
+  // Legacy entries without `game_slug` (pre-2026-04-24) are skipped: the
+  // lobby uses them for prefill-only and never tries to resume the slug.
+  //
+  // Reads `loadHistory()` directly rather than the `entries` state slice so
+  // the dep-array is genuinely empty (validation runs once on mount); a
+  // dep on `entries` would re-trigger validation after every user-driven
+  // removal.
+  useEffect(() => {
+    const controller = new AbortController();
+    for (const entry of loadHistory()) {
+      if (!entry.game_slug) continue;
+      const slug = entry.game_slug;
+      void (async () => {
+        try {
+          const res = await fetch(`/api/games/${encodeURIComponent(slug)}`, {
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          if (res.status === 404) {
+            removeHistory({
+              player_name: entry.player_name,
+              genre: entry.genre,
+              world: entry.world,
+            });
+            setEntries((prev) =>
+              prev.filter(
+                (existing) =>
+                  !(
+                    existing.player_name === entry.player_name &&
+                    existing.genre === entry.genre &&
+                    existing.world === entry.world
+                  ),
+              ),
+            );
+          }
+        } catch {
+          // Network errors / aborts are not definitive — keep the entry.
+        }
+      })();
+    }
+    return () => controller.abort();
+  }, []);
 
   const handleRemove = useCallback(
     (entry: JourneyEntry, e: React.MouseEvent) => {

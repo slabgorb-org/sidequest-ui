@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { JourneyHistory } from "@/screens/lobby/JourneyHistory";
 import { modeBadge } from "@/screens/lobby/modeBadge";
 import { appendHistory, loadHistory } from "@/screens/lobby/historyStore";
@@ -198,6 +198,171 @@ describe("JourneyHistory", () => {
     expect(modeBadge(undefined)).toEqual({
       glyph: "◇",
       label: "unknown mode (legacy entry)",
+    });
+  });
+
+  describe("self-eviction of stale entries (server 404)", () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    function makeResponse(status: number): Response {
+      return new Response(null, { status });
+    }
+
+    it("evicts entries whose game_slug returns 404", async () => {
+      appendHistory({
+        player_name: "Narder",
+        genre: "caverns_and_claudes",
+        world: "caverns_sunden",
+        game_slug: "2026-05-10-caverns_sunden-mp",
+        mode: "multiplayer",
+      });
+      appendHistory({
+        player_name: "Keith",
+        genre: "victoria",
+        world: "albion",
+        game_slug: "2026-05-09-albion-solo",
+        mode: "solo",
+      });
+
+      fetchMock.mockImplementation(async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : (input as Request).url;
+        if (url.includes("2026-05-10-caverns_sunden-mp")) {
+          return makeResponse(404);
+        }
+        return makeResponse(200);
+      });
+
+      render(
+        <JourneyHistory
+          onSelect={vi.fn()}
+          prettyGenre={(s) => s}
+          prettyWorld={(_, s) => s}
+        />,
+      );
+
+      // Both rows initially present, then the 404 one self-evicts.
+      expect(screen.getByText(/Narder/)).toBeInTheDocument();
+      expect(screen.getByText(/Keith/)).toBeInTheDocument();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Narder/)).not.toBeInTheDocument();
+      });
+
+      // Surviving entry remains in DOM AND in localStorage.
+      expect(screen.getByText(/Keith/)).toBeInTheDocument();
+      const remaining = loadHistory();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].player_name).toBe("Keith");
+    });
+
+    it("keeps entries that return 200", async () => {
+      appendHistory({
+        player_name: "Keith",
+        genre: "victoria",
+        world: "albion",
+        game_slug: "2026-05-09-albion-solo",
+      });
+
+      fetchMock.mockResolvedValue(makeResponse(200));
+
+      render(
+        <JourneyHistory
+          onSelect={vi.fn()}
+          prettyGenre={(s) => s}
+          prettyWorld={(_, s) => s}
+        />,
+      );
+
+      // Wait one tick for any pending validation to settle.
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalled();
+      });
+      expect(screen.getByText(/Keith/)).toBeInTheDocument();
+      expect(loadHistory()).toHaveLength(1);
+    });
+
+    it("does not validate legacy entries without game_slug", async () => {
+      appendHistory({
+        player_name: "Legacy",
+        genre: "victoria",
+        world: "albion",
+        // No game_slug — pre-2026-04-24 entry.
+      });
+
+      fetchMock.mockResolvedValue(makeResponse(404));
+
+      render(
+        <JourneyHistory
+          onSelect={vi.fn()}
+          prettyGenre={(s) => s}
+          prettyWorld={(_, s) => s}
+        />,
+      );
+
+      // Give the effect a tick to run if it were going to.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.getByText(/Legacy/)).toBeInTheDocument();
+    });
+
+    it("keeps entries on transient network failure (does not evict)", async () => {
+      appendHistory({
+        player_name: "Keith",
+        genre: "victoria",
+        world: "albion",
+        game_slug: "2026-05-09-albion-solo",
+      });
+
+      fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+      render(
+        <JourneyHistory
+          onSelect={vi.fn()}
+          prettyGenre={(s) => s}
+          prettyWorld={(_, s) => s}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalled();
+      });
+      // Network error is not a 404 — keep the entry.
+      expect(screen.getByText(/Keith/)).toBeInTheDocument();
+      expect(loadHistory()).toHaveLength(1);
+    });
+
+    it("keeps entries that return 5xx (server hiccup, not a definitive 'gone')", async () => {
+      appendHistory({
+        player_name: "Keith",
+        genre: "victoria",
+        world: "albion",
+        game_slug: "2026-05-09-albion-solo",
+      });
+
+      fetchMock.mockResolvedValue(makeResponse(503));
+
+      render(
+        <JourneyHistory
+          onSelect={vi.fn()}
+          prettyGenre={(s) => s}
+          prettyWorld={(_, s) => s}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalled();
+      });
+      expect(screen.getByText(/Keith/)).toBeInTheDocument();
+      expect(loadHistory()).toHaveLength(1);
     });
   });
 
