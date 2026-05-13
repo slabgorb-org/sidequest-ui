@@ -59,7 +59,7 @@ describe("journeyHistory", () => {
 
   describe("appendHistory", () => {
     it("adds a new entry with a current timestamp", () => {
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
       const result = loadHistory();
       expect(result).toHaveLength(1);
       expect(result[0].player_name).toBe("Keith");
@@ -67,15 +67,15 @@ describe("journeyHistory", () => {
     });
 
     it("deduplicates by (player_name, genre, world) tuple", () => {
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
       expect(loadHistory()).toHaveLength(1);
     });
 
     it("does NOT dedupe when player name differs", () => {
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
-      appendHistory({ player_name: "Sam", genre: "victoria", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
+      appendHistory({ player_name: "Sam", genre: "tea_and_murder", world: "albion" });
       expect(loadHistory()).toHaveLength(2);
     });
 
@@ -100,16 +100,16 @@ describe("journeyHistory", () => {
 
   describe("removeHistory", () => {
     it("removes an entry by full tuple", () => {
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
-      appendHistory({ player_name: "Sam", genre: "victoria", world: "albion" });
-      removeHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
+      appendHistory({ player_name: "Sam", genre: "tea_and_murder", world: "albion" });
+      removeHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
       const result = loadHistory();
       expect(result).toHaveLength(1);
       expect(result[0].player_name).toBe("Sam");
     });
 
     it("is a no-op when the entry is not present", () => {
-      appendHistory({ player_name: "Keith", genre: "victoria", world: "albion" });
+      appendHistory({ player_name: "Keith", genre: "tea_and_murder", world: "albion" });
       removeHistory({ player_name: "Ghost", genre: "x", world: "y" });
       expect(loadHistory()).toHaveLength(1);
     });

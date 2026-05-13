@@ -27,7 +27,7 @@ describe("JourneyHistory", () => {
   it("renders one row per stored entry, newest first", () => {
     appendHistory({
       player_name: "Older",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
     // Force a millisecond gap so timestamps differ.
@@ -56,7 +56,7 @@ describe("JourneyHistory", () => {
     const onSelect = vi.fn();
     appendHistory({
       player_name: "Keith",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
 
@@ -73,7 +73,7 @@ describe("JourneyHistory", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0]).toMatchObject({
       player_name: "Keith",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
   });
@@ -82,7 +82,7 @@ describe("JourneyHistory", () => {
     const user = userEvent.setup();
     appendHistory({
       player_name: "Keith",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
     appendHistory({
@@ -113,7 +113,7 @@ describe("JourneyHistory", () => {
     const onSelect = vi.fn();
     appendHistory({
       player_name: "Keith",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
 
@@ -134,19 +134,19 @@ describe("JourneyHistory", () => {
   it("renders a mode icon per row (solo / multiplayer / unknown legacy)", () => {
     appendHistory({
       player_name: "SoloKid",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       mode: "solo",
     });
     appendHistory({
       player_name: "MPKid",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       mode: "multiplayer",
     });
     appendHistory({
       player_name: "LegacyKid",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       // No mode — simulates a pre-2026-04-24 entry.
     });
@@ -205,7 +205,7 @@ describe("JourneyHistory", () => {
     const user = userEvent.setup();
     appendHistory({
       player_name: "Keith",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
     });
 
