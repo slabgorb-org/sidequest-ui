@@ -24,7 +24,6 @@ vi.mock("@react-three/drei", () => ({
   Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
-import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
 import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
@@ -96,18 +95,18 @@ const CHASE_DATA: ConfrontationData = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC1: ConfrontationOverlay renders in ConfrontationWidget
+// AC1: ConfrontationOverlay renders when data is provided
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC1: ConfrontationOverlay renders in ConfrontationWidget", () => {
+describe("AC1: ConfrontationOverlay renders when data is provided", () => {
   it("renders confrontation overlay when data is provided", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
     expect(screen.getByText("High Noon Standoff")).toBeInTheDocument();
   });
 
-  it("does not render confrontation overlay when data is null (via ConfrontationOverlay)", () => {
+  it("does not render confrontation overlay when data is null", () => {
     render(<ConfrontationOverlay data={null} />);
 
     expect(screen.queryByTestId("confrontation-overlay")).not.toBeInTheDocument();
@@ -120,7 +119,7 @@ describe("AC1: ConfrontationOverlay renders in ConfrontationWidget", () => {
 
 describe("AC2: Confrontation type rendering", () => {
   it("renders standoff with data-type attribute", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     const overlay = screen.getByTestId("confrontation-overlay");
     expect(overlay).toHaveAttribute("data-type", "standoff");
@@ -128,20 +127,21 @@ describe("AC2: Confrontation type rendering", () => {
   });
 
   it("renders chase with secondary stats panel", () => {
-    render(<ConfrontationWidget data={CHASE_DATA} />);
+    render(<ConfrontationOverlay data={CHASE_DATA} />);
 
     const overlay = screen.getByTestId("confrontation-overlay");
     expect(overlay).toHaveAttribute("data-type", "chase");
     expect(screen.getByTestId("secondary-stats")).toBeInTheDocument();
   });
 
-  it("renders actor portraits for all encounter participants", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+  it("renders actor chips for all encounter participants", () => {
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     const portraits = screen.getAllByTestId("actor-portrait");
     expect(portraits.length).toBe(2);
-    expect(screen.getByText("The Stranger")).toBeInTheDocument();
-    expect(screen.getByText("Black Bart")).toBeInTheDocument();
+    // Compact status line: name lives on the chip's title attribute.
+    expect(portraits[0]).toHaveAttribute("title", expect.stringMatching(/The Stranger/));
+    expect(portraits[1]).toHaveAttribute("title", expect.stringMatching(/Black Bart/));
   });
 });
 
@@ -151,7 +151,7 @@ describe("AC2: Confrontation type rendering", () => {
 
 describe("AC3: Dual-dial metric display", () => {
   it("renders both player and opponent metric bars", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     const bars = screen.getAllByTestId("metric-bar");
     expect(bars).toHaveLength(2);
@@ -160,35 +160,35 @@ describe("AC3: Dual-dial metric display", () => {
   });
 
   it("renders fill elements for both bars", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     expect(screen.getAllByTestId("metric-bar-fill")).toHaveLength(2);
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC4: Beat buttons render and fire onBeatSelect callback
+// AC4: Beat tiles render and fire onBeatSelect callback
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC4: Beat action buttons", () => {
-  it("renders all beat options as buttons", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+describe("AC4: Beat action tiles", () => {
+  it("renders all beat options as tiles", () => {
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     expect(screen.getByText("Stare Down")).toBeInTheDocument();
     expect(screen.getByText("Draw!")).toBeInTheDocument();
   });
 
   it("marks resolution beats with data-resolution attribute", () => {
-    render(<ConfrontationWidget data={STANDOFF_DATA} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
 
     const drawBtn = screen.getByText("Draw!").closest("button");
     expect(drawBtn).toHaveAttribute("data-resolution", "true");
   });
 
-  it("calls onBeatSelect when a beat button is clicked", async () => {
+  it("calls onBeatSelect when a beat tile is clicked", async () => {
     const user = userEvent.setup();
     const onBeatSelect = vi.fn();
-    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
 
     await user.click(screen.getByText("Stare Down"));
     expect(onBeatSelect).toHaveBeenCalledWith("stare");
@@ -197,7 +197,7 @@ describe("AC4: Beat action buttons", () => {
   it("calls onBeatSelect for resolution beats on click", async () => {
     const user = userEvent.setup();
     const onBeatSelect = vi.fn();
-    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
+    render(<ConfrontationOverlay data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
 
     await user.click(screen.getByText("Draw!"));
     expect(onBeatSelect).toHaveBeenCalledWith("draw");
@@ -221,41 +221,17 @@ describe("AC5: Overlay lifecycle", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Wiring tests — verify ConfrontationWidget and ConfrontationOverlay are connected
+// Production wiring — App.tsx → GameBoard → ConfrontationOverlay
+//
+// The component-level tests above prove the callback plumbing inside
+// ConfrontationOverlay. This block reads source files to assert the production
+// wire-up is present: GameBoard accepts the props, GameBoard renders the
+// panel above the InputBar when data is present, and App.tsx passes data
+// through to GameBoard. Replaces the dockview-tab wiring asserted before
+// 2026-05-13 (D2 mock — confrontation moved out of dockview).
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("Wiring: ConfrontationWidget component", () => {
-  it("ConfrontationWidget is importable", async () => {
-    const mod = await import("@/components/GameBoard/widgets/ConfrontationWidget");
-    expect(typeof mod.ConfrontationWidget).toBe("function");
-  });
-
-  it("ConfrontationOverlay is importable from @/components/ConfrontationOverlay", async () => {
-    const mod = await import("@/components/ConfrontationOverlay");
-    expect(typeof mod.ConfrontationOverlay).toBe("function");
-  });
-
-  it("ConfrontationWidget renders ConfrontationOverlay with data and callback", async () => {
-    const onBeatSelect = vi.fn();
-    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
-
-    expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByText("Stare Down"));
-    expect(onBeatSelect).toHaveBeenCalled();
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Production wiring test — verify App.tsx and GameBoard actually wire confrontations
-// 
-// The component-level tests above pass vi.fn() and only prove the callback plumbing
-// inside ConfrontationWidget/ConfrontationOverlay. This test reads source files to
-// assert the production wire-up is present: GameBoard accepts the props, GameBoard
-// renders ConfrontationWidget when data is present, and App.tsx passes the data
-// through to GameBoard.
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () => {
+describe("Wiring: Production App.tsx → GameBoard → ConfrontationOverlay", () => {
   it("GameBoard.tsx accepts confrontationData prop", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
@@ -276,20 +252,24 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () 
     expect(gameBoardSrc).toMatch(/onBeatSelect/);
   });
 
-  it("GameBoard.tsx renders ConfrontationWidget when confrontationData is provided", async () => {
+  it("GameBoard.tsx renders ConfrontationOverlay above the InputBar", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const gameBoardSrc = fs.readFileSync(
       path.resolve(__dirname, "../components/GameBoard/GameBoard.tsx"),
       "utf-8",
     );
-    // Should import ConfrontationWidget
-    expect(gameBoardSrc).toMatch(/import.*ConfrontationWidget/);
-    // Should pass confrontationData and onBeatSelect to ConfrontationWidget.
-    // GameBoard renders the widget across multiple lines; use [\s\S]*? to
-    // span newlines between the JSX tag name and the prop name.
-    expect(gameBoardSrc).toMatch(/<ConfrontationWidget[\s\S]*?data=\{confrontationData\}/);
-    expect(gameBoardSrc).toMatch(/<ConfrontationWidget[\s\S]*?onBeatSelect=\{onBeatSelect\}/);
+    // ConfrontationOverlay must be imported as a value, not just a type.
+    expect(gameBoardSrc).toMatch(
+      /import[\s\S]*?ConfrontationOverlay[\s\S]*?from\s*["']@\/components\/ConfrontationOverlay["']/,
+    );
+    // Renders with confrontationData and onBeatSelect threaded in.
+    expect(gameBoardSrc).toMatch(/<ConfrontationOverlay[\s\S]*?data=\{confrontationData\}/);
+    expect(gameBoardSrc).toMatch(/<ConfrontationOverlay[\s\S]*?onBeatSelect=\{onBeatSelect\}/);
+    // Threads confrontationActive into the InputBar so plain Enter is locked.
+    expect(gameBoardSrc).toMatch(
+      /<InputBar[\s\S]*?confrontationActive=\{confrontationData\s*!=\s*null\}/,
+    );
   });
 
   it("App.tsx declares a handleBeatSelect callback", async () => {
@@ -310,7 +290,7 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () 
       "utf-8",
     );
     // The <GameBoard .../> block must contain onBeatSelect={handleBeatSelect}.
-    // Without this, confrontation buttons are silent no-ops in production.
+    // Without this, confrontation tiles are silent no-ops in production.
     const gameBoardBlock = appSrc.match(/<GameBoard[\s\S]*?\/>/);
     expect(gameBoardBlock).not.toBeNull();
     expect(gameBoardBlock?.[0]).toContain("onBeatSelect={handleBeatSelect}");

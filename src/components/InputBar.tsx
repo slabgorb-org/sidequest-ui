@@ -25,6 +25,14 @@ export interface InputBarProps {
   mobile?: boolean;
   thinking?: boolean;
   waitingForPlayer?: string;
+  /**
+   * When true, plain-Enter submit is locked: beat tiles in the confrontation
+   * panel are the only commit path. Typing remains live so peers see the
+   * draft via ACTION_REVEAL and the text is the flavor a beat carries.
+   * The field renders a struck-through ↵ glyph + helper line so the lock
+   * is visible (D2 mock, 2026-05-13).
+   */
+  confrontationActive?: boolean;
 }
 
 const COMPOSING_DEBOUNCE_MS = 250;
@@ -37,6 +45,7 @@ export default function InputBar({
   mobile,
   thinking,
   waitingForPlayer,
+  confrontationActive = false,
 }: InputBarProps) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
@@ -101,20 +110,27 @@ export default function InputBar({
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        if (confrontationActive) {
+          // Plain Enter is locked during confrontation — beat tiles are the
+          // only commit path. We still preventDefault so the field doesn't
+          // flush, but we don't submit.
+          return;
+        }
         submit();
       }
     },
-    [submit],
+    [submit, confrontationActive],
   );
 
   const placeholder =
     waitingForPlayer ? `Waiting for ${waitingForPlayer}…` :
     thinking ? "The narrator is thinking..." :
+    confrontationActive ? "What do you do? (then pick a beat below)" :
     aside ? "What do you whisper?" :
     "What do you do?";
 
   return (
-    <div data-testid="input-bar" className="space-y-2">
+    <div data-testid="input-bar" className="space-y-1">
       <div className="flex items-center gap-2">
         <div className="flex items-center flex-1">
           {aside && (
@@ -126,11 +142,22 @@ export default function InputBar({
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={placeholder}
+            data-confrontation-active={confrontationActive ? "true" : undefined}
             className={cn(aside && "text-muted-foreground/70 italic")}
             {...(mobile ? { "data-mobile": "true" } : {})}
           />
           {aside && (
             <span className="text-muted-foreground/40 text-lg pr-1 select-none">)</span>
+          )}
+          {confrontationActive && (
+            <span
+              data-testid="input-enter-locked"
+              title="Enter is locked — pick a beat to commit"
+              aria-label="Enter disabled during confrontation"
+              className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded border border-border/40 text-[10px] tracking-wider text-muted-foreground/50 flex-shrink-0"
+            >
+              <span className="line-through font-semibold">↵ enter</span>
+            </span>
           )}
         </div>
         <button
@@ -148,6 +175,15 @@ export default function InputBar({
           (…)
         </button>
       </div>
+      {confrontationActive && (
+        <div
+          data-testid="confrontation-lock-helper"
+          className="flex items-center gap-1 text-[10.5px] text-muted-foreground/70 tracking-wide"
+        >
+          <span aria-hidden="true">↑</span>
+          Pick a beat above to commit · plain Enter is locked during confrontation
+        </div>
+      )}
     </div>
   );
 }

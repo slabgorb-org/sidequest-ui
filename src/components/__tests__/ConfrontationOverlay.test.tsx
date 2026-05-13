@@ -219,10 +219,13 @@ describe('AC2: Dual-dial metric display', () => {
     expect(fills[1]).toHaveStyle({ width: '10%' });
   });
 
-  it('labels each bar with its side', () => {
+  it('labels each bar with its side via aria-label', () => {
+    // D2 redesign (2026-05-13): the visible chip is "You"/"Them"; the long-
+    // form "Player edge"/"Opponent edge" label lives on aria-label for screen
+    // readers + tests. data-metric-side stays load-bearing for selection.
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getByText(/Player edge/i)).toBeInTheDocument();
-    expect(screen.getByText(/Opponent edge/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Player edge/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Opponent edge/i)).toBeInTheDocument();
   });
 
   it('flags a bar at threshold for visual emphasis', () => {
@@ -284,33 +287,44 @@ describe('AC3: Beat action buttons', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// AC4: Actor portraits display
+// AC4: Actor chips (compact status line)
+//
+// D2 redesign (2026-05-13): the panel now mounts above the InputBar, not
+// as a side dockview tab. Actors render as tiny initial-bubbles in a one-
+// line status row instead of full portrait + name + role cards — the full
+// portrait gallery is the CharacterPanel's job. Name + role live on the
+// chip's title attribute so they're still surfaced for tooltips/a11y.
 // ═══════════════════════════════════════════════════════════
 
-describe('AC4: Actor portraits', () => {
-  it('renders actor names', () => {
+describe('AC4: Actor chips', () => {
+  it('renders one chip per actor', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getByText('The Stranger')).toBeInTheDocument();
-    expect(screen.getByText('Black Bart')).toBeInTheDocument();
+    const chips = screen.getAllByTestId('actor-portrait');
+    expect(chips).toHaveLength(2);
   });
 
-  it('renders portrait images when URL provided', () => {
+  it('surfaces actor name + role via chip title attribute', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    const portraits = screen.getAllByRole('img');
-    expect(portraits.length).toBeGreaterThanOrEqual(2);
-    expect(portraits[0]).toHaveAttribute('src', '/portraits/stranger.png');
+    const chips = screen.getAllByTestId('actor-portrait');
+    expect(chips[0]).toHaveAttribute('title', expect.stringMatching(/The Stranger.*duelist/));
+    expect(chips[1]).toHaveAttribute('title', expect.stringMatching(/Black Bart.*duelist/));
   });
 
-  it('renders placeholder when no portrait URL', () => {
-    render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
-    // Player has no portrait_url — should render a placeholder
+  it('shows the actor initial inside the chip', () => {
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
     const overlay = screen.getByTestId('confrontation-overlay');
-    expect(within(overlay).getByText('Player')).toBeInTheDocument();
+    // Both standoff actors start with different letters → both appear inside
+    // the overlay's actor chips.
+    expect(within(overlay).getByText('T')).toBeInTheDocument();
+    expect(within(overlay).getByText('B')).toBeInTheDocument();
   });
 
-  it('shows actor roles', () => {
-    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getAllByText(/duelist/i).length).toBe(2);
+  it('renders chips for participants with no portrait_url', () => {
+    render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
+    const chips = screen.getAllByTestId('actor-portrait');
+    expect(chips).toHaveLength(2);
+    // "Player" (no portrait_url) is still a chip with its title set.
+    expect(chips[0]).toHaveAttribute('title', expect.stringMatching(/Player/));
   });
 });
 
@@ -352,37 +366,20 @@ describe('AC5: Secondary stats', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// AC6: Standoff gets letterbox framing + extreme close-up
+// AC6: Standoff still exposes its type via data-type
+//
+// D2 redesign (2026-05-13): the old letterbox/extreme-closeup theming
+// targeted the side-dockview tab layout. With the panel now mounting in
+// the input area, the compact status line is the only chrome and there's
+// no closeup-frame to letterbox. data-type stays on the root so
+// genre-themed CSS overrides remain wireable in the future.
 // ═══════════════════════════════════════════════════════════
 
-describe('AC6: Standoff visual treatment', () => {
-  it('applies letterbox framing for standoff', () => {
+describe('AC6: Standoff exposes data-type', () => {
+  it('marks standoff overlay with data-type="standoff"', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
     const overlay = screen.getByTestId('confrontation-overlay');
     expect(overlay).toHaveAttribute('data-type', 'standoff');
-    expect(overlay).toHaveClass('letterbox');
-  });
-
-  it('does not apply letterbox for negotiation', () => {
-    render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
-    const overlay = screen.getByTestId('confrontation-overlay');
-    expect(overlay).not.toHaveClass('letterbox');
-  });
-
-  it('renders extreme close-up portrait style for standoff', () => {
-    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    const portraits = screen.getAllByTestId('actor-portrait');
-    portraits.forEach((portrait) => {
-      expect(portrait).toHaveClass('extreme-closeup');
-    });
-  });
-
-  it('does not apply extreme close-up for other types', () => {
-    render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
-    const portraits = screen.queryAllByTestId('actor-portrait');
-    portraits.forEach((portrait) => {
-      expect(portrait).not.toHaveClass('extreme-closeup');
-    });
   });
 });
 

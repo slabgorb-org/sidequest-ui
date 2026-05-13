@@ -205,6 +205,36 @@ describe("InputBar — action reveal broadcast", () => {
     expect(onSend).toHaveBeenCalledWith("I draw", false);
   });
 
+  it("does not submit on Enter when confrontationActive is true", () => {
+    // D2 redesign (2026-05-13): during a confrontation, plain Enter is
+    // locked — beat tiles in ConfrontationOverlay are the only commit
+    // path. The text the player typed is the flavor a beat carries; it
+    // must stay in the field so a beat click can pair it.
+    const onSend = vi.fn();
+    const { container } = render(
+      <InputBar onSend={onSend} confrontationActive />
+    );
+    const input = container.querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "I swing from the chandelier" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input.value).toBe("I swing from the chandelier");
+  });
+
+  it("renders the locked-enter glyph + helper line when confrontationActive", () => {
+    const { getByTestId } = render(
+      <InputBar onSend={vi.fn()} confrontationActive />
+    );
+    expect(getByTestId("input-enter-locked")).toBeInTheDocument();
+    expect(getByTestId("confrontation-lock-helper")).toBeInTheDocument();
+  });
+
+  it("does not render lock chrome when confrontationActive is false", () => {
+    const { queryByTestId } = render(<InputBar onSend={vi.fn()} />);
+    expect(queryByTestId("input-enter-locked")).not.toBeInTheDocument();
+    expect(queryByTestId("confrontation-lock-helper")).not.toBeInTheDocument();
+  });
+
   it("aside flag carries through composing and submitted", () => {
     const onReveal = vi.fn<(call: InputBarRevealCall) => void>();
     const { container, getByTestId } = render(
