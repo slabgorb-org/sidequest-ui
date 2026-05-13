@@ -20,9 +20,9 @@ import type { GenresResponse } from "@/types/genres";
  * passing the entry's mode field through, this test fails.
  */
 const GENRES: GenresResponse = {
-  victoria: {
-    name: "Victorian London",
-    description: "Gaslight and intrigue.",
+  tea_and_murder: {
+    name: "Tea & Murder",
+    description: "Cosy Edwardian village mystery.",
     worlds: [
       {
         slug: "albion",
@@ -58,19 +58,19 @@ describe("past-journeys mode icon — lobby wiring", () => {
     // production code seeds them via appendHistory after a successful start.
     appendHistory({
       player_name: "SoloRider",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       mode: "solo",
     });
     appendHistory({
       player_name: "MPRider",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       mode: "multiplayer",
     });
     appendHistory({
       player_name: "LegacyRider",
-      genre: "victoria",
+      genre: "tea_and_murder",
       world: "albion",
       // No `mode` — pre-2026-04-24 entry shape.
     });

@@ -16,8 +16,8 @@ describe("getArchetypeForGenre", () => {
     expect(getArchetypeForGenre("low_fantasy")).toBe("parchment");
   });
 
-  it("maps victoria to parchment", () => {
-    expect(getArchetypeForGenre("victoria")).toBe("parchment");
+  it("maps tea_and_murder to parchment", () => {
+    expect(getArchetypeForGenre("tea_and_murder")).toBe("parchment");
   });
 
   it("maps elemental_harmony to parchment", () => {

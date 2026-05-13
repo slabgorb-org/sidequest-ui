@@ -4,7 +4,7 @@ export type ChromeArchetype = "parchment" | "terminal" | "rugged";
 
 const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
-  victoria: "parchment",
+  tea_and_murder: "parchment",
   elemental_harmony: "parchment",
   neon_dystopia: "terminal",
   space_opera: "terminal",

@@ -52,7 +52,7 @@ const GENRE_DICE_THEMES: Record<string, DiceTheme> = {
     normalScale: 0.25,
     labelFont: PARCHMENT_FONT,
   },
-  victoria: {
+  tea_and_murder: {
     dieColor: "#4a1a3a",    // deep plum
     labelColor: "#d4af37",  // polished brass
     roughness: 0.25,

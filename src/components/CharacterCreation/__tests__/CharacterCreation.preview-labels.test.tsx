@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { CharacterCreation } from "../CharacterCreation";
 
 /**
- * Bug context: the Victoria pack rendered "Race: Colonial" because the
+ * Bug context: the Tea & Murder pack rendered "Race: Colonial" because the
  * server emitted hard-coded English fantasy field labels and the client
  * displayed them verbatim. The fix routes labels through
  * ``rules.chargen_field_labels`` on the server, which resolves them to
@@ -16,7 +16,7 @@ import { CharacterCreation } from "../CharacterCreation";
  * the client.
  */
 describe("CharacterCreation confirmation preview — genre field labels", () => {
-  it("renders the server-supplied display labels verbatim (Victoria override)", () => {
+  it("renders the server-supplied display labels verbatim (Tea & Murder override)", () => {
     render(
       <CharacterCreation
         scene={{
