@@ -429,7 +429,13 @@
   line-height: 1.55;
 }
 [data-archetype="parchment"] .narr-text em {
-  color: var(--accent);
+  /* Italics carry emphasis via slant; preserve full body luminance so
+     clue-bearing emphasis (object labels, titles, stressed words) stays
+     readable in both light and dark modes. The previous ``color:
+     var(--accent)`` collapsed to oklch(0.269 0.006 80) in dark mode,
+     rendering Edwardian narration italics nearly invisible against the
+     dark background (Glenross 2026-05-12 playtest, _"Miss Lyle,
+     private"_ illegible). */
   font-style: italic;
 }
 [data-archetype="parchment"] .narr-text strong {
@@ -512,7 +518,7 @@
   line-height: 1.55;
 }
 [data-archetype="rugged"] .narr-text em {
-  color: var(--accent);
+  /* Italics keep full body luminance (see parchment note above). */
   font-style: italic;
 }
 [data-archetype="rugged"] .narr-text strong {
