@@ -39,8 +39,12 @@
 import { useEffect, useState, type FC } from "react";
 import { render, screen, act, cleanup } from "@testing-library/react";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
+// ConfrontationWidget removed 2026-05-13 (D2 mock) — confrontation now
+// mounts directly above the InputBar via ConfrontationOverlay; the harness
+// renders ConfrontationOverlay directly. The end-to-end transport claim
+// (msg → dispatch → reveal) is identical; only the widget wrapper is gone.
 import {
+  ConfrontationOverlay,
   type ConfrontationData,
   type ConfrontationOutcome,
 } from "@/components/ConfrontationOverlay";
@@ -126,7 +130,7 @@ const Harness: FC<{
   });
 
   return (
-    <ConfrontationWidget
+    <ConfrontationOverlay
       data={BLEEDING_THROUGH_DATA}
       outcome={outcome}
     />
@@ -147,7 +151,7 @@ describe("magic confrontation wiring (Story 47-3 boundary)", () => {
     );
   });
 
-  it("ConfrontationWidget surfaces the reveal panel when outcome prop is set", () => {
+  it("ConfrontationOverlay surfaces the reveal panel when outcome prop is set", () => {
     const outcome: ConfrontationOutcome = {
       confrontation_id: "the_bleeding_through",
       label: "The Bleeding-Through",

@@ -1,4 +1,12 @@
-import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +15,20 @@ export interface InputBarRevealCall {
   action: string;
   aside: boolean;
   seq: number;
+}
+
+/**
+ * Imperative handle for sibling components that need to read+clear the
+ * field atomically. Currently used by the confrontation panel (D2 mock,
+ * 2026-05-13): when a player clicks a beat tile, the panel asks the
+ * InputBar for the current draft and clears it in one call so the typed
+ * text rides along with the beat dispatch.
+ */
+export interface InputBarHandle {
+  /** Returns the current trimmed draft and clears the field. */
+  consumeDraft(): string;
+  /** Returns the current draft text without mutating state. */
+  peekDraft(): string;
 }
 
 export interface InputBarProps {
@@ -25,21 +47,40 @@ export interface InputBarProps {
   mobile?: boolean;
   thinking?: boolean;
   waitingForPlayer?: string;
+  /**
+   * When true, plain-Enter submit is locked: beat tiles in the confrontation
+   * panel are the only commit path. Typing remains live so peers see the
+   * draft via ACTION_REVEAL and the text is the flavor a beat carries.
+   * The field renders a struck-through ↵ glyph + helper line so the lock
+   * is visible (D2 mock, 2026-05-13).
+   */
+  confrontationActive?: boolean;
 }
 
 const COMPOSING_DEBOUNCE_MS = 250;
 
-export default function InputBar({
-  onSend,
-  onReveal,
-  round = 0,
-  disabled,
-  mobile,
-  thinking,
-  waitingForPlayer,
-}: InputBarProps) {
+function InputBarImpl(
+  {
+    onSend,
+    onReveal,
+    round = 0,
+    disabled,
+    mobile,
+    thinking,
+    waitingForPlayer,
+    confrontationActive = false,
+  }: InputBarProps,
+  ref: React.ForwardedRef<InputBarHandle>,
+) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
+
+  // Ref-shadow of `text` so the imperative handle below can read the latest
+  // value without rebinding on every keystroke.
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
 
   // Monotonic seq per round; resets when round prop changes.
   // Held in a ref so debounce flushes can read+increment without
@@ -59,6 +100,31 @@ export default function InputBar({
 
   // Debounced composing broadcast — fires 250ms after the last keystroke.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Expose read+clear to siblings (beat-tile clicks need the draft atomically).
+  // Declared AFTER debounceRef so the callback can cancel a pending composing
+  // broadcast — the draft is being committed via a beat, which fires its own
+  // dispatch path, and the trailing composing event would race with it.
+  useImperativeHandle(
+    ref,
+    () => ({
+      consumeDraft: () => {
+        const draft = textRef.current.trim();
+        if (draft.length > 0) {
+          if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+          }
+          setText("");
+          textRef.current = "";
+        }
+        return draft;
+      },
+      peekDraft: () => textRef.current,
+    }),
+    [],
+  );
+
   useEffect(() => {
     if (!onRevealRef.current) return;
     if (text.length === 0) return;
@@ -101,20 +167,27 @@ export default function InputBar({
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        if (confrontationActive) {
+          // Plain Enter is locked during confrontation — beat tiles are the
+          // only commit path. We still preventDefault so the field doesn't
+          // flush, but we don't submit.
+          return;
+        }
         submit();
       }
     },
-    [submit],
+    [submit, confrontationActive],
   );
 
   const placeholder =
     waitingForPlayer ? `Waiting for ${waitingForPlayer}…` :
     thinking ? "The narrator is thinking..." :
+    confrontationActive ? "What do you do? (then pick a beat below)" :
     aside ? "What do you whisper?" :
     "What do you do?";
 
   return (
-    <div data-testid="input-bar" className="space-y-2">
+    <div data-testid="input-bar" className="space-y-1">
       <div className="flex items-center gap-2">
         <div className="flex items-center flex-1">
           {aside && (
@@ -126,11 +199,22 @@ export default function InputBar({
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={placeholder}
+            data-confrontation-active={confrontationActive ? "true" : undefined}
             className={cn(aside && "text-muted-foreground/70 italic")}
             {...(mobile ? { "data-mobile": "true" } : {})}
           />
           {aside && (
             <span className="text-muted-foreground/40 text-lg pr-1 select-none">)</span>
+          )}
+          {confrontationActive && (
+            <span
+              data-testid="input-enter-locked"
+              title="Enter is locked — pick a beat to commit"
+              aria-label="Enter disabled during confrontation"
+              className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded border border-border/40 text-[10px] tracking-wider text-muted-foreground/50 flex-shrink-0"
+            >
+              <span className="line-through font-semibold">↵ enter</span>
+            </span>
           )}
         </div>
         <button
@@ -148,6 +232,19 @@ export default function InputBar({
           (…)
         </button>
       </div>
+      {confrontationActive && (
+        <div
+          data-testid="confrontation-lock-helper"
+          className="flex items-center gap-1 text-[10.5px] text-muted-foreground/70 tracking-wide"
+        >
+          <span aria-hidden="true">↑</span>
+          Pick a beat above to commit · plain Enter is locked during confrontation
+        </div>
+      )}
     </div>
   );
 }
+
+const InputBar = forwardRef<InputBarHandle, InputBarProps>(InputBarImpl);
+InputBar.displayName = "InputBar";
+export default InputBar;

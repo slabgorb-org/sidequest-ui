@@ -40,7 +40,9 @@ describe("GameBoard wiring", () => {
       // JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts.
       "@/components/GameBoard/widgets/KnowledgeWidget",
       "@/components/GameBoard/widgets/ImageGalleryWidget",
-      "@/components/GameBoard/widgets/ConfrontationWidget",
+      // ConfrontationWidget removed 2026-05-13 — confrontation panel now
+      // mounts directly above the InputBar via ConfrontationOverlay; it is
+      // not a dockview tab.
       "@/components/GameBoard/widgets/AudioWidget",
     ];
     for (const path of widgets) {
@@ -69,8 +71,8 @@ describe("GameBoard wiring", () => {
     const requiredIds = [
       "narrative", "character", "inventory", "map", "ship",
       // "journal" removed playtest 2026-04-11 — empty Handouts tab.
-      "knowledge", "gallery",
-      "confrontation", "audio",
+      // "confrontation" removed 2026-05-13 — panel renders above InputBar.
+      "knowledge", "gallery", "audio",
     ];
     for (const id of requiredIds) {
       expect(mod.WIDGET_REGISTRY[id as keyof typeof mod.WIDGET_REGISTRY]).toBeDefined();

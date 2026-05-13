@@ -1,7 +1,11 @@
+import { createRef } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import InputBar, { type InputBarRevealCall } from "../InputBar";
+import InputBar, {
+  type InputBarHandle,
+  type InputBarRevealCall,
+} from "../InputBar";
 
 // ── Legacy tests (preserved) ─────────────────────────────────────────────────
 
@@ -203,6 +207,95 @@ describe("InputBar — action reveal broadcast", () => {
 
     // No crash; send still fires; no reveals to assert (none subscribed).
     expect(onSend).toHaveBeenCalledWith("I draw", false);
+  });
+
+  describe("imperative handle — consumeDraft", () => {
+    it("returns the trimmed draft and clears the field", () => {
+      const ref = createRef<InputBarHandle>();
+      const { container } = render(<InputBar ref={ref} onSend={vi.fn()} />);
+      const input = container.querySelector("input") as HTMLInputElement;
+      fireEvent.change(input, {
+        target: { value: "  I swing from the chandelier  " },
+      });
+      let draft: string | undefined;
+      act(() => {
+        // consumeDraft mutates state (setText("")) — wrap so the clear
+        // flushes to the DOM before we read input.value.
+        draft = ref.current!.consumeDraft();
+      });
+      expect(draft).toBe("I swing from the chandelier");
+      expect(input.value).toBe("");
+    });
+
+    it("returns empty string when no text is typed and leaves field empty", () => {
+      const ref = createRef<InputBarHandle>();
+      const { container } = render(<InputBar ref={ref} onSend={vi.fn()} />);
+      const input = container.querySelector("input") as HTMLInputElement;
+      let draft: string | undefined;
+      act(() => {
+        draft = ref.current!.consumeDraft();
+      });
+      expect(draft).toBe("");
+      expect(input.value).toBe("");
+    });
+
+    it("peekDraft reads without clearing", () => {
+      const ref = createRef<InputBarHandle>();
+      const { container } = render(<InputBar ref={ref} onSend={vi.fn()} />);
+      const input = container.querySelector("input") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "untouched" } });
+      expect(ref.current!.peekDraft()).toBe("untouched");
+      expect(input.value).toBe("untouched");
+    });
+
+    it("consuming the draft cancels the pending composing broadcast", () => {
+      const onReveal = vi.fn<(call: InputBarRevealCall) => void>();
+      const ref = createRef<InputBarHandle>();
+      const { container } = render(
+        <InputBar ref={ref} onSend={vi.fn()} onReveal={onReveal} round={1} />,
+      );
+      const input = container.querySelector("input") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "I draw" } });
+      // Draft consumed before the 250ms debounce elapses — composing
+      // broadcast must NOT fire after consume().
+      act(() => {
+        ref.current!.consumeDraft();
+      });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(onReveal).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not submit on Enter when confrontationActive is true", () => {
+    // D2 redesign (2026-05-13): during a confrontation, plain Enter is
+    // locked — beat tiles in ConfrontationOverlay are the only commit
+    // path. The text the player typed is the flavor a beat carries; it
+    // must stay in the field so a beat click can pair it.
+    const onSend = vi.fn();
+    const { container } = render(
+      <InputBar onSend={onSend} confrontationActive />
+    );
+    const input = container.querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "I swing from the chandelier" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(input.value).toBe("I swing from the chandelier");
+  });
+
+  it("renders the locked-enter glyph + helper line when confrontationActive", () => {
+    const { getByTestId } = render(
+      <InputBar onSend={vi.fn()} confrontationActive />
+    );
+    expect(getByTestId("input-enter-locked")).toBeInTheDocument();
+    expect(getByTestId("confrontation-lock-helper")).toBeInTheDocument();
+  });
+
+  it("does not render lock chrome when confrontationActive is false", () => {
+    const { queryByTestId } = render(<InputBar onSend={vi.fn()} />);
+    expect(queryByTestId("input-enter-locked")).not.toBeInTheDocument();
+    expect(queryByTestId("confrontation-lock-helper")).not.toBeInTheDocument();
   });
 
   it("aside flag carries through composing and submitted", () => {

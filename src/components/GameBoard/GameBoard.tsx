@@ -19,7 +19,10 @@ import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 
-import InputBar, { type InputBarRevealCall } from "@/components/InputBar";
+import InputBar, {
+  type InputBarHandle,
+  type InputBarRevealCall,
+} from "@/components/InputBar";
 import { MultiplayerTurnBanner } from "@/components/MultiplayerTurnBanner";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
@@ -30,7 +33,11 @@ import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import type { ConfrontationData, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
+import {
+  ConfrontationOverlay,
+  type ConfrontationData,
+  type ConfrontationOutcome,
+} from "@/components/ConfrontationOverlay";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
@@ -55,7 +62,8 @@ import { InventoryWidget } from "./widgets/InventoryWidget";
 // JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts comment.
 // JournalView and the journal data pipeline are intentionally retained.
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
-import { ConfrontationWidget } from "./widgets/ConfrontationWidget";
+// ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
+// dedicated panel between the dockview workspace and the InputBar (D2 mock).
 import { AudioWidget } from "./widgets/AudioWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
 
@@ -136,7 +144,16 @@ export interface GameBoardProps {
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
-  onBeatSelect?: (beatId: string) => void;
+  /**
+   * Beat tile click. The optional ``playerAction`` carries whatever the
+   * player typed into the InputBar at the moment of the click — beats
+   * are an alternate submit verb for whatever's in the field (D2
+   * confrontation panel, 2026-05-13). GameBoard reads the InputBar's
+   * draft via an imperative ref and forwards it here; App attaches it
+   * to the DICE_THROW so the narrator runs with both the mechanical
+   * outcome AND the player's invention.
+   */
+  onBeatSelect?: (beatId: string, playerAction?: string) => void;
   onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -235,13 +252,8 @@ export function GameBoard({
   const isMobile = breakpoint === "mobile";
 
   // Layout management — dockview handles its own layout state internally,
-  // but we still use the show/hide tracking for data-gating widgets.
-  const {
-    visibleWidgets,
-    showWidget,
-    hideWidget,
-    toggleWidget,
-  } = useGameBoardLayout(genreSlug, worldSlug);
+  // but we still use show/hide tracking for hotkeys.
+  const { toggleWidget } = useGameBoardLayout(genreSlug, worldSlug);
 
   const dockviewApiRef = useRef<DockviewApi | null>(null);
 
@@ -260,8 +272,8 @@ export function GameBoard({
   // (`renderWidgetContent`) is responsible for showing loading/empty states
   // when a widget's data has not yet arrived.
   //
-  // Confrontation is the ONE exception — it is an overlay that only exists
-  // mid-encounter, and its appearance is a narrative event, not a dock state.
+  // Confrontation is NOT a widget — see widgetRegistry.ts. It mounts as a
+  // dedicated panel in the input area below the dockview workspace.
   const availableWidgets = useMemo(() => {
     const available = new Set<WidgetId>();
     available.add("narrative");
@@ -272,22 +284,11 @@ export function GameBoard({
     available.add("gallery");
     available.add("audio");
     if (worldSlug === "coyote_star") available.add("ship");
-    if (confrontationData) available.add("confrontation");
     return available;
-  }, [confrontationData, worldSlug]);
+  }, [worldSlug]);
 
-  // Hotkeys
+  // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
-
-  // Confrontation auto-promote
-  useEffect(() => {
-    if (confrontationData && !visibleWidgets.has("confrontation")) {
-      showWidget("confrontation");
-    }
-    if (!confrontationData && visibleWidgets.has("confrontation")) {
-      hideWidget("confrontation");
-    }
-  }, [confrontationData, visibleWidgets, showWidget, hideWidget]);
 
   // Audio state (migrated from GameLayout)
   const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5 });
@@ -414,19 +415,6 @@ export function GameBoard({
         ) : null;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
-      case "confrontation":
-        return confrontationData ? (
-          <ConfrontationWidget
-            data={confrontationData}
-            outcome={confrontationOutcome ?? null}
-            onBeatSelect={onBeatSelect}
-            onYield={onYield}
-            diceRequest={diceRequest}
-            diceResult={diceResult}
-            playerId={currentPlayerId}
-            onDiceThrow={onDiceThrow}
-          />
-        ) : null;
       case "audio":
         return (
           <AudioWidget
@@ -443,8 +431,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      knowledgeEntries, confrontationData, confrontationOutcome, onBeatSelect, onYield, diceRequest, diceResult,
-      onDiceThrow, nowPlaying, volumes, muted,
+      knowledgeEntries, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent,
@@ -459,6 +446,37 @@ export function GameBoard({
     characters?.find((c) => c.player_id === currentPlayerId)?.character_name ??
     characters?.find((c) => c.player_id === currentPlayerId)?.name ??
     null;
+  // Confrontation panel — D2 mock (2026-05-13). Mounts between the dockview
+  // workspace and the InputBar when a confrontation is active. Beat tiles
+  // are alternate submit verbs for whatever's in the InputBar; plain Enter
+  // is locked while the panel is up.
+  //
+  // The beat-tile click goes through ``handleBeatTileSelect`` which reads
+  // the InputBar's draft text via an imperative ref and forwards it to
+  // the App-level ``onBeatSelect``. That gives App.handleBeatSelect both
+  // the beat id AND the chandelier-swing the player typed, so the
+  // resulting DICE_THROW can carry ``player_action`` to the server.
+  const inputBarRef = useRef<InputBarHandle | null>(null);
+  const handleBeatTileSelect = useCallback(
+    (beatId: string) => {
+      const draft = inputBarRef.current?.consumeDraft() ?? "";
+      onBeatSelect?.(beatId, draft);
+    },
+    [onBeatSelect],
+  );
+  const confrontationPanel = confrontationData ? (
+    <ConfrontationOverlay
+      data={confrontationData}
+      outcome={confrontationOutcome ?? null}
+      onBeatSelect={handleBeatTileSelect}
+      onYield={onYield}
+      diceRequest={diceRequest}
+      diceResult={diceResult}
+      playerId={currentPlayerId}
+      onDiceThrow={onDiceThrow}
+    />
+  ) : null;
+
   const inputBar = (
     <div className="flex flex-col">
       <PeerRevealList reveals={peerReveals ?? new Map()} partyOrder={partyOrder} />
@@ -479,7 +497,9 @@ export function GameBoard({
         mpInputState={mpInputState}
         peersOutstanding={peersOutstanding}
       />
+      {confrontationPanel}
       <InputBar
+        ref={inputBarRef}
         onSend={onSend}
         disabled={disabled}
         mobile={isMobile}
@@ -487,6 +507,7 @@ export function GameBoard({
         waitingForPlayer={waitingForPlayer}
         onReveal={onReveal}
         round={round}
+        confrontationActive={confrontationData != null}
       />
     </div>
   );

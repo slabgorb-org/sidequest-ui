@@ -364,6 +364,16 @@ export interface DiceThrowPayload {
   face: number[];
   /** Beat ID from confrontation — when present, server applies beat + narrates in one tick. */
   beat_id?: string;
+  /**
+   * Freeform text the player typed into the InputBar at the moment they
+   * clicked a beat tile (D2 confrontation panel, 2026-05-13). Beats are an
+   * alternate submit verb for whatever's in the InputBar — "I swing from
+   * the chandelier" + click Attack carries the chandelier swing as the
+   * player's stated action. Server prepends it to the narrator's
+   * ``replay_action_text`` so the chandelier reaches the prose. Empty /
+   * whitespace-only values are equivalent to omitting the field.
+   */
+  player_action?: string;
 }
 
 /** Server -> all clients: resolved dice roll outcome. */
