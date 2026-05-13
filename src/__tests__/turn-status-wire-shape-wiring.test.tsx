@@ -32,7 +32,7 @@ const Host = forwardRef<HostHandle>(function Host(_props, ref) {
     const status = msg.payload.status as string | undefined;
     // Mirrors the post-fix App.tsx line: top-level first, payload fallback.
     const playerId =
-      ((msg as Record<string, unknown>).player_id as string | undefined) ??
+      ((msg as unknown as Record<string, unknown>).player_id as string | undefined) ??
       (msg.payload.player_id as string | undefined);
 
     if (status === "resolved") {

@@ -724,7 +724,7 @@ function AppInner() {
       // (playtest 2026-05-10). Fall back to msg.payload.player_id for any
       // future server schema change.
       const playerId =
-        ((msg as Record<string, unknown>).player_id as string | undefined) ??
+        ((msg as unknown as Record<string, unknown>).player_id as string | undefined) ??
         (msg.payload.player_id as string | undefined);
 
       if (name && status === "active") {
