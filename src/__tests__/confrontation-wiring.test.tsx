@@ -263,13 +263,39 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationOverlay", ()
     expect(gameBoardSrc).toMatch(
       /import[\s\S]*?ConfrontationOverlay[\s\S]*?from\s*["']@\/components\/ConfrontationOverlay["']/,
     );
-    // Renders with confrontationData and onBeatSelect threaded in.
+    // Renders with confrontationData and the draft-capturing handler.
     expect(gameBoardSrc).toMatch(/<ConfrontationOverlay[\s\S]*?data=\{confrontationData\}/);
-    expect(gameBoardSrc).toMatch(/<ConfrontationOverlay[\s\S]*?onBeatSelect=\{onBeatSelect\}/);
+    expect(gameBoardSrc).toMatch(
+      /<ConfrontationOverlay[\s\S]*?onBeatSelect=\{handleBeatTileSelect\}/,
+    );
     // Threads confrontationActive into the InputBar so plain Enter is locked.
     expect(gameBoardSrc).toMatch(
       /<InputBar[\s\S]*?confrontationActive=\{confrontationData\s*!=\s*null\}/,
     );
+  });
+
+  it("GameBoard wraps onBeatSelect with a draft-capturing handler", async () => {
+    // D2 confrontation panel (2026-05-13): beat tiles are alternate submit
+    // verbs. GameBoard must read the InputBar's current draft via an
+    // imperative ref, then forward (beatId, draftText) to the App-level
+    // onBeatSelect — that is the wire that carries "I swing from the
+    // chandelier" out to the DICE_THROW. Without this wrapper the typed
+    // text is lost on click and the narrator never sees it.
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const gameBoardSrc = fs.readFileSync(
+      path.resolve(__dirname, "../components/GameBoard/GameBoard.tsx"),
+      "utf-8",
+    );
+    expect(gameBoardSrc).toMatch(
+      /const inputBarRef\s*=\s*useRef<InputBarHandle \| null>\(null\)/,
+    );
+    expect(gameBoardSrc).toMatch(
+      /handleBeatTileSelect[\s\S]*?inputBarRef\.current\?\.consumeDraft\(\)/,
+    );
+    expect(gameBoardSrc).toMatch(/onBeatSelect\?\.\(beatId,\s*draft\)/);
+    // The InputBar must actually receive the ref so the handle is bound.
+    expect(gameBoardSrc).toMatch(/<InputBar[\s\S]*?ref=\{inputBarRef\}/);
   });
 
   it("App.tsx declares a handleBeatSelect callback", async () => {
@@ -320,6 +346,35 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationOverlay", ()
     // throw with beat_id when one is pending.
     expect(appSrc).toMatch(/type:\s*MessageType\.DICE_THROW/);
     expect(appSrc).toMatch(/beat_id\s*:\s*beatId/);
+  });
+
+  it("handleBeatSelect accepts playerAction and forwards it through DICE_THROW", async () => {
+    // D2 confrontation panel (2026-05-13): the freeform text the player
+    // typed into the InputBar at the moment of a beat-tile click must
+    // ride with the beat through to the server's narrator. handleBeatSelect
+    // accepts the playerAction param, latches it in pendingPlayerActionRef
+    // alongside pendingBeatIdRef, and handleDiceThrow re-attaches it as
+    // ``player_action`` on the DICE_THROW payload when (and only when) a
+    // beat is pending.
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const appSrc = fs.readFileSync(
+      path.resolve(__dirname, "../App.tsx"),
+      "utf-8",
+    );
+    // handleBeatSelect signature must accept the optional playerAction.
+    expect(appSrc).toMatch(
+      /const handleBeatSelect\s*=\s*useCallback\(\s*\(\s*beatId:\s*string,\s*playerAction\?:\s*string\s*\)/,
+    );
+    // Latched alongside pendingBeatIdRef.
+    expect(appSrc).toContain("pendingPlayerActionRef");
+    expect(appSrc).toMatch(
+      /pendingPlayerActionRef\.current\s*=\s*\(playerAction\s*\?\?\s*""\)\.trim\(\)/,
+    );
+    // DICE_THROW payload includes player_action when beat is pending.
+    expect(appSrc).toMatch(
+      /beatId\s*&&\s*playerAction\s*\?\s*\{\s*player_action:\s*playerAction\s*\}/,
+    );
   });
 
   it("NARRATION_END clears confrontation when no CONFRONTATION message arrived this turn", async () => {

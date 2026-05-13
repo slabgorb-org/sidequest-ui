@@ -19,7 +19,10 @@ import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 
-import InputBar, { type InputBarRevealCall } from "@/components/InputBar";
+import InputBar, {
+  type InputBarHandle,
+  type InputBarRevealCall,
+} from "@/components/InputBar";
 import { MultiplayerTurnBanner } from "@/components/MultiplayerTurnBanner";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
@@ -141,7 +144,16 @@ export interface GameBoardProps {
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
-  onBeatSelect?: (beatId: string) => void;
+  /**
+   * Beat tile click. The optional ``playerAction`` carries whatever the
+   * player typed into the InputBar at the moment of the click — beats
+   * are an alternate submit verb for whatever's in the field (D2
+   * confrontation panel, 2026-05-13). GameBoard reads the InputBar's
+   * draft via an imperative ref and forwards it here; App attaches it
+   * to the DICE_THROW so the narrator runs with both the mechanical
+   * outcome AND the player's invention.
+   */
+  onBeatSelect?: (beatId: string, playerAction?: string) => void;
   onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -438,11 +450,25 @@ export function GameBoard({
   // workspace and the InputBar when a confrontation is active. Beat tiles
   // are alternate submit verbs for whatever's in the InputBar; plain Enter
   // is locked while the panel is up.
+  //
+  // The beat-tile click goes through ``handleBeatTileSelect`` which reads
+  // the InputBar's draft text via an imperative ref and forwards it to
+  // the App-level ``onBeatSelect``. That gives App.handleBeatSelect both
+  // the beat id AND the chandelier-swing the player typed, so the
+  // resulting DICE_THROW can carry ``player_action`` to the server.
+  const inputBarRef = useRef<InputBarHandle | null>(null);
+  const handleBeatTileSelect = useCallback(
+    (beatId: string) => {
+      const draft = inputBarRef.current?.consumeDraft() ?? "";
+      onBeatSelect?.(beatId, draft);
+    },
+    [onBeatSelect],
+  );
   const confrontationPanel = confrontationData ? (
     <ConfrontationOverlay
       data={confrontationData}
       outcome={confrontationOutcome ?? null}
-      onBeatSelect={onBeatSelect}
+      onBeatSelect={handleBeatTileSelect}
       onYield={onYield}
       diceRequest={diceRequest}
       diceResult={diceResult}
@@ -473,6 +499,7 @@ export function GameBoard({
       />
       {confrontationPanel}
       <InputBar
+        ref={inputBarRef}
         onSend={onSend}
         disabled={disabled}
         mobile={isMobile}

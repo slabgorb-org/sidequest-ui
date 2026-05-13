@@ -1,4 +1,12 @@
-import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -7,6 +15,20 @@ export interface InputBarRevealCall {
   action: string;
   aside: boolean;
   seq: number;
+}
+
+/**
+ * Imperative handle for sibling components that need to read+clear the
+ * field atomically. Currently used by the confrontation panel (D2 mock,
+ * 2026-05-13): when a player clicks a beat tile, the panel asks the
+ * InputBar for the current draft and clears it in one call so the typed
+ * text rides along with the beat dispatch.
+ */
+export interface InputBarHandle {
+  /** Returns the current trimmed draft and clears the field. */
+  consumeDraft(): string;
+  /** Returns the current draft text without mutating state. */
+  peekDraft(): string;
 }
 
 export interface InputBarProps {
@@ -37,18 +59,28 @@ export interface InputBarProps {
 
 const COMPOSING_DEBOUNCE_MS = 250;
 
-export default function InputBar({
-  onSend,
-  onReveal,
-  round = 0,
-  disabled,
-  mobile,
-  thinking,
-  waitingForPlayer,
-  confrontationActive = false,
-}: InputBarProps) {
+function InputBarImpl(
+  {
+    onSend,
+    onReveal,
+    round = 0,
+    disabled,
+    mobile,
+    thinking,
+    waitingForPlayer,
+    confrontationActive = false,
+  }: InputBarProps,
+  ref: React.ForwardedRef<InputBarHandle>,
+) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
+
+  // Ref-shadow of `text` so the imperative handle below can read the latest
+  // value without rebinding on every keystroke.
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
 
   // Monotonic seq per round; resets when round prop changes.
   // Held in a ref so debounce flushes can read+increment without
@@ -68,6 +100,31 @@ export default function InputBar({
 
   // Debounced composing broadcast — fires 250ms after the last keystroke.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Expose read+clear to siblings (beat-tile clicks need the draft atomically).
+  // Declared AFTER debounceRef so the callback can cancel a pending composing
+  // broadcast — the draft is being committed via a beat, which fires its own
+  // dispatch path, and the trailing composing event would race with it.
+  useImperativeHandle(
+    ref,
+    () => ({
+      consumeDraft: () => {
+        const draft = textRef.current.trim();
+        if (draft.length > 0) {
+          if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+          }
+          setText("");
+          textRef.current = "";
+        }
+        return draft;
+      },
+      peekDraft: () => textRef.current,
+    }),
+    [],
+  );
+
   useEffect(() => {
     if (!onRevealRef.current) return;
     if (text.length === 0) return;
@@ -187,3 +244,7 @@ export default function InputBar({
     </div>
   );
 }
+
+const InputBar = forwardRef<InputBarHandle, InputBarProps>(InputBarImpl);
+InputBar.displayName = "InputBar";
+export default InputBar;

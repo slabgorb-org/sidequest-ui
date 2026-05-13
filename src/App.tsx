@@ -416,6 +416,11 @@ function AppInner() {
   // Beat ID pending a client-side dice roll — set when user picks a beat,
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
+  // Freeform text the player typed into the InputBar at the moment they
+  // clicked a beat tile (D2 confrontation panel, 2026-05-13). Latched
+  // alongside pendingBeatIdRef and re-attached to DICE_THROW.player_action
+  // when dice settle. Empty string when the player didn't type anything.
+  const pendingPlayerActionRef = useRef<string>("");
 
   // Ref bridge: peerReveals.apply is defined after handleMessage (useCallback).
   // Updated synchronously alongside sendRef so handleMessage always calls the
@@ -1192,7 +1197,7 @@ function AppInner() {
   // as a PLAYER_ACTION text string — violating: no keyword matching (Zork Problem,
   // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
-    (beatId: string) => {
+    (beatId: string, playerAction?: string) => {
       if (thinking) {
         console.warn(
           `[beat-dispatch] onBeatSelect fired for "${beatId}" while thinking — duplicate suppressed.`,
@@ -1239,6 +1244,10 @@ function AppInner() {
         context: `${beat.label} — ${beat.stat_check} check`,
       };
       pendingBeatIdRef.current = beatId;
+      // Stash the player's typed action so handleDiceThrow can attach it
+      // to the DICE_THROW once physics settles. Trim defensively; empty
+      // string is the well-defined "no action typed" case.
+      pendingPlayerActionRef.current = (playerAction ?? "").trim();
       setDiceResult(null);
       setDiceRequest(localReq);
     },
@@ -1268,6 +1277,11 @@ function AppInner() {
       if (!diceRequest) return;
       const beatId = pendingBeatIdRef.current;
       pendingBeatIdRef.current = null;
+      // Consume the latched player_action atomically with the beat id.
+      // The ref is reset even when beatId is null so a stale free-roll
+      // can't accidentally inherit a prior beat's draft text.
+      const playerAction = pendingPlayerActionRef.current;
+      pendingPlayerActionRef.current = "";
       send({
         type: MessageType.DICE_THROW,
         payload: {
@@ -1275,6 +1289,7 @@ function AppInner() {
           throw_params: params,
           face,
           ...(beatId ? { beat_id: beatId } : {}),
+          ...(beatId && playerAction ? { player_action: playerAction } : {}),
         },
         player_id: "",
       });
