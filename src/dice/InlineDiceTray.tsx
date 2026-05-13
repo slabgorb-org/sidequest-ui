@@ -12,10 +12,15 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { DiceScene, type ThrowParams } from "./DiceScene";
-import { type DiceTheme, DEFAULT_DICE_THEME } from "./diceTheme";
+import {
+  DiceScene,
+  DEFAULT_DICE_THEME,
+  D20_RADIUS,
+  replayThrowParams,
+  type DiceTheme,
+  type ThrowParams,
+} from "@local/dice-lib";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
-import { replayThrowParams } from "./replayThrowParams";
 
 // Archetype → dice label font (matches useChromeArchetype UI fonts)
 const PARCHMENT_FONT = "/fonts/EBGaramond.ttf";
@@ -215,7 +220,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
   useLayoutEffect(() => {
     if (!diceResult) return;
     if (isRollingPlayer) return;
-    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed, D20_RADIUS);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
     setRollKey((k) => k + 1);
@@ -310,10 +315,12 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
           style={{ pointerEvents: "none", background: "transparent" }}
         >
           <DiceScene
+            kind="d20"
+            count={1}
             throwParams={throwParams}
             rollKey={rollKey}
             onThrow={noopThrow}
-            onSettle={handleSettle}
+            onAllSettle={(values) => handleSettle(values[0])}
             theme={diceTheme}
           />
         </Canvas>

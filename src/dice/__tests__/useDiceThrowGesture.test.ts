@@ -15,13 +15,13 @@ import { renderHook, act } from "@testing-library/react";
 
 describe("AC-1: useDiceThrowGesture hook exports and basic contract", () => {
   it("exports useDiceThrowGesture from dice/useDiceThrowGesture", async () => {
-    const mod = await import("../useDiceThrowGesture");
+    const mod = await import("@local/dice-lib");
     expect(mod.useDiceThrowGesture).toBeDefined();
     expect(typeof mod.useDiceThrowGesture).toBe("function");
   });
 
   it("returns an object with onPointerDown handler", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
     expect(result.current).toHaveProperty("onPointerDown");
@@ -43,7 +43,7 @@ describe("AC-2: Velocity calculation", () => {
   });
 
   it("calculates linear velocity from drag distance and duration", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -88,7 +88,7 @@ describe("AC-2: Velocity calculation", () => {
     // whenever the fast drag clamps at `MAX_THROW_SPEED`.
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
 
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrowSlow = vi.fn();
     const onThrowFast = vi.fn();
 
@@ -148,7 +148,7 @@ describe("AC-2: Velocity calculation", () => {
 
 describe("AC-3: Angular velocity calculation", () => {
   it("produces non-zero angular velocity on throw", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
 
     vi.useFakeTimers();
@@ -195,7 +195,7 @@ describe("AC-4: ThrowParams shape", () => {
   });
 
   it("onThrow callback receives ThrowParams with correct shape", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -232,7 +232,7 @@ describe("AC-4: ThrowParams shape", () => {
   });
 
   it("ThrowParams contains no extra unexpected fields", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -270,7 +270,7 @@ describe("AC-6: Edge cases", () => {
   });
 
   it("single-point drag (down + immediate up) does NOT fire onThrow", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -286,7 +286,7 @@ describe("AC-6: Edge cases", () => {
   });
 
   it("very slow drag below minimum speed threshold does NOT fire onThrow", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -305,7 +305,7 @@ describe("AC-6: Edge cases", () => {
   });
 
   it("fast flick fires onThrow with capped velocity (no infinite speed)", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const { result } = renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -334,7 +334,7 @@ describe("AC-6: Edge cases", () => {
   });
 
   it("pointer up without prior pointer down does NOT fire onThrow", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -354,7 +354,7 @@ describe("AC-6: Edge cases", () => {
 describe("AC-7: No network calls", () => {
   it("hook module does not import WebSocket or fetch utilities", async () => {
     // Read the module source to verify no network imports
-    const mod = await import("../useDiceThrowGesture");
+    const mod = await import("@local/dice-lib");
     // The hook should exist without importing any network modules
     expect(mod.useDiceThrowGesture).toBeDefined();
     // If the module imported fetch/WebSocket, it would likely add properties
@@ -375,7 +375,7 @@ describe("AC-8: Keyboard throw fallback", () => {
   });
 
   it("pressing Enter/Space fires onThrow with default ThrowParams", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -398,7 +398,7 @@ describe("AC-8: Keyboard throw fallback", () => {
   });
 
   it("Space key also triggers default throw", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -410,7 +410,7 @@ describe("AC-8: Keyboard throw fallback", () => {
   });
 
   it("non-activation keys do NOT trigger throw", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -424,7 +424,7 @@ describe("AC-8: Keyboard throw fallback", () => {
   });
 
   it("keyboard throw produces valid ThrowParams shape", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     renderHook(() => useDiceThrowGesture({ onThrow }));
 
@@ -448,7 +448,7 @@ describe("AC-8: Keyboard throw fallback", () => {
 describe("AC-5: Wiring — DiceScene uses useDiceThrowGesture", () => {
   it("DiceScene imports useDiceThrowGesture from the hook module", async () => {
     // Read the DiceScene source to verify import
-    const diceSceneSrc = await import("../DiceScene");
+    const diceSceneSrc = await import("@local/dice-lib");
     // The scene should export DiceScene that internally uses the hook.
     // We verify by checking the module re-exports or that useDragThrow is gone
     expect(diceSceneSrc.DiceScene).toBeDefined();
@@ -458,7 +458,7 @@ describe("AC-5: Wiring — DiceScene uses useDiceThrowGesture", () => {
     // The inline useDragThrow function should be extracted.
     // After extraction, DiceScene.tsx should import from useDiceThrowGesture
     // and the local useDragThrow function should no longer exist.
-    const mod = await import("../useDiceThrowGesture");
+    const mod = await import("@local/dice-lib");
     expect(mod.useDiceThrowGesture).toBeDefined();
     // The hook should be the canonical gesture handler
     expect(typeof mod.useDiceThrowGesture).toBe("function");
@@ -471,7 +471,7 @@ describe("AC-5: Wiring — DiceScene uses useDiceThrowGesture", () => {
 
 describe("Lifecycle: cleanup on unmount", () => {
   it("removes window event listeners when hook unmounts", async () => {
-    const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
+    const { useDiceThrowGesture } = await import("@local/dice-lib");
     const onThrow = vi.fn();
     const removeSpy = vi.spyOn(window, "removeEventListener");
 

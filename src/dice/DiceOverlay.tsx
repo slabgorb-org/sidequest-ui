@@ -16,9 +16,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { DiceScene, type ThrowParams } from "./DiceScene";
+import {
+  DiceScene,
+  D20_RADIUS,
+  replayThrowParams,
+  type ThrowParams,
+} from "@local/dice-lib";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
-import { replayThrowParams } from "./replayThrowParams";
 
 export interface DiceOverlayProps {
   diceRequest: DiceRequestPayload | null;
@@ -76,7 +80,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
   useEffect(() => {
     if (!diceResult) return;
     if (isRollingPlayer) return;
-    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed, D20_RADIUS);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
     setRollKey((k) => k + 1);
@@ -182,10 +186,12 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
         dpr={Math.min(window.devicePixelRatio, 2)}
       >
         <DiceScene
+          kind="d20"
+          count={1}
           throwParams={throwParams}
           rollKey={rollKey}
           onThrow={handleSceneThrow}
-          onSettle={handleSettle}
+          onAllSettle={(values) => handleSettle(values[0])}
         />
       </Canvas>
 

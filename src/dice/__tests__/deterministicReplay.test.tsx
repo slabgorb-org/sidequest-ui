@@ -13,6 +13,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { D20_RADIUS } from "@local/dice-lib";
 
 // ── Mock R3F and Rapier — no WebGL in test environment ───────────────────────
 
@@ -81,14 +82,14 @@ const DICE_RESULT = {
 
 describe("AC-1: replayThrowParams exists and converts wire→scene params", () => {
   it("exports replayThrowParams from dice module", async () => {
-    const mod = await import("../replayThrowParams");
+    const mod = await import("@local/dice-lib");
     expect(mod.replayThrowParams).toBeDefined();
     expect(typeof mod.replayThrowParams).toBe("function");
   });
 
   it("returns scene ThrowParams with all required fields", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     expect(scene).toHaveProperty("position");
     expect(scene).toHaveProperty("linearVelocity");
@@ -102,23 +103,23 @@ describe("AC-1: replayThrowParams exists and converts wire→scene params", () =
   });
 
   it("maps wire velocity to scene linearVelocity", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     // Wire velocity should map directly to scene linearVelocity
     expect(scene.linearVelocity).toEqual(WIRE_THROW_PARAMS.velocity);
   });
 
   it("maps wire angular to scene angularVelocity", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     expect(scene.angularVelocity).toEqual(WIRE_THROW_PARAMS.angular);
   });
 
   it("converts wire 2D position to scene 3D position", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     // Wire position is [x, y] normalized (0..1), scene position is [x, y, z] in tray space
     // Conversion must be deterministic and place die within the tray
@@ -127,8 +128,8 @@ describe("AC-1: replayThrowParams exists and converts wire→scene params", () =
   });
 
   it("produces no NaN or Infinity values in any field", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const scene = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     const allValues = [
       ...scene.position,
@@ -148,11 +149,11 @@ describe("AC-1: replayThrowParams exists and converts wire→scene params", () =
 
 describe("AC-2: Determinism — same inputs always produce same output", () => {
   it("same seed + params produces identical scene params over 100 iterations", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const reference = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const reference = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     for (let i = 0; i < 100; i++) {
-      const result = replayThrowParams(WIRE_THROW_PARAMS, 42);
+      const result = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
       expect(result.position).toEqual(reference.position);
       expect(result.linearVelocity).toEqual(reference.linearVelocity);
       expect(result.angularVelocity).toEqual(reference.angularVelocity);
@@ -161,8 +162,8 @@ describe("AC-2: Determinism — same inputs always produce same output", () => {
   });
 
   it("different wire params produce different scene positions", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const params1 = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const params1 = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
     const params2 = replayThrowParams(
       {
         velocity: [0.5, 1.0, -0.5] as [number, number, number],
@@ -170,6 +171,7 @@ describe("AC-2: Determinism — same inputs always produce same output", () => {
         position: [0.8, 0.2] as [number, number],
       },
       42,
+      D20_RADIUS,
     );
 
     // At least one field should differ
@@ -185,9 +187,9 @@ describe("AC-2: Determinism — same inputs always produce same output", () => {
 
 describe("AC-3: Seed determines initial die rotation", () => {
   it("different seeds produce different initial rotations", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const result1 = replayThrowParams(WIRE_THROW_PARAMS, 42);
-    const result2 = replayThrowParams(WIRE_THROW_PARAMS, 9999);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const result1 = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
+    const result2 = replayThrowParams(WIRE_THROW_PARAMS, 9999, D20_RADIUS);
 
     // Same throw params but different seeds must produce different rotations
     const rotationsMatch = result1.rotation.every(
@@ -197,9 +199,9 @@ describe("AC-3: Seed determines initial die rotation", () => {
   });
 
   it("same seed always produces same rotation", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
+    const { replayThrowParams } = await import("@local/dice-lib");
     const results = Array.from({ length: 50 }, () =>
-      replayThrowParams(WIRE_THROW_PARAMS, 42),
+      replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS),
     );
 
     for (const r of results) {
@@ -208,10 +210,10 @@ describe("AC-3: Seed determines initial die rotation", () => {
   });
 
   it("rotation values are in valid Euler range", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
+    const { replayThrowParams } = await import("@local/dice-lib");
     // Test with multiple seeds to check range across different values
     for (const seed of [0, 1, 42, 999, 2 ** 32, Number.MAX_SAFE_INTEGER]) {
-      const result = replayThrowParams(WIRE_THROW_PARAMS, seed);
+      const result = replayThrowParams(WIRE_THROW_PARAMS, seed, D20_RADIUS);
       for (const angle of result.rotation) {
         expect(angle).toBeGreaterThanOrEqual(-Math.PI);
         expect(angle).toBeLessThanOrEqual(Math.PI);
@@ -227,23 +229,23 @@ describe("AC-3: Seed determines initial die rotation", () => {
 
 describe("AC-4: Seed boundary — JS safe integer range", () => {
   it("handles seed of 0 without error", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const result = replayThrowParams(WIRE_THROW_PARAMS, 0);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const result = replayThrowParams(WIRE_THROW_PARAMS, 0, D20_RADIUS);
     expect(result.rotation).toHaveLength(3);
     expect(result.rotation.every((v: number) => Number.isFinite(v))).toBe(true);
   });
 
   it("handles seed at MAX_SAFE_INTEGER boundary", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const result = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const result = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER, D20_RADIUS);
     expect(result.rotation).toHaveLength(3);
     expect(result.rotation.every((v: number) => Number.isFinite(v))).toBe(true);
   });
 
   it("is deterministic at MAX_SAFE_INTEGER", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const a = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER);
-    const b = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const a = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER, D20_RADIUS);
+    const b = replayThrowParams(WIRE_THROW_PARAMS, Number.MAX_SAFE_INTEGER, D20_RADIUS);
     expect(a.rotation).toEqual(b.rotation);
   });
 });
@@ -338,7 +340,7 @@ describe("AC-7: Rolling player gets server-authoritative replay on DiceResult", 
 
 describe("AC-8: Edge cases for replay conversion", () => {
   it("handles zero-velocity throw (dropped die)", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
+    const { replayThrowParams } = await import("@local/dice-lib");
     const scene = replayThrowParams(
       {
         velocity: [0, 0, 0] as [number, number, number],
@@ -346,6 +348,7 @@ describe("AC-8: Edge cases for replay conversion", () => {
         position: [0.5, 0.5] as [number, number],
       },
       42,
+      D20_RADIUS,
     );
 
     // Should still produce valid params (die drops straight down)
@@ -357,15 +360,17 @@ describe("AC-8: Edge cases for replay conversion", () => {
   });
 
   it("handles position at tray boundaries (0,0) and (1,1)", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
+    const { replayThrowParams } = await import("@local/dice-lib");
 
     const corner00 = replayThrowParams(
       { ...WIRE_THROW_PARAMS, position: [0, 0] as [number, number] },
       42,
+      D20_RADIUS,
     );
     const corner11 = replayThrowParams(
       { ...WIRE_THROW_PARAMS, position: [1, 1] as [number, number] },
       42,
+      D20_RADIUS,
     );
 
     // Both should produce valid positions within tray bounds
@@ -375,7 +380,7 @@ describe("AC-8: Edge cases for replay conversion", () => {
   });
 
   it("handles negative velocity components", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
+    const { replayThrowParams } = await import("@local/dice-lib");
     const scene = replayThrowParams(
       {
         velocity: [-5.0, -3.0, -1.0] as [number, number, number],
@@ -383,6 +388,7 @@ describe("AC-8: Edge cases for replay conversion", () => {
         position: [0.5, 0.5] as [number, number],
       },
       42,
+      D20_RADIUS,
     );
 
     expect(scene.linearVelocity).toEqual([-5.0, -3.0, -1.0]);
@@ -397,7 +403,7 @@ describe("AC-8: Edge cases for replay conversion", () => {
 describe("Rule: replayThrowParams has no type-safety escapes (#1)", () => {
   it("module source does not use 'as any'", async () => {
     // Structural check: the module should not need type escapes
-    const mod = await import("../replayThrowParams");
+    const mod = await import("@local/dice-lib");
     expect(mod.replayThrowParams).toBeDefined();
     // The real gate is the TS compiler — if it compiles without as any, this passes
   });
@@ -405,8 +411,8 @@ describe("Rule: replayThrowParams has no type-safety escapes (#1)", () => {
 
 describe("Rule: null/undefined handling (#4)", () => {
   it("replayThrowParams does not return undefined for any field", async () => {
-    const { replayThrowParams } = await import("../replayThrowParams");
-    const result = replayThrowParams(WIRE_THROW_PARAMS, 42);
+    const { replayThrowParams } = await import("@local/dice-lib");
+    const result = replayThrowParams(WIRE_THROW_PARAMS, 42, D20_RADIUS);
 
     expect(result.position).toBeDefined();
     expect(result.linearVelocity).toBeDefined();
@@ -437,7 +443,7 @@ describe("Wiring: replayThrowParams is imported by DiceOverlay", () => {
     // it must import from replayThrowParams module. We verify the module
     // loads cleanly which means the import chain is intact.
     const overlay = await import("../DiceOverlay");
-    const replay = await import("../replayThrowParams");
+    const replay = await import("@local/dice-lib");
     expect(overlay.DiceOverlay).toBeDefined();
     expect(replay.replayThrowParams).toBeDefined();
   });

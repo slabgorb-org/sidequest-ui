@@ -13,9 +13,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SRC_ROOT = path.resolve(__dirname, "..");
+// After dice-lib extraction, DiceScene lives in the shared package, not in
+// this repo's src/dice/. Use this helper to read dice-lib sources.
+const DICE_LIB_SRC = path.resolve(__dirname, "../../../../dice-lib/src");
 
 function readSrc(relativePath: string): string {
   return fs.readFileSync(path.resolve(SRC_ROOT, relativePath), "utf-8");
+}
+
+function readDiceLibSrc(relativePath: string): string {
+  return fs.readFileSync(path.resolve(DICE_LIB_SRC, relativePath), "utf-8");
 }
 
 // ═══��══════════════════════════════════════════════════════════════════════════
@@ -220,9 +227,13 @@ describe("Wiring: Physics-is-the-roll (story 34-12)", () => {
   });
 
   it("readD20Value has a production consumer via onSettle", () => {
-    const sceneSrc = readSrc("dice/DiceScene.tsx");
-    // The producer exists and flows into onSettle.
-    expect(sceneSrc).toMatch(/readD20Value/);
+    // DiceScene now lives in @local/dice-lib (extracted from sidequest's
+    // src/dice/). Face-reading goes through the DIE_REGISTRY (entry.readValue)
+    // rather than calling readD20Value directly, but the contract holds:
+    // the registry calls the geometry's readValue, which IS readD20Value for
+    // d20s. Verify DiceScene reads a face value and forwards it to onSettle.
+    const sceneSrc = readDiceLibSrc("DiceScene.tsx");
+    expect(sceneSrc).toMatch(/entry\.readValue\s*\(|\.readValue\s*\(/);
     expect(sceneSrc).toMatch(/onSettle\s*\(\s*value\s*\)/);
   });
 

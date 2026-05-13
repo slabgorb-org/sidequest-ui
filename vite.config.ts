@@ -10,6 +10,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Deduplicate shared peer dependencies when @local/dice-lib (file-linked)
+    // has its own node_modules. Without this, React and Three are instantiated
+    // twice which breaks hook invariants ("Invalid hook call") and throws
+    // "Multiple instances of Three.js being imported".
+    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', '@react-three/drei', '@react-three/rapier'],
   },
   build: {
     rollupOptions: {
@@ -21,6 +26,11 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
+    fs: {
+      // Allow serving assets from the locally-linked @local/dice-lib package
+      // which lives outside this project's root directory.
+      allow: ['..', path.resolve(__dirname, '../../dice-lib')],
+    },
     proxy: {
       '/ws': { target: 'ws://localhost:8765', ws: true },
       '/api': { target: 'http://localhost:8765' },
