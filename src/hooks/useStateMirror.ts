@@ -34,10 +34,10 @@ function validateConfidence(raw: string | undefined): Confidence {
  * initial_state from SESSION_EVENT join messages.
  *
  * Accumulates footnotes into knowledge entries keyed by the narrator's
- * `Footnote.fact_id` (ADR-100 Seam C, story 50-15). Footnotes that arrive
- * without a fact_id are skipped with a `console.warn` rather than
- * fabricating a synthetic id — callers must ensure the server narrator
- * pipeline emits fact_id on every footnote per ADR-039.
+ * `Footnote.fact_id` (ADR-100 Seam C). Footnotes that arrive without a
+ * fact_id are skipped with a `console.warn` rather than fabricating a
+ * synthetic id — callers must ensure the server narrator pipeline emits
+ * fact_id on every footnote per ADR-039.
  */
 export function useStateMirror(messages: GameMessage[]): void {
   const { setState, setLocalPlayerId, setStreamingNarration } = useGameState();
@@ -124,7 +124,12 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
-      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries
+      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries.
+      // The canonical row IS the authoritative record (ADR-100 Seam C). If an
+      // ephemeral footnote-derived entry was already laid down for this
+      // fact_id (defaulted to 'Suspected'), overwrite it in place rather than
+      // dropping the canonical on the seen-set — otherwise the server's
+      // KnownFact.confidence is silently lost behind the ephemeral default.
       if (msg.type === MessageType.JOURNAL_RESPONSE) {
         const entries = msg.payload.entries as Array<{
           fact_id: string;
@@ -136,9 +141,7 @@ export function useStateMirror(messages: GameMessage[]): void {
         }> | undefined;
         if (entries) {
           for (const entry of entries) {
-            if (seenFactIds.has(entry.fact_id)) continue;
-            seenFactIds.add(entry.fact_id);
-            knowledge.push({
+            const canonical: KnowledgeEntry = {
               fact_id: entry.fact_id,
               content: entry.content,
               category: validateCategory(entry.category),
@@ -146,7 +149,14 @@ export function useStateMirror(messages: GameMessage[]): void {
               confidence: validateConfidence(entry.confidence),
               is_new: false,
               learned_turn: entry.learned_turn,
-            });
+            };
+            if (seenFactIds.has(entry.fact_id)) {
+              const idx = knowledge.findIndex(k => k.fact_id === entry.fact_id);
+              if (idx >= 0) knowledge[idx] = canonical;
+            } else {
+              seenFactIds.add(entry.fact_id);
+              knowledge.push(canonical);
+            }
           }
         }
         continue;
@@ -181,11 +191,11 @@ export function useStateMirror(messages: GameMessage[]): void {
         const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
         for (const fn of footnotes) {
           if (!fn.summary) continue;
-          // ADR-100 Seam C UI part 1 (story 50-15): fact identity is
-          // narrator-supplied. If a footnote arrives without fact_id the
-          // server narrator pipeline has emitted incomplete structured
-          // output — drop the entry loudly rather than fabricating a
-          // synthetic id that breaks per-fact dedupe with JOURNAL_RESPONSE.
+          // Fact identity is narrator-supplied (ADR-100 Seam C). If a
+          // footnote arrives without fact_id the server narrator pipeline
+          // has emitted incomplete structured output — drop the entry
+          // loudly rather than fabricating a synthetic id that breaks
+          // per-fact dedupe with JOURNAL_RESPONSE.
           if (!fn.fact_id) {
             console.warn(
               '[useStateMirror] footnote missing fact_id; skipping',
@@ -195,12 +205,19 @@ export function useStateMirror(messages: GameMessage[]): void {
           }
           if (seenFactIds.has(fn.fact_id)) continue;
           seenFactIds.add(fn.fact_id);
+          // Footnotes do not carry confidence on the wire. Ephemeral
+          // entries default to 'Suspected' so the journal is populated
+          // immediately; the JOURNAL_RESPONSE handler overwrites with
+          // the server's authoritative KnownFact.confidence once it
+          // arrives. Routing through validateConfidence(undefined) keeps
+          // the default in one place — a literal cast would bypass the
+          // single-source-of-truth contract.
           knowledge.push({
             fact_id: fn.fact_id,
             content: fn.summary,
             category: validateCategory(fn.category),
-            source: 'Observation' as FactSource,
-            confidence: 'Suspected' as Confidence,
+            source: validateSource('Observation'),
+            confidence: validateConfidence(undefined),
             is_new: fn.is_new ?? true,
             learned_turn: turnCounter,
           });
