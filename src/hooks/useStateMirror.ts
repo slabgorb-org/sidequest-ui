@@ -124,7 +124,13 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
-      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries
+      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries.
+      // ADR-100 Seam C UI part 2 (story 50-16): the canonical row IS the
+      // authoritative record. If an ephemeral footnote-derived entry was
+      // already laid down for this fact_id (defaulted to 'Suspected'),
+      // overwrite it in place rather than dropping the canonical on the
+      // seen-set — otherwise the server's KnownFact.confidence is silently
+      // lost behind the ephemeral default.
       if (msg.type === MessageType.JOURNAL_RESPONSE) {
         const entries = msg.payload.entries as Array<{
           fact_id: string;
@@ -136,9 +142,7 @@ export function useStateMirror(messages: GameMessage[]): void {
         }> | undefined;
         if (entries) {
           for (const entry of entries) {
-            if (seenFactIds.has(entry.fact_id)) continue;
-            seenFactIds.add(entry.fact_id);
-            knowledge.push({
+            const canonical: KnowledgeEntry = {
               fact_id: entry.fact_id,
               content: entry.content,
               category: validateCategory(entry.category),
@@ -146,7 +150,14 @@ export function useStateMirror(messages: GameMessage[]): void {
               confidence: validateConfidence(entry.confidence),
               is_new: false,
               learned_turn: entry.learned_turn,
-            });
+            };
+            if (seenFactIds.has(entry.fact_id)) {
+              const idx = knowledge.findIndex(k => k.fact_id === entry.fact_id);
+              if (idx >= 0) knowledge[idx] = canonical;
+            } else {
+              seenFactIds.add(entry.fact_id);
+              knowledge.push(canonical);
+            }
           }
         }
         continue;
@@ -195,12 +206,19 @@ export function useStateMirror(messages: GameMessage[]): void {
           }
           if (seenFactIds.has(fn.fact_id)) continue;
           seenFactIds.add(fn.fact_id);
+          // ADR-100 Seam C UI part 2 (story 50-16): footnotes do not
+          // carry confidence on the wire. Default ephemeral entries to
+          // 'Suspected' via the central validator (matches Klinger's
+          // call), and rely on the JOURNAL_RESPONSE override above to
+          // promote to the canonical KnownFact.confidence when the
+          // server replies. No literal 'Suspected' cast — the
+          // canonical truth is sourced from one place only.
           knowledge.push({
             fact_id: fn.fact_id,
             content: fn.summary,
             category: validateCategory(fn.category),
             source: 'Observation' as FactSource,
-            confidence: 'Suspected' as Confidence,
+            confidence: validateConfidence(undefined),
             is_new: fn.is_new ?? true,
             learned_turn: turnCounter,
           });
