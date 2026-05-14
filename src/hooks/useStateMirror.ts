@@ -32,7 +32,12 @@ function validateConfidence(raw: string | undefined): Confidence {
  * Applies state deltas from game messages to the GameState context.
  * Extracts state_delta from NARRATION/TURN_STATUS payloads and
  * initial_state from SESSION_EVENT join messages.
- * Accumulates footnotes into knowledge entries.
+ *
+ * Accumulates footnotes into knowledge entries keyed by the narrator's
+ * `Footnote.fact_id` (ADR-100 Seam C, story 50-15). Footnotes that arrive
+ * without a fact_id are skipped with a `console.warn` rather than
+ * fabricating a synthetic id — callers must ensure the server narrator
+ * pipeline emits fact_id on every footnote per ADR-039.
  */
 export function useStateMirror(messages: GameMessage[]): void {
   const { setState, setLocalPlayerId, setStreamingNarration } = useGameState();
