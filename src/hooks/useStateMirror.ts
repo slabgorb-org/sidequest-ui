@@ -217,7 +217,7 @@ export function useStateMirror(messages: GameMessage[]): void {
             fact_id: fn.fact_id,
             content: fn.summary,
             category: validateCategory(fn.category),
-            source: 'Observation' as FactSource,
+            source: validateSource('Observation'),
             confidence: validateConfidence(undefined),
             is_new: fn.is_new ?? true,
             learned_turn: turnCounter,
