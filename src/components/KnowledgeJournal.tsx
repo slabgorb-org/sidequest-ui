@@ -11,16 +11,18 @@ interface KnowledgeJournalProps {
   onRequestJournal?: (category?: string) => void;
 }
 
-// Dark-Folio palette — kept in sync with CharacterPanel / InventoryPanel so
-// all three side panels read as the same artifact. Change one, change all.
+// Folio palette — kept in sync with CharacterPanel / InventoryPanel so all
+// three side panels read as the same artifact. Values resolve through CSS
+// custom properties set by useGenreTheme (ADR-079); the semantic names
+// (ink, paper, crimson, gold, rule) stay stable while colors shift per genre.
 const FOLIO = {
-  ink: '#ecdba8',
-  inkSoft: '#b09a6a',
-  paper: '#1a140d',
-  paper2: '#221a10',
-  crimson: '#d6735e',
-  gold: '#d4a945',
-  rule: 'rgba(212,169,69,0.22)',
+  ink: 'var(--card-foreground)',
+  inkSoft: 'var(--muted-foreground)',
+  paper: 'var(--card)',
+  paper2: 'var(--muted)',
+  crimson: 'var(--accent)',
+  gold: 'var(--primary)',
+  rule: 'var(--border)',
 } as const;
 
 const FONT_DISPLAY = "'Pirata One', serif";
@@ -31,7 +33,7 @@ const FONT_BODY = "'EB Garamond', serif";
 // and unselected states without forking JSX.
 function pillStyle(active: boolean): CSSProperties {
   return {
-    background: active ? `${FOLIO.crimson}26` : 'transparent',
+    background: active ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'transparent',
     color: active ? FOLIO.crimson : FOLIO.inkSoft,
     border: `1px solid ${active ? FOLIO.crimson : FOLIO.rule}`,
     fontFamily: FONT_DISPLAY,

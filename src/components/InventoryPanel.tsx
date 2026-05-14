@@ -32,17 +32,19 @@ interface StackedItem {
   count: number;
 }
 
-// Dark-Folio palette — kept in sync with CharacterPanel.tsx so the
-// two panels read as the same artifact. If you change one set of colors,
-// change the other.
+// Folio palette — kept in sync with CharacterPanel.tsx so the two panels
+// read as the same artifact. Values resolve through CSS custom properties
+// set by useGenreTheme (ADR-079); the semantic names (ink, paper, crimson,
+// gold, rule) are stable across genres while the actual colors shift to
+// match the active genre/world theme.
 const FOLIO = {
-  ink: "#ecdba8",
-  inkSoft: "#b09a6a",
-  paper: "#1a140d",
-  paper2: "#221a10",
-  crimson: "#d6735e",
-  gold: "#d4a945",
-  rule: "rgba(212,169,69,0.22)",
+  ink: "var(--card-foreground)",
+  inkSoft: "var(--muted-foreground)",
+  paper: "var(--card)",
+  paper2: "var(--muted)",
+  crimson: "var(--accent)",
+  gold: "var(--primary)",
+  rule: "var(--border)",
 } as const;
 
 const FONT_DISPLAY = "'Pirata One', serif";
