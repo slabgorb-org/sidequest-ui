@@ -1,34 +1,8 @@
 /**
- * Story 50-16: Journal UI confidence propagation — drop hardcoded
- * 'Suspected' in useStateMirror, source from JOURNAL_RESPONSE
- * (ADR-100 Seam C UI part 2).
- *
- * Today (RED state):
- *   useStateMirror.ts:~194 casts a literal `'Suspected' as Confidence`
- *   on every footnote-derived KnowledgeEntry. The downstream
- *   JOURNAL_RESPONSE handler skips already-seen fact_ids
- *   (`if (seenFactIds.has(entry.fact_id)) continue;`), so a footnote
- *   that lands first locks the confidence at `'Suspected'` forever —
- *   the canonical server confidence is silently dropped. Per ADR-100
- *   Seam C UI part 2, the canonical journal must win.
- *
- * Klinger's call (recorded in the session): ephemeral footnotes still
- * default to `'Suspected'` while awaiting canonical refresh; the
- * JOURNAL_RESPONSE handler is what overrides with truth.
- *
- * ACs (failing tests must drive implementation):
- *   AC2 — default: footnote-derived entries with no canonical follow-up
- *         still show `'Suspected'` (regression guard for the default).
- *   AC3 — canonical preserved: JOURNAL_RESPONSE confidence propagates
- *         to the KnowledgeEntry verbatim.
- *   AC4 — duality (the key test): NARRATION footnote first, then
- *         JOURNAL_RESPONSE for the same fact_id, canonical wins.
- *   AC4 — reverse order: JOURNAL_RESPONSE first, then NARRATION
- *         footnote, canonical wins regardless of arrival order.
- *   AC5 — wiring: useStateMirror is imported by App; canonical
- *         confidence round-trips into knowledge[].
- *   no-regression — literal `'Suspected' as Confidence` cast is gone
- *         from useStateMirror.ts (file-level grep).
+ * Confidence-propagation contract (ADR-100 Seam C):
+ * footnote-derived entries default to 'Suspected'; a subsequent
+ * JOURNAL_RESPONSE for the same fact_id overwrites with the server's
+ * canonical confidence regardless of arrival order.
  */
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -90,7 +64,7 @@ function journalResponse(
 // AC2 — Default behavior: footnote-derived entries default to 'Suspected'
 // ---------------------------------------------------------------------------
 
-describe('useStateMirror 50-16 — AC2: ephemeral default is Suspected', () => {
+describe('AC2: ephemeral default is Suspected', () => {
   it("a footnote with no follow-up JOURNAL_RESPONSE shows confidence='Suspected'", () => {
     const narration = narrationWithFootnotes([
       {
@@ -122,7 +96,7 @@ describe('useStateMirror 50-16 — AC2: ephemeral default is Suspected', () => {
 // AC3 — Canonical preserved: JOURNAL_RESPONSE confidence wins (no footnote)
 // ---------------------------------------------------------------------------
 
-describe('useStateMirror 50-16 — AC3: canonical confidence propagates', () => {
+describe('AC3: canonical confidence propagates', () => {
   it("JOURNAL_RESPONSE with confidence='Certain' yields a 'Certain' KnowledgeEntry", () => {
     const messages: GameMessage[] = [
       journalResponse([
@@ -149,8 +123,7 @@ describe('useStateMirror 50-16 — AC3: canonical confidence propagates', () => 
     const entry = result.current.state.knowledge.find(
       (k) => k.fact_id === 'fact-tower-center',
     );
-    expect(entry).toBeDefined();
-    expect(entry!.confidence).toBe('Certain');
+    expect(entry).toMatchObject({ confidence: 'Certain' });
   });
 
   it("JOURNAL_RESPONSE with confidence='Rumored' yields a 'Rumored' KnowledgeEntry", () => {
@@ -179,8 +152,7 @@ describe('useStateMirror 50-16 — AC3: canonical confidence propagates', () => 
     const entry = result.current.state.knowledge.find(
       (k) => k.fact_id === 'fact-rumor-treasure',
     );
-    expect(entry).toBeDefined();
-    expect(entry!.confidence).toBe('Rumored');
+    expect(entry).toMatchObject({ confidence: 'Rumored' });
   });
 });
 
@@ -188,7 +160,7 @@ describe('useStateMirror 50-16 — AC3: canonical confidence propagates', () => 
 // AC4 — Duality: footnote first, then canonical JOURNAL_RESPONSE
 // ---------------------------------------------------------------------------
 
-describe('useStateMirror 50-16 — AC4: confidence duality (canonical wins)', () => {
+describe('AC4: confidence duality (canonical wins)', () => {
   it('NARRATION footnote then JOURNAL_RESPONSE for same fact_id upgrades confidence to canonical', () => {
     // Step 1: ephemeral footnote arrives mid-turn with no wire confidence.
     // Step 2: server JOURNAL_RESPONSE arrives later with canonical 'Certain'.
@@ -275,24 +247,30 @@ describe('useStateMirror 50-16 — AC4: confidence duality (canonical wins)', ()
     const entry = result.current.state.knowledge.find(
       (k) => k.fact_id === 'fact-canonical-overrides-fields',
     );
-    expect(entry).toBeDefined();
-    expect(entry!.confidence).toBe('Certain');
-    expect(entry!.source).toBe('Discovery');
+    expect(entry).toMatchObject({
+      confidence: 'Certain',
+      source: 'Discovery',
+    });
   });
 
   it('canonical wins when JOURNAL_RESPONSE arrives BEFORE the matching footnote (reverse order)', () => {
     // Out-of-order replay safety: a JOURNAL_RESPONSE that lands
-    // before the NARRATION that introduces its fact_id should NOT
-    // be downgraded back to 'Suspected' when the footnote later
-    // arrives. Canonical wins regardless of arrival order.
+    // before the NARRATION that introduces its fact_id must not be
+    // downgraded by the later footnote. Canonical confidence
+    // 'Rumored' is chosen deliberately so a regression where the
+    // footnote overwrites the canonical fails with a real
+    // 'Rumored' vs 'Suspected' mismatch (not a same-value match
+    // that survives on the seen-set path alone). Source and
+    // content assertions guard against partial-merge regressions
+    // where only confidence survives.
     const messages: GameMessage[] = [
       journalResponse([
         {
           fact_id: 'fact-out-of-order',
-          content: 'A signet ring engraved with two crossed keys.',
+          content: 'A signet ring engraved with two crossed keys (server canonical).',
           category: 'Lore',
           source: 'Discovery',
-          confidence: 'Certain',
+          confidence: 'Rumored',
           learned_turn: 1,
         },
       ]),
@@ -301,7 +279,7 @@ describe('useStateMirror 50-16 — AC4: confidence duality (canonical wins)', ()
         {
           marker: 1,
           fact_id: 'fact-out-of-order',
-          summary: 'A signet ring engraved with two crossed keys.',
+          summary: 'A signet ring engraved with two crossed keys (narrator footnote).',
           category: 'Lore',
           is_new: true,
         },
@@ -321,7 +299,11 @@ describe('useStateMirror 50-16 — AC4: confidence duality (canonical wins)', ()
       (k) => k.fact_id === 'fact-out-of-order',
     );
     expect(entries).toHaveLength(1);
-    expect(entries[0].confidence).toBe('Certain');
+    expect(entries[0]).toMatchObject({
+      confidence: 'Rumored',
+      source: 'Discovery',
+      content: 'A signet ring engraved with two crossed keys (server canonical).',
+    });
   });
 });
 
@@ -329,12 +311,14 @@ describe('useStateMirror 50-16 — AC4: confidence duality (canonical wins)', ()
 // no-regression — literal hardcode is gone from useStateMirror.ts
 // ---------------------------------------------------------------------------
 
-describe('useStateMirror 50-16 — no-regression: literal cast removed', () => {
+describe('no-regression: literal cast removed', () => {
   it("the literal `'Suspected' as Confidence` cast is gone from useStateMirror.ts", () => {
-    // Story 50-16 explicitly drops the hardcoded cast at line ~194.
-    // A future regression that reintroduces the literal would silently
-    // break the canonical-wins behavior. This file-level guard makes
-    // such a regression a test failure rather than a playtest finding.
+    // The default 'Suspected' confidence is sourced from one place
+    // only — `validateConfidence(undefined)`. A literal cast bypasses
+    // that contract and re-introduces a magic-string default; this
+    // grep guards the single-source-of-truth invariant at the file
+    // level so a careless re-introduction is a test failure, not a
+    // silent playtest finding.
     const sourcePath = resolve(__dirname, '../useStateMirror.ts');
     const source = readFileSync(sourcePath, 'utf8');
     expect(source).not.toMatch(/'Suspected'\s+as\s+Confidence/);
@@ -346,7 +330,7 @@ describe('useStateMirror 50-16 — no-regression: literal cast removed', () => {
 // round-trips into state.knowledge[].
 // ---------------------------------------------------------------------------
 
-describe('useStateMirror 50-16 — AC5: end-to-end wiring of canonical confidence', () => {
+describe('AC5: end-to-end wiring of canonical confidence', () => {
   it('App.tsx imports useStateMirror (the hook reaches production)', () => {
     // Without this import, useStateMirror is dead code and no
     // confidence propagation matters in production. Keeps the
@@ -403,7 +387,41 @@ describe('useStateMirror 50-16 — AC5: end-to-end wiring of canonical confidenc
     const clue = result.current.state.knowledge.find(
       (k) => k.fact_id === factId,
     );
-    expect(clue).toBeDefined();
-    expect(clue!.confidence).toBe('Certain');
+    expect(clue).toMatchObject({ confidence: 'Certain' });
+  });
+
+  it("JOURNAL_RESPONSE with an unrecognized confidence falls back to 'Suspected'", () => {
+    // The validator is the single source of truth for the default.
+    // If a future regression bypassed validateConfidence on the
+    // JOURNAL_RESPONSE path, a malformed server payload like
+    // 'GARBAGE' would silently propagate to KnowledgeEntry as an
+    // invalid Confidence — the TS type system cannot catch this at
+    // runtime. This test exercises the validator safety net.
+    const messages: GameMessage[] = [
+      journalResponse([
+        {
+          fact_id: 'fact-bad-confidence',
+          content: 'A note in an unfamiliar hand.',
+          category: 'Lore',
+          source: 'Discovery',
+          confidence: 'GARBAGE',
+          learned_turn: 1,
+        },
+      ]),
+    ];
+
+    const { result } = renderHook(
+      () => {
+        const state = useGameState();
+        useStateMirror(messages);
+        return state;
+      },
+      { wrapper },
+    );
+
+    const entry = result.current.state.knowledge.find(
+      (k) => k.fact_id === 'fact-bad-confidence',
+    );
+    expect(entry).toMatchObject({ confidence: 'Suspected' });
   });
 });
