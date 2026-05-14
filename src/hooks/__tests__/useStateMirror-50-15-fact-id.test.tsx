@@ -2,21 +2,23 @@
  * Story 50-15: Journal UI fact_id respect — drop synthetic id,
  * consume narrator-supplied Footnote.fact_id (Seam C UI part 1 per ADR-100).
  *
- * Today (RED state):
- *   useStateMirror.ts:186 manufactures `${turnCounter}-${marker ?? index}`
- *   and ignores `Footnote.fact_id` even when the narrator supplied it.
- *   Result: per-turn dedupe instead of per-fact dedupe, and the
- *   server-canonical fact identity never reaches the UI knowledge[] array.
+ * Before 50-15:
+ *   useStateMirror manufactured `${turnCounter}-${marker ?? index}` for
+ *   the per-turn footnote path and ignored `Footnote.fact_id` even when
+ *   the narrator supplied it. Result: per-turn dedupe instead of per-fact
+ *   dedupe, and the server-canonical fact identity never reached the UI
+ *   knowledge[] array.
  *
- * ACs (all must fail until 50-15 lands):
- *   AC1 — drop synthetic id; knowledge entries carry narrator fact_id verbatim
- *   AC2 — Footnote.fact_id consumed by the NARRATION path
- *   AC3 — type alignment: FootnoteData.fact_id is `string` without coercion
- *   AC4 — integration: NARRATION+JOURNAL_RESPONSE share fact_id, no transform
+ * After 50-15 (the contract these tests pin down):
+ *   AC1 — knowledge entries carry the narrator's fact_id verbatim
+ *   AC2 — Footnote.fact_id is consumed by the NARRATION path (per-fact dedupe)
+ *   AC3 — type alignment: FootnoteData is the canonical type from payloads.ts
+ *   AC4 — NARRATION + JOURNAL_RESPONSE collapse on shared fact_id
  *   AC5 — wiring: useStateMirror is imported by App and round-trips to knowledge[]
+ *   Drop path — footnotes without fact_id are skipped with console.warn
  */
 import { renderHook } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -200,11 +202,10 @@ describe('useStateMirror 50-15 — AC2: per-fact dedupe via fact_id', () => {
 // ---------------------------------------------------------------------------
 
 describe('useStateMirror 50-15 — AC3: type alignment', () => {
-  it('FootnoteData.fact_id is typed as string (compile-time + runtime check)', () => {
-    // This test is mostly a compile-time guarantee: the assignment below would
-    // fail strict TS if FootnoteData.fact_id were declared as anything other
-    // than `string | undefined`. The runtime assertion locks the contract
-    // that the value is forwarded unmodified.
+  it('a typed FootnoteData.fact_id flows through to knowledge[] unchanged (no coercion)', () => {
+    // Strict TS would reject the literal below if FootnoteData.fact_id were
+    // declared as anything other than `string | undefined`; the runtime
+    // assertion locks the contract that the value is forwarded unmodified.
     const footnote: FootnoteData = {
       marker: 4,
       fact_id: 'string-literal-fact-id',
@@ -212,7 +213,6 @@ describe('useStateMirror 50-15 — AC3: type alignment', () => {
       category: 'Lore',
       is_new: true,
     };
-    expect(typeof footnote.fact_id).toBe('string');
 
     const { result } = renderHook(
       () => {
@@ -226,25 +226,25 @@ describe('useStateMirror 50-15 — AC3: type alignment', () => {
     const entry = result.current.state.knowledge.find(
       (e) => e.fact_id === 'string-literal-fact-id',
     );
-    expect(entry).toBeDefined();
-    // No coercion — the value is the same string we put in.
-    expect(entry!.fact_id).toBe(footnote.fact_id);
+    // Null-safe single assertion: failure path is "no matching entry."
+    expect(entry?.fact_id).toBe(footnote.fact_id);
   });
 
   it('useStateMirror does not own a local FootnoteData interface that shadows the canonical one', () => {
     // The canonical FootnoteData lives in src/types/payloads.ts and already
     // has `fact_id?: string`. The hook used to declare its own local
-    // FootnoteData interface (line 31-36 of useStateMirror.ts) that omitted
-    // fact_id — that shadow is the source of the synthetic-id bug. This
-    // test reads the source and fails if the local shadow is still present.
+    // FootnoteData interface that omitted fact_id — that shadow was the
+    // source of the synthetic-id bug. This test reads the source and fails
+    // if the local shadow returns.
     const src = readFileSync(
       resolve(__dirname, '../useStateMirror.ts'),
       'utf-8',
     );
-    // The hook should import FootnoteData rather than redeclaring it.
-    expect(src).toMatch(/import[^;]*FootnoteData[^;]*from\s+['"](?:\.\.\/|@\/)types\/payloads['"]/);
-    // And no local `interface FootnoteData` block must remain in the hook.
+    // Hard rule: no local interface FootnoteData block in the hook.
     expect(src).not.toMatch(/^interface\s+FootnoteData\b/m);
+    // Soft rule: the canonical type name should appear in the imports.
+    // (Looser than a full path regex so reformat/alias swaps don't break.)
+    expect(src).toMatch(/import[^;]*\bFootnoteData\b/);
   });
 });
 
@@ -334,21 +334,26 @@ describe('useStateMirror 50-15 — AC4: NARRATION/JOURNAL_RESPONSE fact_id align
 // ---------------------------------------------------------------------------
 
 describe('useStateMirror 50-15 — AC5: wiring test', () => {
-  it('useStateMirror is imported by a non-test production code path', () => {
+  it('useStateMirror is imported AND called (not commented out) in App.tsx', () => {
     // Per CLAUDE.md "Verify Wiring, Not Just Existence" — a unit-tested hook
     // means nothing if no production code calls it. App.tsx is the wiring
-    // anchor (line ~485).
+    // anchor. Source-text checks are a weak form of wiring assertion
+    // (a full App render would be stronger), so we layer multiple regexes
+    // and an anti-pattern guard against commented-out calls.
     const appSrc = readFileSync(
       resolve(__dirname, '../../App.tsx'),
       'utf-8',
     );
-    expect(appSrc).toMatch(/import\s*\{\s*useStateMirror\s*\}/);
+    expect(appSrc).toMatch(/\buseStateMirror\b/);
     expect(appSrc).toMatch(/useStateMirror\s*\(/);
+    // Negative guard: a commented-out call site would otherwise pass the
+    // call regex above.
+    expect(appSrc).not.toMatch(/\/\/[^\n]*\buseStateMirror\s*\(/);
   });
 
   it('end-to-end: a NARRATION fact_id reaches knowledge[] under the keyed shape KnowledgeJournal uses', () => {
     // KnowledgeJournal renders entries with `key={entry.fact_id}` (see
-    // src/components/KnowledgeJournal.tsx:313). React keys must be the
+    // src/components/KnowledgeJournal.tsx). React keys must be the
     // narrator-supplied identity so re-renders match across turns. If the
     // synthetic id is still produced, the key flips every turn and the
     // component re-mounts; that is the visible symptom of the bug.
@@ -380,23 +385,123 @@ describe('useStateMirror 50-15 — AC5: wiring test', () => {
       },
       {
         wrapper,
-        initialProps: { msgs: [playerAction(), turn1] as GameMessage[] },
+        initialProps: { msgs: [playerAction(), turn1] },
       },
     );
 
     const afterTurn1 = result.current.state.knowledge.find(
       (e) => e.fact_id === factId,
     );
-    expect(afterTurn1).toBeDefined();
-    expect(afterTurn1!.fact_id).toBe(factId);
+    expect(afterTurn1?.fact_id).toBe(factId);
 
     rerender({ msgs: [playerAction(), turn1, playerAction(), turn2] });
 
     const afterTurn2 = result.current.state.knowledge.filter(
       (e) => e.fact_id === factId,
     );
-    expect(afterTurn2.length).toBe(1);
-    // The id is still the narrator-supplied one, not a fresh synthetic.
+    // Per-fact dedupe holds across turns: one entry, narrator id, stable key.
+    expect(afterTurn2).toHaveLength(1);
     expect(afterTurn2[0].fact_id).toBe(factId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Drop path — footnotes without fact_id are skipped with console.warn
+// ---------------------------------------------------------------------------
+
+describe('useStateMirror 50-15 — drop path for missing fact_id', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('skips a footnote whose fact_id is missing and logs a warning', () => {
+    const narration = narrationWithFootnotes([
+      {
+        marker: 1,
+        // fact_id intentionally omitted — simulates partial narrator output.
+        summary: 'An entry the server forgot to id.',
+        category: 'Lore',
+        is_new: true,
+      },
+    ]);
+
+    const { result } = renderHook(
+      () => {
+        const state = useGameState();
+        useStateMirror([playerAction(), narration]);
+        return state;
+      },
+      { wrapper },
+    );
+
+    expect(result.current.state.knowledge).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+    const warnArgs = warnSpy.mock.calls[0]?.[0];
+    expect(String(warnArgs)).toMatch(/fact_id/);
+  });
+
+  it('treats an empty-string fact_id as missing (skip + warn)', () => {
+    const narration = narrationWithFootnotes([
+      {
+        marker: 1,
+        fact_id: '',
+        summary: 'An entry with empty fact_id.',
+        category: 'Lore',
+        is_new: true,
+      },
+    ]);
+
+    const { result } = renderHook(
+      () => {
+        const state = useGameState();
+        useStateMirror([playerAction(), narration]);
+        return state;
+      },
+      { wrapper },
+    );
+
+    expect(result.current.state.knowledge).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('mixed batch: keeps footnotes with fact_id, drops those without', () => {
+    const narration = narrationWithFootnotes([
+      {
+        marker: 1,
+        fact_id: 'fact-keeper',
+        summary: 'Valid entry.',
+        category: 'Lore',
+        is_new: true,
+      },
+      {
+        marker: 2,
+        // missing fact_id — must be dropped, must not poison seenFactIds
+        summary: 'Dropped entry.',
+        category: 'Lore',
+        is_new: true,
+      },
+    ]);
+
+    const { result } = renderHook(
+      () => {
+        const state = useGameState();
+        useStateMirror([playerAction(), narration]);
+        return state;
+      },
+      { wrapper },
+    );
+
+    expect(result.current.state.knowledge).toHaveLength(1);
+    expect(result.current.state.knowledge[0].fact_id).toBe('fact-keeper');
+    // useEffect replays the message list on each render (React's normal
+    // dev-mode double-invoke), so the warn count may be a multiple of the
+    // number of bad footnotes. Assert that it fired, not how many times.
+    expect(warnSpy).toHaveBeenCalled();
   });
 });
