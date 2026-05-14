@@ -25,18 +25,21 @@ const DEFAULTS: CharacterPanelPrefs = {
   activeTab: "stats",
 };
 
-// Dark-Folio palette — illuminated-manuscript treatment locked in by the
-// 2026-05-09 design pass (Character Sheet.html, FolioPanel theme="dark").
-// Colors live as a const rather than CSS vars because the panel is a single
-// committed surface; theme-swapping at runtime is out of scope.
+// Folio palette — illuminated-manuscript treatment from the 2026-05-09
+// design pass (Character Sheet.html, FolioPanel theme="dark"). The semantic
+// names are kept (ink, paper, crimson, gold, rule) but values now resolve
+// through CSS custom properties set by useGenreTheme (ADR-079), so the
+// panel reads as a coherent artifact in every genre — dark torchlight in
+// caverns_and_claudes, cream watercolour in tea_and_murder, etc. — instead
+// of a fixed dark palette that clashed with the rest of the page.
 const FOLIO = {
-  ink: "#ecdba8",
-  inkSoft: "#b09a6a",
-  paper: "#1a140d",
-  paper2: "#221a10",
-  crimson: "#d6735e",
-  gold: "#d4a945",
-  rule: "rgba(212,169,69,0.22)",
+  ink: "var(--card-foreground)",
+  inkSoft: "var(--muted-foreground)",
+  paper: "var(--card)",
+  paper2: "var(--muted)",
+  crimson: "var(--accent)",
+  gold: "var(--primary)",
+  rule: "var(--border)",
 } as const;
 
 const FONT_DISPLAY = "'Pirata One', serif";
@@ -446,9 +449,10 @@ export function CharacterPanel({
                           data-testid={`party-member-acting-badge-${c.player_id}`}
                           className="ml-1 inline-flex items-center gap-1 align-middle rounded-sm bg-primary/15 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary ring-1 ring-primary/40"
                           style={{
-                            background: `${FOLIO.crimson}26`,
+                            background: "color-mix(in srgb, var(--accent) 15%, transparent)",
                             color: FOLIO.crimson,
-                            boxShadow: `0 0 0 1px ${FOLIO.crimson}66 inset`,
+                            boxShadow:
+                              "0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent) inset",
                             fontFamily: FONT_DISPLAY,
                             letterSpacing: 1.2,
                           }}
