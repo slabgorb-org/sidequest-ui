@@ -38,6 +38,21 @@ vi.mock("@react-three/drei", () => ({
   Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
+// Stub @local/dice-lib so DiceScene doesn't render R3F intrinsics
+// (<ambientLight>, <directionalLight>, etc.) outside an actual Canvas.
+// dice-lib has its own tests; these tests verify only the sidequest-ui
+// wrapper logic around it.
+vi.mock("@local/dice-lib", () => ({
+  DiceScene: () => null,
+  D20_RADIUS: 0.36,
+  replayThrowParams: () => ({
+    position: [0, 0, 0],
+    linearVelocity: [0, 0, 0],
+    angularVelocity: [0, 0, 0],
+    rotation: [0, 0, 0],
+  }),
+}));
+
 // ── Test fixtures matching Rust wire types ────────────────────────────────────
 
 const DICE_REQUEST_PAYLOAD = {
