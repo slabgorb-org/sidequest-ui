@@ -25,15 +25,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # PR #237 added `"@local/dice-lib": "file:../../dice-lib"` to
+    # package.json. That path resolves locally because the orchestrator
+    # checkout puts sidequest-ui two levels deep from a dice-lib sibling
+    # (Projects/oq-1/sidequest-ui ↔ Projects/dice-lib). CI needs the
+    # same shape — sidequest-ui under a two-deep subpath and dice-lib at
+    # the workspace root — so that `npm ci` can resolve the file: link.
+    defaults:
+      run:
+        working-directory: oq-1/sidequest-ui
+
     steps:
-      - name: Checkout
+      - name: Checkout sidequest-ui
         uses: actions/checkout@v4
+        with:
+          path: oq-1/sidequest-ui
+
+      # dice-lib is a private sibling repo consumed via file: link.
+      # Requires a deploy key on the dice-lib repo with read access,
+      # exposed here as the DICE_LIB_DEPLOY_KEY secret.
+      - name: Checkout dice-lib (sibling for file:../../dice-lib)
+        uses: actions/checkout@v4
+        with:
+          repository: slabgorb/dice-lib
+          path: dice-lib
+          ssh-key: ${{ secrets.DICE_LIB_DEPLOY_KEY }}
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: oq-1/sidequest-ui/package-lock.json
 
       - name: Install dependencies
         run: npm ci
