@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 import { isNarrationDelta } from '../types/payloads';
-import type { NarrationMessage } from '../types/payloads';
+import type { FootnoteData, NarrationMessage } from '../types/payloads';
 import { reduceStreamingNarration, initialStreamingState } from '../providers/streamingNarration';
 import type { MagicState } from '../types/magic';
 
@@ -28,18 +28,16 @@ function validateConfidence(raw: string | undefined): Confidence {
   return 'Suspected';
 }
 
-interface FootnoteData {
-  marker?: number;
-  summary: string;
-  category?: string;
-  is_new?: boolean;
-}
-
 /**
  * Applies state deltas from game messages to the GameState context.
  * Extracts state_delta from NARRATION/TURN_STATUS payloads and
  * initial_state from SESSION_EVENT join messages.
- * Accumulates footnotes into knowledge entries.
+ *
+ * Accumulates footnotes into knowledge entries keyed by the narrator's
+ * `Footnote.fact_id` (ADR-100 Seam C, story 50-15). Footnotes that arrive
+ * without a fact_id are skipped with a `console.warn` rather than
+ * fabricating a synthetic id — callers must ensure the server narrator
+ * pipeline emits fact_id on every footnote per ADR-039.
  */
 export function useStateMirror(messages: GameMessage[]): void {
   const { setState, setLocalPlayerId, setStreamingNarration } = useGameState();
@@ -183,11 +181,22 @@ export function useStateMirror(messages: GameMessage[]): void {
         const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
         for (const fn of footnotes) {
           if (!fn.summary) continue;
-          const factId = `${turnCounter}-${fn.marker ?? knowledge.length}`;
-          if (seenFactIds.has(factId)) continue;
-          seenFactIds.add(factId);
+          // ADR-100 Seam C UI part 1 (story 50-15): fact identity is
+          // narrator-supplied. If a footnote arrives without fact_id the
+          // server narrator pipeline has emitted incomplete structured
+          // output — drop the entry loudly rather than fabricating a
+          // synthetic id that breaks per-fact dedupe with JOURNAL_RESPONSE.
+          if (!fn.fact_id) {
+            console.warn(
+              '[useStateMirror] footnote missing fact_id; skipping',
+              fn,
+            );
+            continue;
+          }
+          if (seenFactIds.has(fn.fact_id)) continue;
+          seenFactIds.add(fn.fact_id);
           knowledge.push({
-            fact_id: factId,
+            fact_id: fn.fact_id,
             content: fn.summary,
             category: validateCategory(fn.category),
             source: 'Observation' as FactSource,
