@@ -8,9 +8,23 @@ export interface PeerRevealListProps {
    * appended after, in iteration order from `reveals`.
    */
   partyOrder: string[];
+  /**
+   * Server-authoritative sealed player_ids (derived from TURN_STATUS).
+   * If a reveal's player_id is in this set, the row renders as submitted
+   * regardless of `r.status` — defends against ACTION_REVEAL drop/race
+   * where the composing→submitted transition didn't reach this client
+   * but the sealed-letter barrier already recorded the seal. Without
+   * this, the PeerRevealList row can disagree with the TurnStatusPanel's
+   * "✓ Sealed" indicator (sq-playtest 2026-05-15 [UX] two-banner mismatch).
+   */
+  sealedPlayerIds?: ReadonlySet<string>;
 }
 
-export function PeerRevealList({ reveals, partyOrder }: PeerRevealListProps) {
+export function PeerRevealList({
+  reveals,
+  partyOrder,
+  sealedPlayerIds,
+}: PeerRevealListProps) {
   if (reveals.size === 0) return null;
 
   const ordered: PeerReveal[] = [];
@@ -29,13 +43,17 @@ export function PeerRevealList({ reveals, partyOrder }: PeerRevealListProps) {
       aria-live="polite"
       className="space-y-1 mb-1"
     >
-      {ordered.map((r) => (
+      {ordered.map((r) => {
+        const effectiveSubmitted =
+          r.status === "submitted" || (sealedPlayerIds?.has(r.player_id) ?? false);
+        return (
         <div
           key={r.player_id}
           data-testid={`peer-reveal-row-${r.player_id}`}
           data-status={r.status}
+          data-effective-submitted={effectiveSubmitted ? "true" : "false"}
           className={`flex flex-col gap-0.5 px-3 py-1.5 rounded-md text-sm border-l-4 motion-reduce:transition-none ${
-            r.status === "submitted"
+            effectiveSubmitted
               ? "border-l-emerald-500 bg-emerald-500/5 text-emerald-100/90"
               : "border-l-amber-500/60 bg-amber-500/5 text-amber-100/80"
           }`}
@@ -44,7 +62,7 @@ export function PeerRevealList({ reveals, partyOrder }: PeerRevealListProps) {
             data-testid="peer-reveal-header"
             className="text-xs uppercase tracking-wide opacity-70"
           >
-            {r.status === "submitted"
+            {effectiveSubmitted
               ? `${r.character_name} ✓ submitted`
               : `${r.character_name} is composing`}
           </span>
@@ -55,7 +73,8 @@ export function PeerRevealList({ reveals, partyOrder }: PeerRevealListProps) {
             {r.aside ? `(${r.action})` : r.action}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

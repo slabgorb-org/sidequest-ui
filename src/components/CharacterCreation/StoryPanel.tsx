@@ -145,7 +145,7 @@ export function StoryPanel({
               onClick={onAutogen}
               className="text-sm px-4 py-2 rounded border border-border/50 hover:border-border text-muted-foreground hover:text-foreground"
             >
-              Let Brecca tell my story
+              Roll a background
             </button>
           )}
           <button
