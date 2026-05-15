@@ -346,6 +346,21 @@ export function GameBoard({
     [characters?.length, turnStatusEntries],
   );
 
+  // Precise seal set — only status='submitted' / 'auto_resolved'. Distinct
+  // from submittedPlayerIdSet above (which includes 'pending' entries) so
+  // PeerRevealList doesn't mislabel a still-typing peer as sealed. Drives
+  // the PeerRevealList override that defends against ACTION_REVEAL drops
+  // (sq-playtest 2026-05-15 [UX] two-banner mismatch).
+  const sealedPlayerIds = useMemo<ReadonlySet<string>>(
+    () =>
+      new Set(
+        turnStatusEntries
+          .filter((e) => e.status === "submitted" || e.status === "auto_resolved")
+          .map((e) => e.player_id),
+      ),
+    [turnStatusEntries],
+  );
+
   // Story 33-11: content signals drive the mobile tab notification badges.
   // Each entry is a change-detection scalar for a tab's visible content —
   // when the value changes while that tab is inactive, MobileTabView
@@ -479,7 +494,11 @@ export function GameBoard({
 
   const inputBar = (
     <div className="flex flex-col">
-      <PeerRevealList reveals={peerReveals ?? new Map()} partyOrder={partyOrder} />
+      <PeerRevealList
+        reveals={peerReveals ?? new Map()}
+        partyOrder={partyOrder}
+        sealedPlayerIds={sealedPlayerIds}
+      />
       <MultiplayerTurnBanner
         isMultiplayer={isMultiplayer}
         // ``disabled`` is true when WS is closed *or* input is locked

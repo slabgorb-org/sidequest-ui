@@ -37,16 +37,23 @@ const Host = forwardRef<HostHandle>(function Host(_props, ref) {
 
     if (status === "resolved") {
       setTurnStatusEntries([]);
-      return;
+      // Fall through deliberately to mirror App.tsx — no per-player push for
+      // "resolved", but also no early return so the gating logic below is
+      // exercised symmetrically. The push branch will skip "resolved".
     }
 
-    if (playerId && name && status) {
-      const mapped: TurnStatusEntry["status"] =
-        status === "submitted"
-          ? "submitted"
-          : status === "auto_resolved"
-            ? "auto_resolved"
-            : "pending";
+    // sq-playtest 2026-05-15: only durable per-player submission statuses
+    // push entries. "active" is a banner-only signal that always arrives
+    // immediately before "submitted" from the same player; "resolved" and
+    // "resolving" are session-level. Pushing a "pending" entry for any of
+    // these caused the post-resolve party-panel inversion (the actor whose
+    // narration just resolved got pinned as "pending" into the next turn,
+    // showing as "Waiting" while the still-composing peer showed "ACTING").
+    if (
+      playerId && name &&
+      (status === "submitted" || status === "auto_resolved")
+    ) {
+      const mapped: TurnStatusEntry["status"] = status;
       setTurnStatusEntries((prev) => {
         const next = prev.filter((e) => e.player_id !== playerId);
         next.push({ player_id: playerId, character_name: name, status: mapped });
@@ -77,7 +84,11 @@ function turnStatusMsg(
 }
 
 describe("TURN_STATUS player_id wire shape — submit-barrier panel", () => {
-  it("pushes a pending entry when an 'active' TURN_STATUS arrives", () => {
+  it("ignores 'active' status — it's a banner signal, not a per-player submission", () => {
+    // sq-playtest 2026-05-15: "active" no longer pushes a transient "pending"
+    // entry. The server always emits "submitted" immediately afterward for the
+    // same player; the transient pending row served no consumer and confused
+    // the party panel.
     let handle!: HostHandle;
     render(
       <Host
@@ -91,12 +102,10 @@ describe("TURN_STATUS player_id wire shape — submit-barrier panel", () => {
       handle.dispatch(turnStatusMsg("p:vyvyan", "Vyvyan", "active"));
     });
 
-    expect(handle.entries()).toEqual([
-      { player_id: "p:vyvyan", character_name: "Vyvyan", status: "pending" },
-    ]);
+    expect(handle.entries()).toEqual([]);
   });
 
-  it("flips an entry from pending to submitted when the server emits status=submitted", () => {
+  it("pushes a submitted entry when status=submitted arrives", () => {
     let handle!: HostHandle;
     render(
       <Host
@@ -110,7 +119,8 @@ describe("TURN_STATUS player_id wire shape — submit-barrier panel", () => {
       handle.dispatch(turnStatusMsg("p:vyvyan", "Vyvyan", "active"));
       handle.dispatch(turnStatusMsg("p:neil", "Neil", "active"));
     });
-    expect(handle.entries().map((e) => e.status)).toEqual(["pending", "pending"]);
+    // active is now a no-op for entries; banner-only signal.
+    expect(handle.entries()).toEqual([]);
 
     act(() => {
       handle.dispatch(turnStatusMsg("p:vyvyan", "Vyvyan", "submitted"));
@@ -121,6 +131,42 @@ describe("TURN_STATUS player_id wire shape — submit-barrier panel", () => {
       { player_id: "p:vyvyan", character_name: "Vyvyan", status: "submitted" },
       { player_id: "p:neil", character_name: "Neil", status: "submitted" },
     ]);
+  });
+
+  it("clears entries cleanly on 'resolved' — no stale 'pending' row carries to next turn", () => {
+    // sq-playtest 2026-05-15 party-panel inversion: a TURN_STATUS{resolved,
+    // <last submitter>} broadcast used to clear entries AND THEN push a
+    // {<last submitter>, pending} row (mapped from the "resolved" status).
+    // The clear+push race left exactly one player pinned in entries across
+    // the turn boundary, causing the post-resolve "Narder=Waiting,
+    // Willes=Acting" inversion when both players were declaring turn N+1.
+    let handle!: HostHandle;
+    render(
+      <Host
+        ref={(h) => {
+          if (h) handle = h;
+        }}
+      />,
+    );
+
+    // Turn N: both submit.
+    act(() => {
+      handle.dispatch(turnStatusMsg("p:vyvyan", "Vyvyan", "active"));
+      handle.dispatch(turnStatusMsg("p:vyvyan", "Vyvyan", "submitted"));
+      handle.dispatch(turnStatusMsg("p:neil", "Neil", "active"));
+      handle.dispatch(turnStatusMsg("p:neil", "Neil", "submitted"));
+    });
+    expect(handle.entries().map((e) => e.status)).toEqual(["submitted", "submitted"]);
+
+    // Narrator resolves; server emits resolved for the last submitter (Neil).
+    act(() => {
+      handle.dispatch(turnStatusMsg("p:neil", "Neil", "resolved"));
+    });
+
+    // Turn N+1 ready. NEITHER player should be in entries — both will show
+    // ACTING in the party panel, which is the correct simultaneous-action
+    // state when nobody has yet submitted on the new turn.
+    expect(handle.entries()).toEqual([]);
   });
 
   it("regression-guard: reading player_id from msg.payload alone would leave entries empty", () => {

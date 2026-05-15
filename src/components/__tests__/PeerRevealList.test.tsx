@@ -90,4 +90,43 @@ describe("PeerRevealList", () => {
     expect(headers[0].textContent).toMatch(/Bob/);
     expect(headers[1].textContent).toMatch(/Mystery/);
   });
+
+  // sq-playtest 2026-05-15 [UX] two-banner mismatch:
+  // when ACTION_REVEAL drops the composing→submitted transition but the
+  // sealed-letter barrier already recorded the seal, PeerRevealList should
+  // trust the server-authoritative seal state, not the stale stream entry.
+  it("renders peer as submitted when in sealedPlayerIds, even if status is composing", () => {
+    const map = new Map([
+      ["p2", reveal({ status: "composing", action: "I draw my torch" })],
+    ]);
+    render(
+      <PeerRevealList
+        reveals={map}
+        partyOrder={partyOrder}
+        sealedPlayerIds={new Set(["p2"])}
+      />,
+    );
+    expect(screen.getByText(/Bob.*submitted/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bob is composing/)).not.toBeInTheDocument();
+    expect(screen.getByText(/I draw my torch/)).toBeInTheDocument();
+    const row = screen.getByTestId("peer-reveal-row-p2");
+    expect(row.getAttribute("data-effective-submitted")).toBe("true");
+    expect(row.getAttribute("data-status")).toBe("composing");
+  });
+
+  it("keeps composing label when sealedPlayerIds does not include the peer", () => {
+    const map = new Map([
+      ["p2", reveal({ status: "composing", action: "I creep" })],
+    ]);
+    render(
+      <PeerRevealList
+        reveals={map}
+        partyOrder={partyOrder}
+        sealedPlayerIds={new Set(["p3"])}
+      />,
+    );
+    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
+    const row = screen.getByTestId("peer-reveal-row-p2");
+    expect(row.getAttribute("data-effective-submitted")).toBe("false");
+  });
 });

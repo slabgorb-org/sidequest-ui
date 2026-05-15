@@ -738,15 +738,28 @@ function AppInner() {
       }
 
       // Update per-player turn status entries for TurnStatusPanel.
-      // Skip "resolving" — it's a session-level narration-start signal, not
-      // a per-player submission row, so we don't want to forge a "pending"
-      // entry for the dispatcher (it would re-introduce the false "waiting
-      // on player" status that 2026-05-10 fixed).
-      if (playerId && name && status && status !== "resolving") {
-        const mapped: TurnStatusEntry["status"] =
-          status === "submitted" ? "submitted" :
-          status === "auto_resolved" ? "auto_resolved" :
-          "pending";
+      //
+      // Only "submitted" and "auto_resolved" represent durable per-player
+      // sealed-letter state. Skip every other status:
+      //   - "active" is a banner-only signal ("this player's narration is
+      //     about to run") that always arrives immediately before the
+      //     "submitted" emit from the same player; pushing a transient
+      //     "pending" entry for it served no consumer.
+      //   - "resolving" is a session-level "narrator is running" signal
+      //     (already-known guard, 2026-05-10).
+      //   - "resolved" is the session-level "turn complete" signal. The
+      //     branch above already does ``setTurnStatusEntries([])`` for
+      //     it; pushing a "pending" entry after the clear ran was the
+      //     2026-05-15 party-panel-inversion bug — whoever submitted
+      //     last on turn N got pinned as "pending" into turn N+1, so
+      //     CharacterPanel showed them as "Waiting" while the peer who
+      //     also hadn't yet declared showed as "ACTING" (the YOU-row
+      //     inversion the SM described).
+      if (
+        playerId && name &&
+        (status === "submitted" || status === "auto_resolved")
+      ) {
+        const mapped: TurnStatusEntry["status"] = status;
         setTurnStatusEntries((prev) => {
           const next = prev.filter((e) => e.player_id !== playerId);
           next.push({ player_id: playerId, character_name: name, status: mapped });
