@@ -145,6 +145,37 @@ describe("GameBoard wiring", () => {
     });
   });
 
+  // Regression guard for sq-playtest 2026-05-16 [BUG] party-panel peer label
+  // stays "ACTING" after that peer submits (observer tab). CharacterPanel was
+  // a third seal-state consumer fed a loose, length-gated `submittedPlayerIdSet`
+  // (every turnStatusEntry player_id) while PeerRevealList read the precise
+  // `sealedPlayerIds` (status submitted/auto_resolved). The two diverged on an
+  // observer tab — banner correct, party panel stale. The fix makes both
+  // consumers read the SAME authoritative set; the loose memo was deleted.
+  describe("seal-state consumers share one authoritative set", () => {
+    it("submittedPlayerIdSet memo is deleted (no loose seal set survives)", async () => {
+      const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+        default: string;
+      };
+      // Allowed only inside the explanatory history comment, never as a
+      // `const ... = useMemo` declaration.
+      expect(src.default).not.toMatch(/const\s+submittedPlayerIdSet\s*=/);
+    });
+
+    it("CharacterPanel is fed sealedPlayerIds (gated), the same set PeerRevealList reads", async () => {
+      const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+        default: string;
+      };
+      // CharacterWidget gets the authoritative set, length-gated so solo
+      // keeps its activePlayerId fallback.
+      expect(src.default).toMatch(
+        /submittedPlayerIds=\{\s*\(characters\?\.length \?\? 0\) > 1 \? sealedPlayerIds : undefined\s*\}/,
+      );
+      // PeerRevealList still reads the identical source of truth.
+      expect(src.default).toMatch(/sealedPlayerIds=\{sealedPlayerIds\}/);
+    });
+  });
+
   it("deleted files do not exist (GameLayout, OverlayManager, SettingsOverlay, presetLayouts)", async () => {
     const tryImport = async (path: string) => {
       try {
