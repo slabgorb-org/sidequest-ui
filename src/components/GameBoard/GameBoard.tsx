@@ -331,26 +331,20 @@ export function GameBoard({
 
   const { chapterTitle } = useRunningHeader(messages, characters, currentPlayerId);
 
-  // Per-player submission state for the simultaneous-action MP model.
-  // Drives CharacterPanel's ACTING/WAITING badges (playtest 2026-05-03 [BUG]
-  // floor/turn-status inconsistent across tabs). Empty in solo / single-
-  // player; CharacterPanel falls back to activePlayerId-based logic when
-  // ``submittedPlayerIds`` is undefined, so we only thread it through in
-  // genuine MP. Mirrors the App-level ``submittedPlayerIds`` derivation
-  // so a future move into a shared hook is a single-site refactor.
-  const submittedPlayerIdSet = useMemo<ReadonlySet<string> | undefined>(
-    () =>
-      (characters?.length ?? 0) > 1
-        ? new Set(turnStatusEntries.map((e) => e.player_id))
-        : undefined,
-    [characters?.length, turnStatusEntries],
-  );
-
-  // Precise seal set — only status='submitted' / 'auto_resolved'. Distinct
-  // from submittedPlayerIdSet above (which includes 'pending' entries) so
-  // PeerRevealList doesn't mislabel a still-typing peer as sealed. Drives
-  // the PeerRevealList override that defends against ACTION_REVEAL drops
-  // (sq-playtest 2026-05-15 [UX] two-banner mismatch).
+  // Authoritative per-player seal set — only status='submitted' /
+  // 'auto_resolved'. The single source of truth for "this peer has acted",
+  // shared by every consumer that paints seal state: PeerRevealList (the
+  // action-area banner) AND CharacterPanel (the party-row ACTING/WAITING
+  // badges, via the length-gated prop below).
+  //
+  // History: a second loose set (`submittedPlayerIdSet` = every entry's
+  // player_id, regardless of status) used to feed CharacterPanel while this
+  // precise set fed PeerRevealList. The two diverged on an observer tab —
+  // banner said "✓ submitted", party panel still said "ACTING" for the same
+  // peer (sq-playtest 2026-05-16 [BUG] party-panel peer label). One set, one
+  // truth: both consumers now read this. The "loose set includes pending"
+  // rationale was itself stale post-2026-05-15 carried-#5 (App no longer
+  // pushes pending rows), so the loose memo was deleted, not retained.
   const sealedPlayerIds = useMemo<ReadonlySet<string>>(
     () =>
       new Set(
@@ -406,7 +400,13 @@ export function GameBoard({
             characters={characters}
             currentPlayerId={currentPlayerId}
             activePlayerId={activePlayerId}
-            submittedPlayerIds={submittedPlayerIdSet}
+            // MP only: feed the authoritative seal set (same one
+            // PeerRevealList reads, so banner and party panel can never
+            // disagree). Solo / single-PC stays undefined so CharacterPanel
+            // keeps its documented activePlayerId fallback contract.
+            submittedPlayerIds={
+              (characters?.length ?? 0) > 1 ? sealedPlayerIds : undefined
+            }
             magicState={magicState}
           />
         ) : null;
@@ -449,7 +449,7 @@ export function GameBoard({
       knowledgeEntries, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId, submittedPlayerIdSet, magicState, lastOrbitalChart, sendOrbitalIntent,
+      activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
       sessionBoundEpoch]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
