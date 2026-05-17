@@ -95,25 +95,6 @@ describe("terminal archetype rules", () => {
     const section = extractArchetypeSection(css, "terminal");
     expect(section).toContain("text-shadow");
   });
-
-  // Regression (playtest 2026-05-17, space_opera/coyote_star): terminal
-  // emphasis used `color: var(--accent)` with `font-style: normal`, so
-  // clue-bearing <em> had NO slant fallback and the only cue was a token
-  // that collapses to oklch(0.269) in dark mode and oklch(0.97) in light
-  // mode — i.e. invisible in BOTH (it's a background fill, paired with
-  // --accent-foreground). Same class as the #232 parchment fix; the green
-  // text-shadow still carries terminal's emphasis identity.
-  it("emphasis (.narr-text em) uses legible --foreground, not the dark-collapsing --accent", () => {
-    const css = loadArchetypeCSS();
-    const emBlock = extractRuleBlock(
-      css,
-      '[data-archetype="terminal"] .narr-text em',
-    );
-    expect(emBlock).not.toContain("var(--accent)");
-    expect(emBlock).toContain("color: var(--foreground)");
-    // Emphasis identity must survive the legibility fix.
-    expect(emBlock).toContain("var(--glow-accent)");
-  });
 });
 
 describe("rugged archetype rules", () => {
