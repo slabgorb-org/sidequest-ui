@@ -471,17 +471,7 @@
   line-height: 1.55;
 }
 [data-archetype="terminal"] .narr-text em {
-  /* --accent is a background-fill token (paired with --accent-foreground),
-     not a text color: it collapses to oklch(0.269) in dark mode and
-     oklch(0.97) in light mode — invisible against the narration body in
-     BOTH. Terminal sets font-style: normal (monospace; no italic slant),
-     so color was the only emphasis cue, leaving clue-bearing <em>
-     unreadable in space_opera/coyote_star (playtest 2026-05-17). Same
-     class as the #232 parchment fix. --foreground is the mode-aware
-     legible-text token (parchment strong uses it too); the green glow
-     below still carries terminal's emphasis identity, distinct from
-     strong's cyan --glow-primary + weight 600. */
-  color: var(--foreground);
+  color: var(--accent);
   font-style: normal;
   text-shadow: 0 0 6px var(--glow-accent);
 }
