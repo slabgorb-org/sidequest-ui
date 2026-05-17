@@ -445,9 +445,10 @@
 [data-archetype="parchment"] .narr-text-current.has-dropcap > p:first-child::first-letter {
   font-family: var(--font-display, var(--font-body));
   float: left;
-  font-size: 4.2em;
-  line-height: 0.9;
-  padding: 0.05em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.8;
+  margin: 0.02em 0.1em 0 0;
+  padding: 0 0.04em;
   color: var(--primary);
   font-weight: 600;
 }
@@ -480,11 +481,12 @@
   text-shadow: 0 0 4px var(--glow-primary);
 }
 [data-archetype="terminal"] .narr-text-current.has-dropcap > p:first-child::first-letter {
-  font-family: var(--font-ui);
+  font-family: var(--font-display, var(--font-ui));
   float: left;
-  font-size: 4.2em;
-  line-height: 0.9;
-  padding: 0.05em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.8;
+  margin: 0.02em 0.1em 0 0;
+  padding: 0 0.04em;
   color: var(--primary);
   font-weight: 700;
   text-shadow: 0 0 16px var(--glow-primary);
@@ -526,12 +528,13 @@
   font-weight: 700;
 }
 [data-archetype="rugged"] .narr-text-current.has-dropcap > p:first-child::first-letter {
-  font-family: var(--font-ui);
+  font-family: var(--font-display, 'Pirata One', var(--font-ui));
   float: left;
-  font-size: 4.2em;
-  line-height: 0.9;
-  padding: 0.05em 0.12em 0 0;
-  color: var(--accent);
+  font-size: 3.4em;
+  line-height: 0.8;
+  margin: 0.02em 0.1em 0 0;
+  padding: 0 0.04em;
+  color: var(--primary);
   font-weight: 700;
 }
 /* Rugged player-action: heavy 3px primary rule, weight 500 italic. */
