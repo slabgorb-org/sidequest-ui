@@ -248,6 +248,60 @@ describe("archetype CSS wiring", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Terminal emphasis two-channel guard.
+//
+// Positive replacement for the false-invariant test deleted in the 4fe0afa
+// revert of c97acc7. c97acc7 wrongly recolored terminal `em` to --foreground
+// to survive a *missing* genre theme — masking the real defect (unguarded
+// theme_css transport, now loud-failed in useGenreTheme). The correct CRT
+// identity is two distinct channels: emphasis (`em`) on the accent channel,
+// strong (`strong`) on the primary channel. This guards that identity WITHOUT
+// re-encoding the false "em must be --foreground" invariant.
+// (sq-playtest-pingpong [BS-BUG] "theme_css transport has no loud-fail", part 2)
+// ---------------------------------------------------------------------------
+
+describe("terminal emphasis two-channel identity", () => {
+  it("terminal .narr-text em renders on the accent channel (var(--accent))", () => {
+    const css = loadArchetypeCSS();
+    const emBlock = extractRuleBlock(
+      css,
+      '[data-archetype="terminal"] .narr-text em',
+    );
+    expect(emBlock).not.toBe("");
+    expect(emBlock).toMatch(/color:\s*var\(--accent\)/);
+    // The false invariant from c97acc7 — must NOT come back.
+    expect(emBlock).not.toMatch(/color:\s*var\(--foreground\)/);
+  });
+
+  it("terminal .narr-text strong renders on the primary channel (var(--primary))", () => {
+    const css = loadArchetypeCSS();
+    const strongBlock = extractRuleBlock(
+      css,
+      '[data-archetype="terminal"] .narr-text strong',
+    );
+    expect(strongBlock).not.toBe("");
+    expect(strongBlock).toMatch(/color:\s*var\(--primary\)/);
+  });
+
+  it("em and strong are distinct channels (accent !== primary)", () => {
+    const css = loadArchetypeCSS();
+    const emBlock = extractRuleBlock(
+      css,
+      '[data-archetype="terminal"] .narr-text em',
+    );
+    const strongBlock = extractRuleBlock(
+      css,
+      '[data-archetype="terminal"] .narr-text strong',
+    );
+    const emColor = emBlock.match(/color:\s*(var\(--[a-z]+\))/)?.[1];
+    const strongColor = strongBlock.match(/color:\s*(var\(--[a-z]+\))/)?.[1];
+    expect(emColor).toBe("var(--accent)");
+    expect(strongColor).toBe("var(--primary)");
+    expect(emColor).not.toBe(strongColor);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helper: Extract the CSS section for a specific archetype
 // ---------------------------------------------------------------------------
 

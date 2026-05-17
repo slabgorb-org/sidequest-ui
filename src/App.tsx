@@ -480,8 +480,10 @@ function AppInner() {
   // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
 
-  // Genre theme CSS must process in ALL phases, not just game view
-  useGenreTheme(messages);
+  // Genre theme CSS must process in ALL phases, not just game view.
+  // `connected` arms the loud-fail guard: once the session is up, theme_css
+  // MUST arrive or the transport is declared broken (No-Silent-Fallbacks).
+  useGenreTheme(messages, connected);
 
   // Chrome archetype: structural CSS (fonts, borders) based on genre family
   useChromeArchetype(currentGenre);

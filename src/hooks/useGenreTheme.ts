@@ -4,6 +4,23 @@ import { MessageType, type GameMessage } from "@/types/protocol";
 const STYLE_TAG_ID = "genre-theme-css";
 
 /**
+ * How long after the session connects we wait for the genre `theme_css`
+ * SESSION_EVENT before declaring the transport broken. The server emits
+ * theme_css immediately on connect; a multi-second silence means it never
+ * arrived (the ONE scenario where `--accent` silently collapses to an
+ * invisible oklch(0.269) — see `THEME_CSS_FAILURE_BANNER_ID`).
+ */
+export const THEME_CSS_GRACE_MS = 4000;
+
+/**
+ * DOM id of the loud-failure banner shown when `theme_css` never arrives
+ * after connect. Per CLAUDE.md No-Silent-Fallbacks the genre theme failing
+ * to load must be *visible*, not a silent degrade to the inherited dark
+ * defaults (where `--accent` is 1.39:1 — effectively invisible).
+ */
+export const THEME_CSS_FAILURE_BANNER_ID = "genre-theme-failure-banner";
+
+/**
  * Parse a CSS color (hex or rgb()) and return its relative luminance (0–1).
  * Returns 0 (dark) if the color can't be parsed.
  */
@@ -37,26 +54,108 @@ function getLuminance(color: string): number {
 }
 
 /**
+ * Show the loud-failure banner. Its own styling is hardcoded and theme-
+ * independent on purpose — it has to be legible precisely when the genre
+ * theme failed to load, so it cannot lean on any `--*` custom property.
+ */
+function showThemeFailureBanner(): void {
+  if (document.getElementById(THEME_CSS_FAILURE_BANNER_ID)) return;
+  const banner = document.createElement("div");
+  banner.id = THEME_CSS_FAILURE_BANNER_ID;
+  banner.setAttribute("role", "alert");
+  banner.textContent =
+    "⚠ Genre theme failed to load — the UI is showing fallback colors " +
+    "(accent text may be near-invisible). The server's theme_css transport " +
+    "did not deliver. Check the server connection / genre pack.";
+  banner.style.cssText = [
+    "position:fixed",
+    "top:0",
+    "left:0",
+    "right:0",
+    "z-index:2147483647",
+    "padding:10px 16px",
+    "background:#7f1d1d",
+    "color:#fff",
+    "font:600 13px/1.4 system-ui,sans-serif",
+    "text-align:center",
+    "border-bottom:2px solid #fca5a5",
+    "box-shadow:0 2px 8px rgba(0,0,0,0.5)",
+  ].join(";");
+  document.body.appendChild(banner);
+}
+
+function removeThemeFailureBanner(): void {
+  document.getElementById(THEME_CSS_FAILURE_BANNER_ID)?.remove();
+}
+
+/**
  * Listens for SESSION_EVENT "theme_css" messages and injects the genre's
  * CSS into a <style> tag in <head>.
+ *
+ * @param messages   accumulated game messages (only theme_css SESSION_EVENTs
+ *                    reach this array — App.tsx drops connected/ready).
+ * @param connected   whether the WebSocket session is established. Arms the
+ *                    loud-fail guard: once connected, `theme_css` MUST arrive
+ *                    within `graceMs` or the transport is declared broken.
+ * @param graceMs     grace window before the loud failure fires.
  */
-export function useGenreTheme(messages: GameMessage[]): void {
+export function useGenreTheme(
+  messages: GameMessage[],
+  connected: boolean,
+  graceMs: number = THEME_CSS_GRACE_MS,
+): void {
   const appliedRef = useRef<string | null>(null);
+  // True once a genre theme has actually been injected this mount. Read live
+  // from the grace-timer callback closure — refs reflect the latest value.
+  const everAppliedRef = useRef(false);
+  const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const clearFailTimer = () => {
+      if (failTimerRef.current !== null) {
+        clearTimeout(failTimerRef.current);
+        failTimerRef.current = null;
+      }
+    };
+
     const themeMessages = messages.filter(
       (m) => m.type === MessageType.SESSION_EVENT && m.payload.event === "theme_css",
     );
-
     const last = themeMessages[themeMessages.length - 1];
-    if (!last) return;
+    const css = (last?.payload.css as string | undefined) ?? undefined;
 
-    const css = last.payload.css as string | undefined;
-    if (!css) return;
+    // ---- Loud-fail guard ----------------------------------------------------
+    // The genre theme_css SESSION_EVENT never arriving after connect is the
+    // ONE scenario where :root[data-genre] is never set, the .dark base wins,
+    // and --accent collapses to an invisible oklch(0.269). Per CLAUDE.md
+    // No-Silent-Fallbacks this must fail loudly, not degrade in silence.
+    clearFailTimer();
+    if (everAppliedRef.current || css) {
+      // A theme is (about to be) applied — clear any prior failure surface.
+      removeThemeFailureBanner();
+    } else if (connected) {
+      // Connected but no theme yet — arm the guard.
+      failTimerRef.current = setTimeout(() => {
+        if (everAppliedRef.current) return;
+        console.error(
+          "[useGenreTheme] genre theme_css never arrived within " +
+            `${graceMs}ms of connect — the genre theme is NOT loaded and ` +
+            "--accent has silently collapsed to the inherited dark default " +
+            "(near-invisible). This is a No-Silent-Fallbacks transport gap.",
+          { graceMs, connected },
+        );
+        showThemeFailureBanner();
+      }, graceMs);
+    }
+    // ------------------------------------------------------------------------
+
+    if (!last || !css) return clearFailTimer;
 
     // Skip if we already injected this exact CSS
-    if (appliedRef.current === css) return;
+    if (appliedRef.current === css) return clearFailTimer;
     appliedRef.current = css;
+    everAppliedRef.current = true;
+    removeThemeFailureBanner();
 
     // Lie-detector: log every theme_css application so we can verify in
     // the browser console that the expected genre theme actually arrived
@@ -124,7 +223,8 @@ export function useGenreTheme(messages: GameMessage[]): void {
     }
 
     return () => {
+      clearFailTimer();
       root.removeAttribute("data-genre");
     };
-  }, [messages]);
+  }, [messages, connected, graceMs]);
 }

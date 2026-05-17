@@ -1,6 +1,10 @@
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { useGenreTheme } from "@/hooks/useGenreTheme";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  useGenreTheme,
+  THEME_CSS_GRACE_MS,
+  THEME_CSS_FAILURE_BANNER_ID,
+} from "@/hooks/useGenreTheme";
 import { MessageType, type GameMessage } from "@/types/protocol";
 
 // ---------------------------------------------------------------------------
@@ -37,13 +41,13 @@ describe("useGenreTheme", () => {
   });
 
   it("does nothing when messages array is empty", () => {
-    renderHook(() => useGenreTheme([]));
+    renderHook(() => useGenreTheme([], false));
     expect(document.getElementById("genre-theme-css")).toBeNull();
   });
 
   it("injects CSS from theme_css event into a style tag", () => {
     const msg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
-    renderHook(() => useGenreTheme([msg]));
+    renderHook(() => useGenreTheme([msg], true));
 
     const styleEl = document.getElementById("genre-theme-css") as HTMLStyleElement;
     expect(styleEl).not.toBeNull();
@@ -52,7 +56,7 @@ describe("useGenreTheme", () => {
 
   it("ignores SESSION_EVENT with non-theme_css events", () => {
     const leaveMsg = makeSessionEvent("leave");
-    renderHook(() => useGenreTheme([leaveMsg]));
+    renderHook(() => useGenreTheme([leaveMsg], false));
     expect(document.getElementById("genre-theme-css")).toBeNull();
   });
 
@@ -62,25 +66,25 @@ describe("useGenreTheme", () => {
       payload: { text: "The wind howls." },
       player_id: "server",
     };
-    renderHook(() => useGenreTheme([narration]));
+    renderHook(() => useGenreTheme([narration], false));
     expect(document.getElementById("genre-theme-css")).toBeNull();
   });
 
   it("handles theme_css event with missing css gracefully", () => {
     const noCSS = makeSessionEvent("theme_css");
-    renderHook(() => useGenreTheme([noCSS]));
+    renderHook(() => useGenreTheme([noCSS], false));
     expect(document.getElementById("genre-theme-css")).toBeNull();
   });
 
   it("sets data-genre attribute on documentElement when theme_css is applied", () => {
     const msg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
-    renderHook(() => useGenreTheme([msg]));
+    renderHook(() => useGenreTheme([msg], true));
     expect(document.documentElement.getAttribute("data-genre")).toBe("active");
   });
 
   it("removes data-genre attribute on cleanup", () => {
     const msg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
-    const { unmount } = renderHook(() => useGenreTheme([msg]));
+    const { unmount } = renderHook(() => useGenreTheme([msg], true));
     expect(document.documentElement.getAttribute("data-genre")).toBe("active");
     unmount();
     expect(document.documentElement.getAttribute("data-genre")).toBeNull();
@@ -89,7 +93,7 @@ describe("useGenreTheme", () => {
   it("updates CSS when a new theme_css event arrives", () => {
     const first = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
     const { rerender } = renderHook(
-      ({ msgs }: { msgs: GameMessage[] }) => useGenreTheme(msgs),
+      ({ msgs }: { msgs: GameMessage[] }) => useGenreTheme(msgs, true),
       { initialProps: { msgs: [first] } },
     );
 
@@ -103,5 +107,92 @@ describe("useGenreTheme", () => {
     expect(
       (document.getElementById("genre-theme-css") as HTMLStyleElement).textContent,
     ).toBe(OTHER_CSS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loud-fail guard: the genre theme_css SESSION_EVENT never arriving after the
+// session connects is the ONE scenario where --accent silently collapses to an
+// invisible oklch(0.269). Per CLAUDE.md No-Silent-Fallbacks the transport must
+// fail loudly (console.error + a visible banner), not degrade in silence.
+// (sq-playtest-pingpong [BS-BUG] "theme_css transport has no loud-fail")
+// ---------------------------------------------------------------------------
+
+describe("useGenreTheme — loud-fail when theme_css never arrives after connect", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    errorSpy.mockRestore();
+    document.getElementById("genre-theme-css")?.remove();
+    document.getElementById(THEME_CSS_FAILURE_BANNER_ID)?.remove();
+    document.documentElement.removeAttribute("data-genre");
+  });
+
+  it("fires console.error + a visible role=alert banner when connected but no theme_css within the grace window", () => {
+    renderHook(() => useGenreTheme([], true));
+
+    // Before the grace window elapses: no failure yet.
+    vi.advanceTimersByTime(THEME_CSS_GRACE_MS - 1);
+    expect(document.getElementById(THEME_CSS_FAILURE_BANNER_ID)).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    // Grace window elapses with no theme_css → loud failure.
+    vi.advanceTimersByTime(2);
+
+    const banner = document.getElementById(THEME_CSS_FAILURE_BANNER_ID);
+    expect(banner).not.toBeNull();
+    expect(banner?.getAttribute("role")).toBe("alert");
+    expect(banner?.textContent).toMatch(/theme/i);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[useGenreTheme]"),
+      expect.anything(),
+    );
+  });
+
+  it("does NOT fire when theme_css arrives before the grace window elapses", () => {
+    const themeMsg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
+    const { rerender } = renderHook(
+      ({ msgs }: { msgs: GameMessage[] }) => useGenreTheme(msgs, true),
+      { initialProps: { msgs: [] as GameMessage[] } },
+    );
+
+    vi.advanceTimersByTime(THEME_CSS_GRACE_MS - 100);
+    rerender({ msgs: [themeMsg] });
+    vi.advanceTimersByTime(500);
+
+    expect(document.getElementById(THEME_CSS_FAILURE_BANNER_ID)).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(
+      (document.getElementById("genre-theme-css") as HTMLStyleElement).textContent,
+    ).toBe(SAMPLE_CSS);
+  });
+
+  it("does NOT fire while still connecting (connected=false) even past the grace window", () => {
+    renderHook(() => useGenreTheme([], false));
+    vi.advanceTimersByTime(THEME_CSS_GRACE_MS * 3);
+
+    expect(document.getElementById(THEME_CSS_FAILURE_BANNER_ID)).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("removes the failure banner if theme_css arrives after the banner was shown (recovery)", () => {
+    const themeMsg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
+    const { rerender } = renderHook(
+      ({ msgs }: { msgs: GameMessage[] }) => useGenreTheme(msgs, true),
+      { initialProps: { msgs: [] as GameMessage[] } },
+    );
+
+    vi.advanceTimersByTime(THEME_CSS_GRACE_MS + 1);
+    expect(document.getElementById(THEME_CSS_FAILURE_BANNER_ID)).not.toBeNull();
+
+    rerender({ msgs: [themeMsg] });
+    expect(document.getElementById(THEME_CSS_FAILURE_BANNER_ID)).toBeNull();
   });
 });
