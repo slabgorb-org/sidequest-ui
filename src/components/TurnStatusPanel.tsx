@@ -50,7 +50,22 @@ export function TurnStatusPanel({
     : undefined;
 
   const localStatus = localEntry?.status;
-  const allResolved = deduped.length > 0 && deduped.every((e) => isResolved(e.status));
+  // `entries` only ever carries submitted/auto_resolved players — App.tsx
+  // deliberately never pushes a "pending" entry (the 2026-05-15
+  // party-panel-inversion regression). So `every(isResolved)` over a
+  // peers-only list reads as "all sealed" on the last-to-act player's
+  // own tab while they still owe an action (playtest 2026-05-17, Katia:
+  // "All letters sealed — resolving…" with her input still live). A tab
+  // always knows whether ITS OWN player has acted; gate all-resolved on
+  // the local player being present AND resolved so a peers-only list can
+  // never falsely claim the turn is resolving. When localPlayerId is
+  // unknown (spectator) keep the original behavior — don't over-constrain
+  // what we can't observe.
+  const localResolved = localEntry !== undefined && isResolved(localEntry.status);
+  const allResolved =
+    deduped.length > 0 &&
+    deduped.every((e) => isResolved(e.status)) &&
+    (localPlayerId === undefined || localResolved);
   const showWaiting = localStatus !== undefined && isResolved(localStatus) && !allResolved;
   const isStructured = gameMode === 'structured';
   const sealedCount = deduped.filter((e) => isResolved(e.status)).length;

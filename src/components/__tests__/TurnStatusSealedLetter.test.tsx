@@ -305,6 +305,29 @@ describe('TurnStatusPanel — 13-13 AC: all-in transition state', () => {
     expect(screen.getByText(/all letters sealed/i)).toBeInTheDocument();
   });
 
+  it('does NOT show all-in on the last-actor tab when peers submitted but local player has not (playtest 2026-05-17)', () => {
+    // App.tsx never pushes a "pending" entry (2026-05-15 inversion
+    // regression), so the last-to-act player's own tab receives a
+    // peers-only list. Without the local-player guard this read as
+    // "All letters sealed — resolving…" while Katia's input was still
+    // live — a slow declarer (Alex/Sebastien) would think the turn
+    // already moved on.
+    const peersOnlyNoKatia: TurnStatusEntry[] = [
+      { player_id: 'carl', character_name: 'Carl', status: 'submitted' },
+      { player_id: 'donut', character_name: 'Donut', status: 'submitted' },
+    ];
+    render(
+      <TurnStatusPanel
+        entries={peersOnlyNoKatia}
+        gameMode="structured"
+        localPlayerId="katia"
+      />,
+    );
+    const panel = screen.getByTestId('turn-status-panel');
+    expect(panel).not.toHaveAttribute('data-all-in', 'true');
+    expect(screen.queryByText(/all letters sealed/i)).not.toBeInTheDocument();
+  });
+
   it('all-in state includes auto_resolved players as sealed', () => {
     const mixedResolved: TurnStatusEntry[] = [
       { player_id: 'p1', character_name: 'Kael', status: 'submitted' },
