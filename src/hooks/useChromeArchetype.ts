@@ -34,16 +34,19 @@ export const ARCHETYPE_PROPERTIES: Record<
   parchment: {
     "--font-body": "'EB Garamond', Georgia, serif",
     "--font-ui": "'EB Garamond', Georgia, serif",
+    "--font-display": "'Cinzel', 'EB Garamond', serif",
     "--border-radius": "2px",
   },
   terminal: {
     "--font-body": "'Share Tech Mono', 'Courier New', monospace",
     "--font-ui": "'Orbitron', monospace",
+    "--font-display": "'Orbitron', monospace",
     "--border-radius": "0px",
   },
   rugged: {
     "--font-body": "'Source Sans 3', 'Helvetica Neue', sans-serif",
     "--font-ui": "'Oswald', Impact, sans-serif",
+    "--font-display": "'Pirata One', 'Oswald', serif",
     "--border-radius": "4px",
   },
 };

@@ -43,6 +43,16 @@ const FOLIO = {
 } as const;
 
 const FONT_DISPLAY = "'Pirata One', serif";
+// Functional/legible face for everything that NAMES A MECHANIC — stat
+// labels, tab labels, section headers, the Edge label. Pirata One
+// (FONT_DISPLAY) is a blackletter display face: legible as a versal/
+// masthead, illegible on 3-letter mechanical tokens ("DEX"→"DECC"). EB
+// Garamond is already loaded (index.html, full weight axis); chosen over
+// the spec's parenthetical var(--font-ui) option because rugged's
+// --font-ui is 'Oswald' which is NOT loaded and silently degrades to
+// Impact — a No-Silent-Fallback violation. Pirata One stays ONLY on the
+// genuinely decorative surfaces (character name, avatar monogram).
+const FONT_LABEL = "'EB Garamond', Georgia, serif";
 const FONT_BODY = "'EB Garamond', serif";
 
 export interface CharacterPanelProps {
@@ -301,13 +311,15 @@ export function CharacterPanel({
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
-                color: active ? FOLIO.crimson : FOLIO.inkSoft,
+                color: active ? FOLIO.gold : FOLIO.ink,
+                opacity: active ? 1 : 0.85,
                 borderBottom: active
-                  ? `2px solid ${FOLIO.crimson}`
+                  ? `2px solid ${FOLIO.gold}`
                   : "2px solid transparent",
                 marginBottom: -1,
-                fontFamily: FONT_DISPLAY,
+                fontFamily: FONT_LABEL,
                 fontSize: 15,
+                fontWeight: active ? 600 : 500,
                 letterSpacing: 1,
                 display: "flex",
                 alignItems: "center",
@@ -358,8 +370,8 @@ export function CharacterPanel({
           <h3
             className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1"
             style={{
-              fontFamily: FONT_DISPLAY,
-              color: FOLIO.crimson,
+              fontFamily: FONT_LABEL,
+              color: FOLIO.gold,
               letterSpacing: 1.5,
               fontWeight: 400,
             }}
@@ -558,8 +570,8 @@ export function CharacterPanel({
           <h3
             className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1"
             style={{
-              fontFamily: FONT_DISPLAY,
-              color: FOLIO.crimson,
+              fontFamily: FONT_LABEL,
+              color: FOLIO.gold,
               letterSpacing: 1.5,
               fontWeight: 400,
             }}
@@ -692,9 +704,9 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
     >
       <span
         style={{
-          fontFamily: FONT_DISPLAY,
+          fontFamily: FONT_LABEL,
           fontSize: 14,
-          color: FOLIO.crimson,
+          color: FOLIO.gold,
           letterSpacing: 1,
         }}
       >
@@ -775,16 +787,17 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
               }}
             >
               <span
-                className="text-[var(--primary)] text-sm"
+                className="text-sm"
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontSize: 14,
+                  fontFamily: FONT_LABEL,
+                  fontSize: 15,
                   color: FOLIO.ink,
-                  letterSpacing: 0.5,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  fontWeight: 400,
+                  fontWeight: 600,
                 }}
               >
                 {toDisplayName(stat)}
@@ -792,9 +805,9 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
               <span
                 style={{
                   fontFamily: FONT_BODY,
-                  fontSize: 13,
+                  fontSize: 15,
                   color: FOLIO.gold,
-                  fontStyle: "italic",
+                  fontWeight: 600,
                   fontVariantNumeric: "tabular-nums",
                   flexShrink: 0,
                 }}
@@ -850,7 +863,7 @@ export function AbilitiesContent({
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {showClassSig && (
         <section>
-          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+          <h4 style={{ fontFamily: FONT_LABEL, color: FOLIO.gold, marginBottom: 6 }}>
             Class signature
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -863,7 +876,7 @@ export function AbilitiesContent({
 
       {showClassMoves && (
         <section>
-          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+          <h4 style={{ fontFamily: FONT_LABEL, color: FOLIO.gold, marginBottom: 6 }}>
             Class moves
           </h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -888,7 +901,7 @@ export function AbilitiesContent({
 
       {showItem && (
         <section>
-          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+          <h4 style={{ fontFamily: FONT_LABEL, color: FOLIO.gold, marginBottom: 6 }}>
             From inventory
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -901,7 +914,7 @@ export function AbilitiesContent({
 
       {showEarned && (
         <section>
-          <h4 style={{ fontFamily: FONT_DISPLAY, color: FOLIO.crimson, marginBottom: 6 }}>
+          <h4 style={{ fontFamily: FONT_LABEL, color: FOLIO.gold, marginBottom: 6 }}>
             Earned
           </h4>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
