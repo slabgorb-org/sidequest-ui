@@ -220,6 +220,19 @@ export function renderSegment(
           {seg.text}
         </div>
       );
+    case "gm-aside":
+      // ADR-107: the GM's OOC answer — same lighter table-talk register
+      // as player-aside (the asking half). whitespace-pre-line preserves
+      // the "X asked: …\nGM: …" two-line shape buildSegments emits.
+      return (
+        <div
+          key={i}
+          data-testid="gm-aside"
+          className="text-sm text-muted-foreground/50 italic max-w-[85ch] mx-auto my-1 whitespace-pre-line"
+        >
+          {seg.text}
+        </div>
+      );
     case "chapter-marker":
       if (chapterTitle === seg.text) return null;
       return (

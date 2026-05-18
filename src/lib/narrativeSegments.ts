@@ -5,7 +5,7 @@ import type { FootnoteData } from "@/types/payloads";
 export type { FootnoteData };
 
 export interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "render-pending" | "gallery-notice";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "gm-aside" | "chapter-marker" | "portrait-group" | "render-pending" | "gallery-notice";
   html?: string;
   url?: string;
   alt?: string;
@@ -120,6 +120,23 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
           segments.push({
             kind: aside ? "player-aside" : "player-action",
             text: aside ? `[aside] ${action}` : action,
+          });
+        }
+        break;
+      }
+      case MessageType.ASIDE_ANSWER: {
+        // ADR-107: the answering half of the OOC aside pair. Table-visible,
+        // never a turn record — rendered in the same lighter OOC register
+        // as player-aside, not as narration text.
+        const p = msg.payload as {
+          asker_id?: string;
+          question?: string;
+          answer?: string;
+        };
+        if (p.answer) {
+          segments.push({
+            kind: "gm-aside",
+            text: `${p.asker_id ?? "?"} asked: ${p.question ?? ""}\nGM: ${p.answer}`,
           });
         }
         break;

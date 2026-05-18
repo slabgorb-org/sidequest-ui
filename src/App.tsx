@@ -528,7 +528,15 @@ function AppInner() {
       return;
     }
 
-    if (msg.type === MessageType.NARRATION || msg.type === MessageType.NARRATION_END) {
+    if (
+      msg.type === MessageType.NARRATION ||
+      msg.type === MessageType.NARRATION_END ||
+      // ADR-107: out-of-band GM aside answer flows into the narrative
+      // scroll (table-visible) but is NOT a turn boundary — it does not
+      // unlock input, clear the confrontation panel, or touch dice
+      // state. Those side-effects stay gated behind NARRATION_END below.
+      msg.type === MessageType.ASIDE_ANSWER
+    ) {
       setThinking(false);
       setMessages((prev) => [...prev, msg]);
       // Turn-end signal: unlock input once the narrator has responded.
