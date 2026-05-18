@@ -426,6 +426,11 @@ function AppInner() {
   // Updated synchronously alongside sendRef so handleMessage always calls the
   // current closure without the circular dep.
   const peerRevealsApplyRef = useRef<((entry: ActionRevealEntry) => void) | null>(null);
+  // Same ref bridge for clear() — invoked from TURN_STATUS{status="resolved"}
+  // to drop the previous round's "✓ submitted" rows the instant narration
+  // completes, instead of waiting for the next round's first ACTION_REVEAL.
+  // (2026-05-18 MP playtest.)
+  const peerRevealsClearRef = useRef<(() => void) | null>(null);
 
   // Dice overlay persists after result so the table can see "rolled N vs
   // target M → outcome" through the narrator's resolution. Cleared by:
@@ -745,6 +750,10 @@ function AppInner() {
         setActivePlayerName(null);
         setTurnStatusEntries([]);
         setNarrationInFlight(false);
+        // Drop peer reveals from the round that just resolved. Without
+        // this, "Laverne ✓ submitted — I walk to the winch..." persists
+        // into the next turn's compose phase on every other tab.
+        peerRevealsClearRef.current?.();
       }
 
       // Update per-player turn status entries for TurnStatusPanel.
@@ -1174,6 +1183,7 @@ function AppInner() {
 
   const peerReveals = usePeerReveals({ selfPlayerId: currentPlayerId, round: currentRound });
   peerRevealsApplyRef.current = peerReveals.apply;
+  peerRevealsClearRef.current = peerReveals.clear;
 
   // ADR-036: Outbound ACTION_REVEAL — broadcast composing/submitted reveals to peers.
   // Sourced from partyMembers; character_name falls back to name if missing.

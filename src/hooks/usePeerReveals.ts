@@ -11,6 +11,18 @@ export interface UsePeerRevealsOptions {
 export interface UsePeerRevealsResult {
   reveals: Map<string, PeerReveal>;
   apply: (entry: ActionRevealEntry) => void;
+  /**
+   * Drop every tracked reveal without touching the round counter.
+   *
+   * Callers wire this to TURN_STATUS{status="resolved"} so the
+   * peer-submitted strip clears the moment narration completes. The
+   * round-bump flush is still authoritative when a new round's
+   * ACTION_REVEAL arrives, but resolved fires *before* the next round's
+   * first reveal — without this explicit hook the previous round's
+   * "✓ submitted" row persists into the next turn's compose phase.
+   * (2026-05-18 MP playtest.)
+   */
+  clear: () => void;
 }
 
 interface State {
@@ -23,12 +35,21 @@ interface State {
 
 type ReducerAction =
   | { type: "APPLY"; entry: ActionRevealEntry; selfPlayerId: string | null | undefined }
-  | { type: "ADVANCE_ROUND"; round: number };
+  | { type: "ADVANCE_ROUND"; round: number }
+  | { type: "CLEAR" };
 
 function reducer(state: State, action: ReducerAction): State {
   switch (action.type) {
     case "ADVANCE_ROUND":
       return { round: action.round, lastSeq: new Map(), reveals: new Map() };
+
+    case "CLEAR":
+      // Preserve the round counter — a subsequent same-round
+      // ACTION_REVEAL would otherwise be treated as a back-in-time
+      // entry and dropped. Only the visible reveal map + per-player
+      // seq tracking reset.
+      if (state.reveals.size === 0 && state.lastSeq.size === 0) return state;
+      return { ...state, lastSeq: new Map(), reveals: new Map() };
 
     case "APPLY": {
       const { entry, selfPlayerId } = action;
@@ -119,5 +140,9 @@ export function usePeerReveals({
     [selfPlayerId]
   );
 
-  return { reveals: activeReveals, apply };
+  const clear = useCallback(() => {
+    dispatch({ type: "CLEAR" });
+  }, []);
+
+  return { reveals: activeReveals, apply, clear };
 }

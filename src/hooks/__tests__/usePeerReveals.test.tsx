@@ -97,6 +97,22 @@ describe("usePeerReveals", () => {
     expect(result.current.reveals.get("p2")?.action).toBe("future");
   });
 
+  it("clear() empties the reveals map without bumping round", () => {
+    // Regression: 2026-05-18 MP playtest. After narration resolved and
+    // turn 2 opened, the previous round's "Laverne ✓ submitted — I walk to
+    // the winch..." persisted on Shirley's tab. The reducer only flushes
+    // on a round bump, but TURN_STATUS{status="resolved"} fires *before*
+    // any new-round ACTION_REVEAL arrives, so the panel needs an explicit
+    // clear hook to call on resolve.
+    const { result } = renderHook(() =>
+      usePeerReveals({ selfPlayerId: "p1", round: 1 })
+    );
+    act(() => result.current.apply(reveal({ seq: 0, status: "submitted" })));
+    expect(result.current.reveals.size).toBe(1);
+    act(() => result.current.clear());
+    expect(result.current.reveals.size).toBe(0);
+  });
+
   it("two peers tracked independently", () => {
     const { result } = renderHook(() =>
       usePeerReveals({ selfPlayerId: "p1", round: 1 })
