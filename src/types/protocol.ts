@@ -29,6 +29,10 @@ export const MessageType = {
   THINKING: "THINKING",
   COMBAT_EVENT: "COMBAT_EVENT",
   ACTION_REVEAL: "ACTION_REVEAL",
+  // Out-of-band OOC GM answer to a player aside (ADR-107). Not a turn
+  // record: it does not advance the world, tick the turn/round counter,
+  // touch the narrative log, or count toward the MP barrier.
+  ASIDE_ANSWER: "ASIDE_ANSWER",
   SCENARIO_EVENT: "SCENARIO_EVENT",
   ACHIEVEMENT_EARNED: "ACHIEVEMENT_EARNED",
   CONFRONTATION: "CONFRONTATION",
@@ -75,6 +79,20 @@ export interface GameMessage {
   type: MessageType;
   payload: Record<string, unknown>;
   player_id: string;
+}
+
+/**
+ * ASIDE_ANSWER payload (ADR-107). The GM's out-of-character reply to a
+ * player aside. `round` is for client ordering only — it is never a turn
+ * record. `grounded_on` is the state-key audit trail (empty on a
+ * refusal/decline outcome).
+ */
+export interface AsideAnswerPayload {
+  asker_id: string;
+  question: string;
+  answer: string;
+  grounded_on: string[];
+  round: number;
 }
 
 // Re-export typed payloads for convenience

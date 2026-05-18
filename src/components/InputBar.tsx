@@ -183,7 +183,7 @@ function InputBarImpl(
     waitingForPlayer ? `Waiting for ${waitingForPlayer}…` :
     thinking ? "The narrator is thinking..." :
     confrontationActive ? "What do you do? (then pick a beat below)" :
-    aside ? "What do you whisper?" :
+    aside ? "Ask the GM — no turn spent" :
     "What do you do?";
 
   return (
