@@ -2,64 +2,46 @@
  * Narrative-axis → tone-chip translation.
  *
  * `axis_snapshot` is a `{ axis_name: float }` map from `world.yaml` where
- * values run roughly 0.0–1.0 (midpoint 0.5 is "neutral"). The lobby preview
- * renders the most-polarized axes as tone chips so the player can read the
- * world's flavor fingerprint at a glance.
+ * values run 0.0–1.0 (midpoint 0.5 is "neutral"). The lobby preview
+ * renders every authored axis as a tone chip so the player can read the
+ * world's tagged fingerprint at a glance.
  *
- * Five canonical axes (ADR-052, narrative axis system):
- *   comedy  — how much tonal humor the world permits
- *   gravity — how grim/weighty the tone runs
- *   outlook — how hopeful/bleak the world feels
- *   mythic  — how grounded/legendary the scale is
- *   loyalty — how trustworthy NPC relationships tend to be
+ * Axis names are world-authored (cosy, gossip, chrome, weirdness, comedy,
+ * stakes, etc.) — there is no canonical 5. The renderer is vocabulary-
+ * agnostic: it just reports each axis as low / medium / high.
  *
- * Axes with values in the neutral band (0.33–0.67) are skipped — only
- * polarized values produce a chip, because a "half gritty, half comic"
- * tag tells the player nothing useful.
+ * Three buckets:
+ *   v ≤ 0.33           → "low {axis}"
+ *   0.33 < v < 0.67    → "medium {axis}"
+ *   v ≥ 0.67           → "high {axis}"
+ *
+ * Chips are sorted by distance-from-neutral (most extreme first) so the
+ * world's strongest signals lead. Medium chips (distance ≈ 0) trail at
+ * the end of the list.
  */
 
 export interface ToneChip {
-  /** Short label rendered on the chip (e.g., "mythic", "gritty"). */
+  /** e.g. "low comedy", "medium chrome", "high cosy". */
   label: string;
-  /** Unicode glyph prefix for visual distinction. */
+  /** Bucket-indicator glyph: ▾ (low), ◇ (medium), ▴ (high). */
   glyph: string;
 }
 
-/** Polarized labels per axis: [low, high]. */
-const AXIS_LABELS: Record<string, { low: ToneChip; high: ToneChip }> = {
-  comedy: {
-    low: { label: "serious", glyph: "☍" },
-    high: { label: "comedic", glyph: "☺" },
-  },
-  gravity: {
-    low: { label: "light", glyph: "☼" },
-    high: { label: "gritty", glyph: "⚖" },
-  },
-  outlook: {
-    low: { label: "bleak", glyph: "☾" },
-    high: { label: "hopeful", glyph: "✦" },
-  },
-  mythic: {
-    low: { label: "grounded", glyph: "⌂" },
-    high: { label: "mythic", glyph: "✧" },
-  },
-  loyalty: {
-    low: { label: "treacherous", glyph: "⚔" },
-    high: { label: "loyal", glyph: "♦" },
-  },
-};
-
-/** Below this, an axis reads as "low." */
+/** At or below this threshold, an axis reads as "low." */
 const LOW_THRESHOLD = 0.33;
-/** Above this, an axis reads as "high." */
+/** At or above this threshold, an axis reads as "high." */
 const HIGH_THRESHOLD = 0.67;
 
+const LOW_GLYPH = "▾";
+const MEDIUM_GLYPH = "◇";
+const HIGH_GLYPH = "▴";
+
 /**
- * Produce an ordered list of tone chips from a world's axis snapshot.
+ * Produce a sorted list of tone chips from a world's axis snapshot.
  *
- * Results are sorted by distance-from-neutral (most extreme first), so the
- * chip list reads the world's strongest signals to the player without
- * burying them under softer flavors.
+ * Every entry in `axis_snapshot` produces exactly one chip. Sort key is
+ * distance from neutral (0.5), descending, so the most polarized axes
+ * lead and medium chips trail.
  */
 export function getToneChips(
   axis_snapshot: Record<string, number>,
@@ -67,15 +49,26 @@ export function getToneChips(
   const chips: Array<{ chip: ToneChip; distance: number }> = [];
 
   for (const [axis, value] of Object.entries(axis_snapshot)) {
-    const labels = AXIS_LABELS[axis];
-    if (!labels) continue;
-
-    if (value <= LOW_THRESHOLD) {
-      chips.push({ chip: labels.low, distance: 0.5 - value });
-    } else if (value >= HIGH_THRESHOLD) {
-      chips.push({ chip: labels.high, distance: value - 0.5 });
+    if (!Number.isFinite(value)) {
+      throw new Error(
+        `getToneChips: axis "${axis}" has non-finite value ${value}; ` +
+          `world.yaml axis_snapshot must hold finite numbers.`,
+      );
     }
-    // Neutral band (0.33 < v < 0.67) produces no chip by design.
+    let label: string;
+    let glyph: string;
+    if (value <= LOW_THRESHOLD) {
+      label = `low ${axis}`;
+      glyph = LOW_GLYPH;
+    } else if (value >= HIGH_THRESHOLD) {
+      label = `high ${axis}`;
+      glyph = HIGH_GLYPH;
+    } else {
+      label = `medium ${axis}`;
+      glyph = MEDIUM_GLYPH;
+    }
+    const distance = Math.abs(value - 0.5);
+    chips.push({ chip: { label, glyph }, distance });
   }
 
   chips.sort((a, b) => b.distance - a.distance);
