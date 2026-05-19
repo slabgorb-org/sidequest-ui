@@ -702,3 +702,54 @@ export function validateConfidence(raw: string | undefined): Confidence {
   if (raw) console.warn(`Unknown Confidence: "${raw}", falling back to "certain"`);
   return "certain";
 }
+
+// ---------------------------------------------------------------------------
+// Story 54-2 / ADR-109: persistent location description + manifest.
+// The Location tab consumer lands in Story 54-9. These types mirror the
+// pydantic shape on the wire (sidequest/protocol/models.py).
+// ---------------------------------------------------------------------------
+
+export type LocationEntityTier = "real_object" | "yes_and" | "flavor_only";
+
+export type LocationEntityBindingKind =
+  | "location_feature"
+  | "npc"
+  | "item"
+  | "clue"
+  | "scenario_clue";
+
+export type LocationEntityProvenance =
+  | "authored"
+  | "cookbook"
+  | "yes_and_promoted"
+  | "yes_and_minted";
+
+export interface LocationEntityBinding {
+  kind: LocationEntityBindingKind;
+  ref: string;
+}
+
+export interface LocationEntity {
+  id: string;
+  label: string;
+  tier: LocationEntityTier;
+  binding: LocationEntityBinding | null;
+  affordances: string[];
+  provenance: LocationEntityProvenance;
+  promoted_at_turn: number | null;
+  promoted_canon: string | null;
+}
+
+export interface LocationDescriptionOverlaySummary {
+  encounter_id: string;
+  prose_suffix: string;
+  entity_delta_count: number;
+}
+
+export interface LocationDescriptionPayload {
+  region_id: string;
+  prose: string;
+  terrain: string | null;
+  entities: LocationEntity[];
+  overlays: LocationDescriptionOverlaySummary[];
+}
