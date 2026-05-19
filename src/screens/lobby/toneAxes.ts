@@ -52,7 +52,7 @@ export function getToneChips(
     if (!Number.isFinite(value)) {
       throw new Error(
         `getToneChips: axis "${axis}" has non-finite value ${value}; ` +
-          `world.yaml axis_snapshot must hold finite numbers in [0, 1].`,
+          `world.yaml axis_snapshot must hold finite numbers.`,
       );
     }
     let label: string;
