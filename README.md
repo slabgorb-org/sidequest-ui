@@ -48,7 +48,7 @@ All paths are relative to `src/components/` unless noted.
 |----------------------------|---------------------------------------------------------------|
 | `GameBoard/GameBoard.tsx`  | Root gameplay layout with widget registry                     |
 | `GameBoard/widgets/`       | Modular widget shell: `AudioWidget`, `CharacterWidget`, `ConfrontationWidget`, `ImageGalleryWidget`, `InventoryWidget`, `KnowledgeWidget`, `MapWidget`, `NarrativeWidget`, `ScrapbookGallery`, `ShipWidget` |
-| `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback); `NarrationScroll` consumes live `NarrationDelta` streaming when `SIDEQUEST_NARRATOR_STREAMING=1` (default) |
+| `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback); `NarrationScroll` consumes live `NarrationDelta` streaming when the server runs with `SIDEQUEST_NARRATOR_STREAMING=1` (server default is **off** — non-streaming on the Anthropic SDK backend per ADR-101) |
 | `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), images |
 | `CharacterPanel.tsx`       | Persistent themed sidebar showing active character            |
 | `PartyPanel.tsx`           | Party portraits, Edge bars, status effects, recruited-NPC companions |
@@ -127,7 +127,9 @@ constructions. See `orc-quest/docs/adr/076-narration-protocol-collapse-post-tts.
 ## WebSocket Protocol
 
 Client-handled message types include `NARRATION`, `NARRATION_END`, `NarrationDelta`
-(streaming, default-on), `PARTY_STATUS`, `CHARACTER_SHEET`, `INVENTORY`, `MAP_UPDATE`,
+(streaming, opt-in via server-side `SIDEQUEST_NARRATOR_STREAMING=1`; default off),
+`PARTY_STATUS`, `CHARACTER_SHEET`, `INVENTORY`, `MAP_UPDATE` (new ADR-055 room-graph
+shape — the legacy ADR-019 cartography `MAP_UPDATE` was deleted in the port),
 `IMAGE`, `AUDIO_CUE`, `CHAPTER_MARKER`, `SESSION_EVENT`, `TURN_STATUS`,
 `CHARACTER_CREATION`, `THINKING`, `ERROR`, `ACTION_QUEUE`, `ACTION_REVEAL` (live
 teammate typing per ADR-036 amendment 2026-05-03), `CONFRONTATION`,
