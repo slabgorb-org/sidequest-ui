@@ -87,3 +87,21 @@ describe("WorldPreview — hero image states", () => {
     expect(screen.getByText("◇")).toBeInTheDocument();
   });
 });
+
+describe("WorldPreview — tone chips wiring", () => {
+  it("renders one chip per authored axis from axis_snapshot", () => {
+    render(
+      <WorldPreview
+        pack={makePack()}
+        world={makeWorld({
+          axis_snapshot: { gravity: 0.9, comedy: 0.05, outlook: 0.5 },
+        })}
+      />,
+    );
+    // Chips are wired through getToneChips() and rendered as <li> items
+    // under an aria-labelled <ul>. Confirm each authored axis surfaces.
+    expect(screen.getByText("high gravity")).toBeInTheDocument();
+    expect(screen.getByText("low comedy")).toBeInTheDocument();
+    expect(screen.getByText("medium outlook")).toBeInTheDocument();
+  });
+});

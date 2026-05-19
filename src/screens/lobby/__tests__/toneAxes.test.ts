@@ -52,8 +52,29 @@ describe("getToneChips", () => {
     ]);
   });
 
+  it("keeps both chips when two axes share the same distance-from-neutral", () => {
+    // Both axes sit 0.2 from neutral; sort order between them is unspecified
+    // but neither may be dropped.
+    const chips = getToneChips({ axis_a: 0.7, axis_b: 0.3 });
+    expect(chips).toHaveLength(2);
+    const labels = new Set(chips.map((c) => c.label));
+    expect(labels).toEqual(new Set(["high axis_a", "low axis_b"]));
+  });
+
   it("returns empty array for empty axis snapshot", () => {
     expect(getToneChips({})).toEqual([]);
+  });
+
+  it("throws on NaN axis values (no silent fallback to medium)", () => {
+    expect(() => getToneChips({ comedy: NaN })).toThrowError(/non-finite/);
+  });
+
+  it("throws on Infinity axis values", () => {
+    expect(() => getToneChips({ gravity: Infinity })).toThrowError(/non-finite/);
+  });
+
+  it("throws on -Infinity axis values", () => {
+    expect(() => getToneChips({ outlook: -Infinity })).toThrowError(/non-finite/);
   });
 
   it("is vocabulary-agnostic: any axis name works", () => {

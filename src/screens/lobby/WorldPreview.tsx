@@ -135,7 +135,7 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
         )}
       </div>
 
-      {/* Tone chips — only rendered when axes are polarized enough. */}
+      {/* Tone chips — one per authored axis; hidden only when the world declared none. */}
       {toneChips.length > 0 && (
         <ul
           className="flex flex-wrap gap-2"

@@ -27,9 +27,9 @@ export interface ToneChip {
   glyph: string;
 }
 
-/** Below this, an axis reads as "low." */
+/** At or below this threshold, an axis reads as "low." */
 const LOW_THRESHOLD = 0.33;
-/** Above this, an axis reads as "high." */
+/** At or above this threshold, an axis reads as "high." */
 const HIGH_THRESHOLD = 0.67;
 
 const LOW_GLYPH = "▾";
@@ -49,6 +49,12 @@ export function getToneChips(
   const chips: Array<{ chip: ToneChip; distance: number }> = [];
 
   for (const [axis, value] of Object.entries(axis_snapshot)) {
+    if (!Number.isFinite(value)) {
+      throw new Error(
+        `getToneChips: axis "${axis}" has non-finite value ${value}; ` +
+          `world.yaml axis_snapshot must hold finite numbers in [0, 1].`,
+      );
+    }
     let label: string;
     let glyph: string;
     if (value <= LOW_THRESHOLD) {
