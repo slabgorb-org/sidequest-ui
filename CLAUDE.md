@@ -103,8 +103,9 @@ Particularly relevant to this UI repo:
 | Frontend / protocol | 026 (client state mirror), 027 (reactive state messaging), 076 (narration protocol collapse post-TTS), 079 (genre theme system unification), 094 (orrery label placement) |
 | Audio / media surface | 045 (client audio engine — 2-channel post-TTS), 050 (image pacing throttle), 086 (image-composition taxonomy), 096 (cavern renderer revival — partial) |
 | Dice | 074 (dice resolution protocol), 075 (3D dice rendering — Three.js + Rapier, partial) |
-| Multiplayer surface | 028 (perception rewriter), 036 (multiplayer turn coordination), 037 (shared/per-player state split) |
-| Telemetry surface | 058 (Claude subprocess OTEL passthrough), 090 (OTEL dashboard restoration) |
+| Multiplayer surface | 028 (perception rewriter — *superseded by 104*), 036 (multiplayer turn coordination, with 2026-05-03 action-visibility amendment), 037 (shared/per-player state split), 104 (perception filtering at the tool layer), 105 (broadcast-layer perception firewall), 107 (out-of-band aside channel) |
+| Telemetry surface | 058 (Claude subprocess OTEL passthrough — *superseded by 103*), 090 (OTEL dashboard restoration), 103 (native OTEL via tool registry) |
+| Locations / rooms | 055 (room graph navigation — the new `MAP_UPDATE` shape lives here; ADR-019 cartography `MAP_UPDATE` was deleted in the port), 106 (runtime procedural Jaquaysed megadungeon, `beneath_sunden`), 109 (persistent location descriptions + mechanical manifest) |
 | Class mechanics surface | 095 (class mechanical surface — Lv1 abilities tab) |
 
 For the full ADR index across all domains see `orc-quest/docs/adr/README.md`.
