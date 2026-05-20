@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 import { isNarrationDelta } from '../types/payloads';
-import type { FootnoteData, NarrationMessage } from '../types/payloads';
+import type {
+  FootnoteData,
+  LocationDescriptionPayload,
+  LocationOverlayChangedPayload,
+  NarrationMessage,
+} from '../types/payloads';
 import { reduceStreamingNarration, initialStreamingState } from '../providers/streamingNarration';
 import type { MagicState } from '../types/magic';
 
@@ -66,6 +71,14 @@ export function useStateMirror(messages: GameMessage[]): void {
     // Streaming narration: rebuilt from scratch on every replay (same idempotency
     // contract as `current` above — full replace, no incremental accumulation).
     let streamingState = initialStreamingState;
+    // Story 54-9 / ADR-109: persistent-location snapshot + buffered delta.
+    // LOCATION_DESCRIPTION is a full replace; LOCATION_OVERLAY_CHANGED is an
+    // overlays-only delta. A delta arriving before a matching baseline is
+    // buffered and merged into the next matching LOCATION_DESCRIPTION
+    // (spec §6.3 delta-before-baseline). A delta whose region differs from
+    // the current baseline is dropped (room change is the truth source).
+    let currentLocation: LocationDescriptionPayload | null = null;
+    let pendingOverlays: LocationOverlayChangedPayload | null = null;
 
     for (const msg of messages) {
       // narration.delta arrives with `kind` (not `type`) and is NOT a GameMessage
@@ -182,6 +195,52 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // Story 54-9 / ADR-109: persistent location description snapshot.
+      // Full replace of currentLocation. If a delta was buffered (delta-
+      // before-baseline per spec §6.3) and its region_id matches this
+      // baseline, merge it in by replacing the baseline's overlays slice.
+      // A buffered delta whose region_id no longer matches is dropped —
+      // it belonged to a room we never received a baseline for.
+      if (msg.type === MessageType.LOCATION_DESCRIPTION) {
+        const payload = msg.payload as unknown as LocationDescriptionPayload;
+        if (
+          pendingOverlays !== null &&
+          pendingOverlays.region_id === payload.region_id
+        ) {
+          currentLocation = {
+            ...payload,
+            overlays: [...pendingOverlays.overlays],
+          };
+        } else {
+          currentLocation = payload;
+        }
+        pendingOverlays = null;
+        continue;
+      }
+
+      // Story 54-9: per-encounter overlay delta. When a baseline exists
+      // for the same region_id, replace its overlays slice. When the
+      // baseline is for a DIFFERENT region the delta is stale (room change
+      // happened mid-stream) — drop silently. When no baseline exists yet,
+      // buffer the delta until the next matching LOCATION_DESCRIPTION.
+      if (msg.type === MessageType.LOCATION_OVERLAY_CHANGED) {
+        const payload =
+          msg.payload as unknown as LocationOverlayChangedPayload;
+        if (
+          currentLocation !== null &&
+          currentLocation.region_id === payload.region_id
+        ) {
+          currentLocation = {
+            ...currentLocation,
+            overlays: [...payload.overlays],
+          };
+        } else if (currentLocation === null) {
+          pendingOverlays = payload;
+        }
+        // else: baseline exists for a different region — drop silently.
+        continue;
+      }
+
       if (msg.type !== MessageType.NARRATION && msg.type !== MessageType.TURN_STATUS) {
         continue;
       }
@@ -273,6 +332,13 @@ export function useStateMirror(messages: GameMessage[]): void {
     if (resourceAlerts.length > 0) {
       current = { ...current, resourceAlerts };
     }
+
+    // Story 54-9 / ADR-109: persistent location description slice. Always
+    // mirrored — null when no LOCATION_DESCRIPTION has been received, the
+    // composed payload (baseline ± overlay delta) otherwise. The empty
+    // default in EMPTY_GAME_STATE is null so the panel's dataGated tab
+    // stays hidden during chargen and on pre-54 worlds.
+    current = { ...current, currentLocation };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

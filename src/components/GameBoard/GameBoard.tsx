@@ -44,7 +44,12 @@ import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type {
+  DiceRequestPayload,
+  DiceResultPayload,
+  DiceThrowParams,
+  LocationDescriptionPayload,
+} from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
 import { PeerRevealList } from "@/components/PeerRevealList";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
@@ -62,6 +67,7 @@ import { InventoryWidget } from "./widgets/InventoryWidget";
 // JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts comment.
 // JournalView and the journal data pipeline are intentionally retained.
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
+import { LocationWidget } from "./widgets/LocationWidget";
 // ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
 // dedicated panel between the dockview workspace and the InputBar (D2 mock).
 import { AudioWidget } from "./widgets/AudioWidget";
@@ -135,6 +141,13 @@ export interface GameBoardProps {
   characterSheet?: CharacterSheetData | null;
   inventoryData?: InventoryData | null;
   mapData?: MapState | null;
+  /**
+   * Story 54-9 / ADR-109: persistent location description for the
+   * current room. Mirrored from state.currentLocation. Null when no
+   * manifest has been delivered yet; the location tab is hidden in
+   * that state (dataGated, gated in availableWidgets below).
+   */
+  currentLocation?: LocationDescriptionPayload | null;
   audio?: ReturnType<typeof useAudio>;
   nowPlaying?: NowPlaying | null;
   // journalEntries prop removed playtest 2026-04-11 along with the Handouts
@@ -216,6 +229,7 @@ export function GameBoard({
   characterSheet = null,
   inventoryData = null,
   mapData = null,
+  currentLocation = null,
   audio,
   nowPlaying = null,
   knowledgeEntries,
@@ -284,8 +298,14 @@ export function GameBoard({
     available.add("gallery");
     available.add("audio");
     if (worldSlug === "coyote_star") available.add("ship");
+    // Story 54-9 / ADR-109: Location tab appears only when a manifest
+    // has been delivered. Hidden during chargen, on legacy saves with
+    // no manifest yet, and in pre-54 worlds. The post-mount sync effect
+    // below adds the panel to dockview when currentLocation transitions
+    // null → non-null mid-session.
+    if (currentLocation) available.add("location");
     return available;
-  }, [worldSlug]);
+  }, [worldSlug, currentLocation]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -430,6 +450,8 @@ export function GameBoard({
         ) : null;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
+      case "location":
+        return <LocationWidget data={currentLocation ?? null} />;
       case "audio":
         return (
           <AudioWidget
@@ -446,7 +468,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      knowledgeEntries, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
@@ -571,6 +593,7 @@ export function GameBoard({
       "character",
       "inventory",
       "map",
+      "location",
       "knowledge",
       "gallery",
       "audio",

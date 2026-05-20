@@ -18,6 +18,7 @@ export type WidgetId =
   | "character"
   | "inventory"
   | "map"
+  | "location"
   | "ship"
   | "knowledge"
   | "gallery"
@@ -73,6 +74,20 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     id: "map",
     label: "Map",
     hotkey: "m",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
+    closable: true,
+    dataGated: true,
+  },
+  // Story 54-9 / ADR-109: persistent-location panel slots between Map
+  // and Knowledge. dataGated so the tab is hidden during chargen and on
+  // pre-54 worlds without a delivered manifest.
+  location: {
+    id: "location",
+    label: "Location",
+    hotkey: "l",
     minW: 3,
     minH: 3,
     defaultW: 4,
