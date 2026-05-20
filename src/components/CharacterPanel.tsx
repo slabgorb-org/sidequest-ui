@@ -225,6 +225,12 @@ export function CharacterPanel({
             }}
           >
             {character.name}
+            {/* Story 56-1: controlling player's name in MP only. Three-guard
+                gate — player_id non-empty (data present), characters defined,
+                characters.length > 1 (multiplayer signal mirroring the
+                established pattern at GameBoard.tsx:407). Defense in depth
+                alongside App.tsx, which already leaves player_id undefined
+                in SP. AC-4 single-player suppression is the load-bearing AC. */}
             {character.player_id && characters && characters.length > 1 ? (
               <span
                 data-testid="character-panel-player-name"
