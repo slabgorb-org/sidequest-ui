@@ -158,7 +158,10 @@ export interface TacticalGridData {
   readonly mask: string;
   readonly cavern_image_url: string;
   readonly cell_size: number;
-  readonly cellular: CavernCellularParams;
+  /** Generation params. Null for runtime-procedural caverns (Epic 52 / ADR-106) — the
+   *  mask BLOB does not persist size/seed/density. Renderers must derive dimensions
+   *  from the mask string when this is null. Populated for statically authored rooms. */
+  readonly cellular: CavernCellularParams | null;
   readonly derived: CavernDerivedData;
   readonly tokens: readonly TacticalToken[];
 }

@@ -17,8 +17,18 @@ const FACTION_COLOR: Record<TacticalToken["faction"], string> = {
 export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const cellSize = grid.cell_size;
-  const W = grid.cellular.size[0] * cellSize;
-  const H = grid.cellular.size[1] * cellSize;
+  // Story 52-5: runtime caverns (ADR-106) have cellular=null because the persisted
+  // mask BLOB does not carry generation params. Fall back to the mask string itself
+  // — rows are "\n"-separated; width = longest row, height = row count.
+  const [cols, rows] = grid.cellular
+    ? grid.cellular.size
+    : (() => {
+        const lines = grid.mask.split("\n");
+        const width = lines.reduce((m, line) => Math.max(m, line.length), 0);
+        return [width, lines.length] as const;
+      })();
+  const W = cols * cellSize;
+  const H = rows * cellSize;
 
   const selected = grid.tokens.find(t => t.id === selectedId) ?? null;
   const isSelectable = (t: TacticalToken) => t.faction === "player" || t.faction === "ally";

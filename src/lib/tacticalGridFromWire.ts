@@ -33,7 +33,10 @@ interface WireToken {
 
 export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
   if (p.room_type !== "cavern") return null;
-  if (!p.mask || !p.cavern_image_url || !p.cell_size || !p.cellular || !p.derived) {
+  // Story 52-5: cellular may be null for runtime-procedural caverns (ADR-106) —
+  // the mask BLOB does not persist generation params. Renderers derive dimensions
+  // from the mask string. mask + cavern_image_url + cell_size + derived stay required.
+  if (!p.mask || !p.cavern_image_url || !p.cell_size || !p.derived) {
     throw new Error(
       `tacticalGridFromWire: cavern room ${p.room_id} missing required fields`,
     );
