@@ -25,6 +25,10 @@ export const COMP_COLORS: Record<string, string> = {
   state: "#81c784",
   trope: "#ffb74d",
   combat: "#e57373",
+  // Story 54-8 / ADR-109: location subsystem — entity resolver + overlay
+  // activate/deactivate. Distinct cyan hue so the GM panel can lane the
+  // rows without conflicting with the existing palette.
+  location: "#26c6da",
   music_director: "#f06292",
   multiplayer: "#ce93d8",
   orchestrator: "#03dac6",

@@ -84,12 +84,20 @@ describe("SubsystemsTab — location lie-detector colour rule (Story 54-8)", () 
         turnCount={1}
       />,
     );
-    // Amber background colour appears in the rendered DOM. The grid cell
-    // renderer keys on THEME.amber (#ff9800) for the warn state.
-    // We search the rendered HTML in a case-insensitive way so future
-    // styling refactors (rgba(), CSS vars) still surface the colour.
+    // Amber appears in the rendered DOM. The grid cell renderer keys on
+    // THEME.amber (#ff9800) for the warn state, which jsdom serializes
+    // as `rgb(255, 152, 0)` / `rgba(255, 152, 0, 0.3)` — checking both
+    // forms keeps the assertion robust against a future styling refactor
+    // (CSS vars, hex literals, etc.) without re-pegging to one form.
     const html = container.innerHTML.toLowerCase();
-    expect(html).toContain("ff9800");
+    const hasAmber =
+      html.includes("rgb(255, 152, 0)") ||
+      html.includes("rgba(255, 152, 0") ||
+      html.includes("#ff9800");
+    expect(
+      hasAmber,
+      `Expected a lie-detector location event to render with the amber 'warn' cell colour. Got: ${html.slice(0, 400)}`,
+    ).toBe(true);
   });
 
   it("does NOT upgrade a non-lie-detector location event to warn", () => {
@@ -123,12 +131,16 @@ describe("SubsystemsTab — location lie-detector colour rule (Story 54-8)", () 
     // amber anywhere". Instead, assert green is present for the location
     // cell — proving the cell rendered as "ok", not "warn".
     const html = container.innerHTML.toLowerCase();
-    // 76, 175, 80 is THEME.green in rgba; #4caf50 is the same colour. Either
-    // form proves the ok cell rendered.
-    const hasGreen = html.includes("76,175,80") || html.includes("4caf50");
+    // 76, 175, 80 is THEME.green; jsdom serializes the React style prop
+    // as `rgba(76, 175, 80, 0.3)` (with spaces). Either rgb/rgba form
+    // OR the source hex (`#4caf50`) proves the ok cell rendered.
+    const hasGreen =
+      html.includes("rgb(76, 175, 80)") ||
+      html.includes("rgba(76, 175, 80") ||
+      html.includes("#4caf50");
     expect(
       hasGreen,
-      "Expected a non-lie-detector location event to render with the green 'ok' cell colour.",
+      `Expected a non-lie-detector location event to render with the green 'ok' cell colour. Got: ${html.slice(0, 400)}`,
     ).toBe(true);
   });
 });
