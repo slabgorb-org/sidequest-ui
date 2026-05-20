@@ -704,9 +704,12 @@ describe("CharacterPanel — wiring", () => {
 // so the component itself can be dumb — "render if non-empty, else don't."
 // This matches the existing MP-gating pattern at GameBoard.tsx:407 where
 // (characters?.length ?? 0) > 1 is the established multiplayer signal.
+// (Note: the canonical isMultiplayer at GameBoard.tsx:456-458 is broader —
+// (characters > 1) || (turnStatusEntries > 0) || activePlayerName != null.
+// This story intentionally uses only the deduped-roster signal to keep SP
+// suppression conservative; transient/edge states err toward hiding the
+// suffix until the roster settles.)
 // ---------------------------------------------------------------------------
-
-type CharacterSheetDataWithPlayer = CharacterSheetData & { player_id?: string };
 
 // A second PC in the party roster — its presence is what flips the "this is
 // MP" perception both for the component (companion subsection layout, etc.)
@@ -725,7 +728,7 @@ const SECOND_PC_SUMMARY = {
 
 describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
   it("AC-1: renders the controlling player's name inside the character header in MP", () => {
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "Sebastien",
     };
@@ -754,7 +757,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
   });
 
   it("AC-1: empty player_id renders no suffix and no dangling em-dash", () => {
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "",
     };
@@ -803,7 +806,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     // ((characters?.length ?? 0) > 1) signal — Dev's implementation must
     // honor an equivalent gate, OR App.tsx must not populate player_id in
     // SP. Either path passes this test, neither path adds a new prop.
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "Sebastien",
     };
@@ -838,7 +841,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     // Companions look like PCs in the roster layout but have no player_id.
     // A naive implementation that counts (characters + companions).length
     // would incorrectly read this as MP. Guard against that.
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "Sebastien",
     };
@@ -881,7 +884,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     // at sidequest-ui/src/App.tsx:820-869 (PARTY_STATUS → CharacterSheetData
     // build) — minimum: name/class/level/stats/abilities/class_moves/
     // backstory + player_id sourced from the matching party member.
-    const built: CharacterSheetDataWithPlayer = {
+    const built: CharacterSheetData = {
       name: "Rux",
       class: "Ranger",
       race: "Wood Elf",
@@ -926,7 +929,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     // must be verified — this test locks that the wrapper does not strip
     // or shadow the new player-name treatment.
     const { CharacterWidget } = await import("../GameBoard/widgets/CharacterWidget");
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "Sebastien",
     };
@@ -959,7 +962,7 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     // `characters`. An NPC-shaped entry — one with an empty player_id —
     // must not render a stray suffix on its row even when the surrounding
     // session is multiplayer.
-    const character: CharacterSheetDataWithPlayer = {
+    const character: CharacterSheetData = {
       ...CHARACTER,
       player_id: "Sebastien",
     };

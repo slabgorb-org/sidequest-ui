@@ -126,15 +126,14 @@ describe('CharacterSheet — Story 14-2: current location', () => {
 // Implementation assumption: CharacterSheet's `data` (CharacterSheetData)
 // grows an optional `player_id` field. The component renders the player's
 // name as a secondary-weight label inside the existing sheet header (the
-// flex row at CharacterSheet.tsx:52-71). MP-detection lives in App.tsx —
-// the component itself only checks "is player_id non-empty?"
+// flex row at CharacterSheet.tsx:57; h2 with player_id span at lines 66-76).
+// MP-detection lives in App.tsx — the component itself only checks "is
+// player_id non-empty?"
 // ---------------------------------------------------------------------------
-
-type CharacterSheetDataWithPlayer = CharacterSheetData & { player_id?: string };
 
 describe('CharacterSheet — Story 56-1: controlling player name (MP)', () => {
   it('AC-2: renders the controlling player name in the sheet header', () => {
-    const data: CharacterSheetDataWithPlayer = {
+    const data: CharacterSheetData = {
       ...BASE_DATA,
       player_id: 'James',
     };
@@ -148,7 +147,7 @@ describe('CharacterSheet — Story 56-1: controlling player name (MP)', () => {
   });
 
   it('AC-2: empty player_id renders no suffix and no dangling separator', () => {
-    const data: CharacterSheetDataWithPlayer = {
+    const data: CharacterSheetData = {
       ...BASE_DATA,
       player_id: '',
     };
@@ -181,7 +180,7 @@ describe('CharacterSheet — Story 56-1: controlling player name (MP)', () => {
     // sourced from the matching party member's player_id field. This
     // anchors the test to the production data path even when invoking
     // the sheet in isolation.
-    const built: CharacterSheetDataWithPlayer = {
+    const built: CharacterSheetData = {
       name: 'Rux',
       class: 'Ranger',
       race: 'Wood Elf',

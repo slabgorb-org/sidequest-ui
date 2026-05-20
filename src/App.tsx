@@ -853,10 +853,15 @@ function AppInner() {
           // root fields (name/class/level/portrait_url/current_location) plus
           // the nested sheet facet (stats/abilities/backstory).
           // Story 56-1: in MP, surface the controlling player's name on the
-          // sheet header. MP-detection mirrors the established gate at
-          // GameBoard.tsx (characters?.length ?? 0) > 1 — here the
-          // equivalent signal is the deduped party-member count. SP path
-          // leaves player_id undefined so the header renders character-only.
+          // sheet header. MP-detection: deduped.length > 1. The canonical
+          // isMultiplayer at GameBoard.tsx:456-458 is broader (also fires
+          // on turnStatusEntries / activePlayerName) — the deduped count
+          // is the correct signal here because it is derived directly from
+          // the PARTY_STATUS payload assembled in this same handler, before
+          // any side-channel signals are available. Erring conservative
+          // (this gate suppresses the suffix on a 1-PC payload even if a
+          // second PC's PARTY_STATUS arrives later) is appropriate for the
+          // load-bearing AC-4: single-player must not regress.
           const isMultiplayer = deduped.length > 1;
           const built: CharacterSheetData = {
             name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",

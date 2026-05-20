@@ -33,10 +33,11 @@ export interface CharacterSheetData {
   backstory: string;
   portrait_url?: string;
   current_location?: string;
-  /** Controlling player's name (== PARTY_STATUS member.player_id, which is
-   *  the player's typed displayName per the App.tsx convention). Populated
-   *  only in multiplayer sessions — App.tsx leaves this undefined in
-   *  single-player so the header renders character-name only. Story 56-1. */
+  /** Controlling player's name (== PARTY_STATUS `member.player_id` as
+   *  returned by the server; the server stores the player's login
+   *  displayName there). Populated only in multiplayer sessions — App.tsx
+   *  leaves this undefined in single-player so the header renders the
+   *  character name only. Story 56-1. */
   player_id?: string;
 }
 
