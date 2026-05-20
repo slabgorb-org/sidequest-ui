@@ -33,7 +33,24 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
         const compEvents = bucket.filter((e) => e.component === comp);
         if (compEvents.length === 0) return "empty";
         if (compEvents.some((e) => e.severity === "error")) return "error";
-        if (compEvents.some((e) => e.severity === "warning")) return "warn";
+        // Story 54-8: lie-detector events (the narrator referenced a
+        // location entity not in the manifest) are info-severity at the
+        // server but represent a contract violation. The route extractor
+        // in sidequest-server/sidequest/telemetry/spans/location.py sets
+        // fields.is_lie_detector=true; the UI promotes the cell to warn
+        // (amber) so Keith can spot narrator drift at a glance. ADR-031
+        // keeps colour logic in one place — read the explicit boolean,
+        // do not re-derive from raw attributes.
+        if (
+          compEvents.some(
+            (e) =>
+              e.severity === "warning" ||
+              (e.fields &&
+                (e.fields as Record<string, unknown>).is_lie_detector ===
+                  true),
+          )
+        )
+          return "warn";
         return "ok";
       });
       return { comp, cells };
