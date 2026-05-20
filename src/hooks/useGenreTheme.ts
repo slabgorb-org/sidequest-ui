@@ -9,8 +9,16 @@ const STYLE_TAG_ID = "genre-theme-css";
  * theme_css immediately on connect; a multi-second silence means it never
  * arrived (the ONE scenario where `--accent` silently collapses to an
  * invisible oklch(0.269) — see `THEME_CSS_FAILURE_BANNER_ID`).
+ *
+ * Playtest 2026-05-20 — bumped from 4000ms to 8000ms after the beneath_sunden
+ * solo path showed the banner flash-then-dismiss when chargen render +
+ * theme delivery raced past the 4s window. The race was real but the
+ * decision was wrong: theme arrived ~5s after connect on a cold start
+ * (chargen scene serialization + WS frame ordering), and the banner
+ * appeared then auto-dismissed — confusing for the player. 8s is comfortably
+ * past the cold-start tail; a real transport break is still caught loudly.
  */
-export const THEME_CSS_GRACE_MS = 4000;
+export const THEME_CSS_GRACE_MS = 8000;
 
 /**
  * DOM id of the loud-failure banner shown when `theme_css` never arrives
