@@ -67,6 +67,11 @@ export const MessageType = {
   // Carries TacticalGridPayload; the UI Automapper routes cavern rooms to
   // TacticalGridRenderer and settlement rooms to SettlementRoomView.
   TACTICAL_GRID: "TACTICAL_GRID",
+  // Story 54-2 / ADR-109: snapshot channel for the persistent location
+  // description (region/room prose + typed entity manifest). Server emits
+  // on room enter and on overlay-bound changes that require a full
+  // re-baseline. UI consumer in 54-9 (LocationPanel + state-mirror).
+  LOCATION_DESCRIPTION: "LOCATION_DESCRIPTION",
   // Story 54-7 / ADR-109: delta channel for encounter location overlay
   // state changes. Fires when an encounter with a non-None
   // location_overlay activates or deactivates. UI consumer in 54-9.

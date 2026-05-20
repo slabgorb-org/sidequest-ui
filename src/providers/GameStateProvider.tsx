@@ -6,7 +6,11 @@ import {
   initialStreamingState,
   type StreamingNarrationState,
 } from './streamingNarration';
-import type { NarrationDelta, NarrationMessage } from '@/types/payloads';
+import type {
+  LocationDescriptionPayload,
+  NarrationDelta,
+  NarrationMessage,
+} from '@/types/payloads';
 
 export interface CharacterState {
   name: string;
@@ -63,6 +67,14 @@ export interface ClientGameState {
    *  GameSnapshot.magic_state via state_delta on NARRATION_END. Null
    *  when the active world has no magic configured. */
   magicState?: MagicState | null;
+  /**
+   * Story 54-9 / ADR-109: persistent location description for the
+   * currently rendered region/room. Mirrored from the server's
+   * LOCATION_DESCRIPTION (snapshot) and LOCATION_OVERLAY_CHANGED (delta).
+   * Null when no manifest has been delivered yet — legacy saves and
+   * pre-54 worlds remain valid in this shape.
+   */
+  currentLocation?: LocationDescriptionPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -91,6 +103,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   location: '',
   quests: {},
   knowledge: [],
+  currentLocation: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

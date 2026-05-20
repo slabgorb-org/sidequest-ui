@@ -2001,6 +2001,7 @@ function AppInner() {
                 characterSheet={characterSheet}
                 inventoryData={inventoryData}
                 mapData={mapData}
+                currentLocation={gameState.currentLocation ?? null}
                 audio={audio}
                 nowPlaying={nowPlaying}
                 knowledgeEntries={gameState.knowledge}
