@@ -688,3 +688,326 @@ describe("CharacterPanel — wiring", () => {
     expect(typeof mod.CharacterPanel).toBe("function");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 56-1: Show controlling player's name on character displays (MP only)
+//
+// Source-of-truth context: sprint/context/context-story-56-1.md
+// - AC-1: MP CharacterPanel header shows controlling player's name.
+// - AC-4: SP path renders no player-name treatment anywhere.
+// - AC-5: NPCs / entries with empty player_id never get a suffix.
+// - AC-6: At least one wiring test exercises the production data shape.
+//
+// Implementation assumption being tested: CharacterSheetData carries an
+// optional `player_id` (the controlling player's displayName, equal to the
+// PARTY_STATUS member.player_id). App.tsx populates it only in MP sessions,
+// so the component itself can be dumb — "render if non-empty, else don't."
+// This matches the existing MP-gating pattern at GameBoard.tsx:407 where
+// (characters?.length ?? 0) > 1 is the established multiplayer signal.
+// (Note: the canonical isMultiplayer at GameBoard.tsx:456-458 is broader —
+// (characters > 1) || (turnStatusEntries > 0) || activePlayerName != null.
+// This story intentionally uses only the deduped-roster signal to keep SP
+// suppression conservative; transient/edge states err toward hiding the
+// suffix until the roster settles.)
+// ---------------------------------------------------------------------------
+
+// A second PC in the party roster — its presence is what flips the "this is
+// MP" perception both for the component (companion subsection layout, etc.)
+// and for any assertion that asks "is this an MP-context render?"
+const SECOND_PC_SUMMARY = {
+  player_id: "James",
+  name: "James",
+  character_name: "Rux",
+  hp: 12,
+  hp_max: 20,
+  status_effects: [],
+  class: "Ranger",
+  level: 2,
+  current_location: "The Rusty Cantina",
+};
+
+describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
+  it("AC-1: renders the controlling player's name inside the character header in MP", () => {
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: CHARACTER.name,
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(within(header).getByText(/Sebastien/)).toBeInTheDocument();
+  });
+
+  it("AC-1: empty player_id renders no suffix and no dangling em-dash", () => {
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          { ...SECOND_PC_SUMMARY, player_id: "Sebastien", name: "Sebastien" },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    // No em-dash + nothing after the character name. The negative case is
+    // load-bearing: a SP-style header must not have a half-baked "Kael — "
+    // trailing visual artifact.
+    expect(header.textContent ?? "").not.toMatch(/—\s*$/);
+    expect(header.textContent ?? "").not.toMatch(/—\s*undefined/i);
+    expect(header.textContent ?? "").not.toMatch(/—\s*null/i);
+  });
+
+  it("AC-1: absent player_id (undefined) renders no suffix and no dangling em-dash", () => {
+    // Same negative-case lock as the empty-string variant — undefined and
+    // empty-string must produce identical (suffix-less) rendering.
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={[
+          { ...SECOND_PC_SUMMARY, player_id: "Sebastien", name: "Sebastien" },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(header.textContent ?? "").not.toMatch(/—\s*$/);
+    expect(header.textContent ?? "").not.toMatch(/—\s*undefined/i);
+    expect(header.textContent ?? "").not.toMatch(/—\s*null/i);
+  });
+
+  it("AC-4: single-player session does NOT render a player-name suffix in the header", () => {
+    // The load-bearing AC. Even if the focused character carries a
+    // player_id (transient state between SP and MP, for example), a single-
+    // PC roster MUST suppress the treatment. App.tsx's MP-gate is the
+    // ((characters?.length ?? 0) > 1) signal — Dev's implementation must
+    // honor an equivalent gate, OR App.tsx must not populate player_id in
+    // SP. Either path passes this test, neither path adds a new prop.
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: CHARACTER.name,
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    // The player name must not appear inside the header in SP. Note we use
+    // queryByText with the header subtree — a global match could collide
+    // with the party-row testid `party-member-Sebastien` which is fine to
+    // exist (it's the roster, not the header).
+    expect(within(header).queryByText(/Sebastien/)).not.toBeInTheDocument();
+  });
+
+  it("AC-4: SP with companions array does not render a player-name suffix", () => {
+    // Companions look like PCs in the roster layout but have no player_id.
+    // A naive implementation that counts (characters + companions).length
+    // would incorrectly read this as MP. Guard against that.
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: CHARACTER.name,
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+        ]}
+        companions={[
+          {
+            name: "Bramble",
+            role: "Hireling",
+            description: "A wiry tracker.",
+            notes: "",
+            recruited_turn: 4,
+            recruited_by: CHARACTER.name,
+          },
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(within(header).queryByText(/Sebastien/)).not.toBeInTheDocument();
+  });
+
+  it("AC-6 (wiring): MP-shaped data flowing through CharacterPanel renders the player name", () => {
+    // Wiring test per sidequest-ui/CLAUDE.md "Every test suite needs a
+    // wiring test." This exercises the same data shape App.tsx assembles
+    // at sidequest-ui/src/App.tsx:820-869 (PARTY_STATUS → CharacterSheetData
+    // build) — minimum: name/class/level/stats/abilities/class_moves/
+    // backstory + player_id sourced from the matching party member.
+    const built: CharacterSheetData = {
+      name: "Rux",
+      class: "Ranger",
+      race: "Wood Elf",
+      level: 2,
+      hp: 18,
+      hp_max: 20,
+      stats: { strength: 12, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 14, charisma: 8 },
+      abilities: [makeAbility("Tracker")],
+      class_moves: [],
+      backstory: "Born under the Ashwood canopy.",
+      portrait_url: undefined,
+      current_location: "The Rusty Cantina",
+      player_id: "James",
+    };
+    render(
+      <CharacterPanel
+        character={built}
+        characters={[
+          {
+            player_id: "James",
+            name: "James",
+            character_name: "Rux",
+            hp: 18,
+            hp_max: 20,
+            status_effects: [],
+            class: "Ranger",
+            level: 2,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="James"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(within(header).getByText(/James/)).toBeInTheDocument();
+  });
+
+  it("AC-3 (inheritance): CharacterWidget wrapper renders the same player name", async () => {
+    // CharacterWidget.tsx is a 7-line passthrough of CharacterPanel. The
+    // story context says no separate edit is needed but the inheritance
+    // must be verified — this test locks that the wrapper does not strip
+    // or shadow the new player-name treatment.
+    const { CharacterWidget } = await import("../GameBoard/widgets/CharacterWidget");
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterWidget
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: CHARACTER.name,
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(within(header).getByText(/Sebastien/)).toBeInTheDocument();
+  });
+
+  it("AC-5: NPC party-row (empty player_id) does not get a player-name suffix", () => {
+    // The party roster (line ~404-525 of CharacterPanel.tsx) iterates over
+    // `characters`. An NPC-shaped entry — one with an empty player_id —
+    // must not render a stray suffix on its row even when the surrounding
+    // session is multiplayer.
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: CHARACTER.name,
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          // NPC-shaped: empty player_id is the marker. The DOM testid
+          // formula uses player_id verbatim, so an empty key would clash
+          // with itself across multiple NPCs — but for this single-NPC
+          // case the row should render without a suffix.
+          {
+            player_id: "",
+            name: "Grizelda",
+            character_name: "Grizelda",
+            hp: 6,
+            hp_max: 6,
+            status_effects: [],
+            class: "Innkeeper",
+            level: 1,
+            current_location: "The Rusty Cantina",
+          },
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    // The row for the NPC: locate by character name, then verify no
+    // controlling-player-name suffix decoration appears on the row.
+    const grizeldaCell = screen.getByText("Grizelda");
+    const row = grizeldaCell.closest("[data-testid^='party-member-']");
+    expect(row).not.toBeNull();
+    // Negative: no em-dash + name pattern (e.g. "— Grizelda" attribution).
+    // The roster row already shows the character name; what must NOT
+    // appear is an em-dash-style player-attribution dangling on the row.
+    expect((row as HTMLElement).textContent ?? "").not.toMatch(/—\s*[A-Za-z]/);
+  });
+});

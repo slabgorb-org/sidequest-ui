@@ -33,6 +33,12 @@ export interface CharacterSheetData {
   backstory: string;
   portrait_url?: string;
   current_location?: string;
+  /** Controlling player's name (== PARTY_STATUS `member.player_id` as
+   *  returned by the server; the server stores the player's login
+   *  displayName there). Populated only in multiplayer sessions — App.tsx
+   *  leaves this undefined in single-player so the header renders the
+   *  character name only. Story 56-1. */
+  player_id?: string;
 }
 
 export interface CharacterSheetProps {
@@ -58,7 +64,17 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           />
         )}
         <div>
-          <h2 className="text-2xl font-bold text-[var(--primary)]">{data.name}</h2>
+          <h2 className="text-2xl font-bold text-[var(--primary)]">
+            {data.name}
+            {data.player_id ? (
+              <span
+                data-testid="character-sheet-player-name"
+                className="ml-2 text-sm font-normal text-muted-foreground"
+              >
+                — {data.player_id}
+              </span>
+            ) : null}
+          </h2>
           <p className="text-sm text-muted-foreground">
             Level {data.level} {toDisplayName(data.class)}
           </p>
