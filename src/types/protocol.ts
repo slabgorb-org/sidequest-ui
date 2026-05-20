@@ -67,6 +67,10 @@ export const MessageType = {
   // Carries TacticalGridPayload; the UI Automapper routes cavern rooms to
   // TacticalGridRenderer and settlement rooms to SettlementRoomView.
   TACTICAL_GRID: "TACTICAL_GRID",
+  // Story 54-7 / ADR-109: delta channel for encounter location overlay
+  // state changes. Fires when an encounter with a non-None
+  // location_overlay activates or deactivates. UI consumer in 54-9.
+  LOCATION_OVERLAY_CHANGED: "LOCATION_OVERLAY_CHANGED",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

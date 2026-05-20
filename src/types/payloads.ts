@@ -753,3 +753,12 @@ export interface LocationDescriptionPayload {
   entities: LocationEntity[];
   overlays: LocationDescriptionOverlaySummary[];
 }
+
+// Story 54-7 / ADR-109: delta-channel payload for encounter location
+// overlay state changes. The overlays array carries the FULL
+// post-transition overlay set — UI replaces its overlay slice rather
+// than reconciling enter/leave events. UI consumer ships in 54-9.
+export interface LocationOverlayChangedPayload {
+  region_id: string;
+  overlays: LocationDescriptionOverlaySummary[];
+}
