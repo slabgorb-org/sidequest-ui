@@ -852,6 +852,12 @@ function AppInner() {
           // Assemble the UI-facing CharacterSheetData from the PartyMember
           // root fields (name/class/level/portrait_url/current_location) plus
           // the nested sheet facet (stats/abilities/backstory).
+          // Story 56-1: in MP, surface the controlling player's name on the
+          // sheet header. MP-detection mirrors the established gate at
+          // GameBoard.tsx (characters?.length ?? 0) > 1 — here the
+          // equivalent signal is the deduped party-member count. SP path
+          // leaves player_id undefined so the header renders character-only.
+          const isMultiplayer = deduped.length > 1;
           const built: CharacterSheetData = {
             name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
             class: (rawLocal.class as string) ?? "",
@@ -865,6 +871,9 @@ function AppInner() {
             backstory: (sheetFacet.backstory as string) ?? "",
             portrait_url: (rawLocal.portrait_url as string) || undefined,
             current_location: (rawLocal.current_location as string) ?? "",
+            player_id: isMultiplayer
+              ? ((rawLocal.player_id as string) || undefined)
+              : undefined,
           };
           setCharacterSheet(built);
         }

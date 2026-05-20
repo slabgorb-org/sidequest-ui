@@ -225,6 +225,19 @@ export function CharacterPanel({
             }}
           >
             {character.name}
+            {character.player_id && characters && characters.length > 1 ? (
+              <span
+                data-testid="character-panel-player-name"
+                className="ml-2 text-xs font-normal"
+                style={{
+                  fontFamily: FONT_BODY,
+                  color: FOLIO.inkSoft,
+                  letterSpacing: 0,
+                }}
+              >
+                — {character.player_id}
+              </span>
+            ) : null}
           </h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
           {/* Subtitle is class · race ("Beastkin · Uplifted Animal"). Was
