@@ -82,6 +82,11 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    /* Confrontation panel tokens (D2 mock, 2026-05-13). */
+    --border-soft: oklch(0 0 0 / 6%);
+    --encounter-player: oklch(0.55 0.14 240);
+    --encounter-opponent: oklch(0.62 0.16 70);
+    --accent-finisher: oklch(0.70 0.14 85);
 }
 
 .dark {
@@ -116,6 +121,11 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    /* Confrontation panel tokens (D2 mock, 2026-05-13). */
+    --border-soft: oklch(1 0 0 / 6%);
+    --encounter-player: oklch(0.72 0.12 240);
+    --encounter-opponent: oklch(0.80 0.16 70);
+    --accent-finisher: oklch(0.85 0.14 85);
 }
 
 @layer base {

@@ -677,16 +677,6 @@ export function GameBoard({
     }
   }, [availableWidgets]);
 
-  // Confrontation rendering is handled entirely by the dockview
-  // `ConfrontationWidget` tab (see `renderWidgetContent("confrontation")`
-  // and the auto-show effect above). The old bottom-docked
-  // `<ConfrontationOverlay/>` was a book-era artifact retained after the
-  // UI redesign that moved confrontations into the persistent sidebar —
-  // it double-rendered the same data AND its `fixed inset-x-0 bottom-0`
-  // positioning overlapped the InputBar, absorbing all input and blocking
-  // every action. Removed outright. The tab auto-opens on
-  // `confrontationData` arrival and auto-closes when it clears.
-
   // Running header (shared by mobile and desktop). Mobile users were
   // previously trapped in-session because the header — and its Leave button
   // — only rendered in the desktop branch (playtest 2026-04-23).
