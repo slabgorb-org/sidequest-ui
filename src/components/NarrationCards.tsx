@@ -8,6 +8,8 @@ import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
 export interface NarrationCardsProps {
   messages: GameMessage[];
   thinking?: boolean;
+  /** Genre slug — selects which loader pair drives the thinking indicator. */
+  genreSlug?: string | null;
 }
 
 /** Turn boundary kinds — a new turn card starts at these segment types. */
@@ -45,7 +47,7 @@ function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
   return turns;
 }
 
-export function NarrationCards({ messages, thinking }: NarrationCardsProps) {
+export function NarrationCards({ messages, thinking, genreSlug }: NarrationCardsProps) {
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
     [messages],
@@ -80,7 +82,7 @@ export function NarrationCards({ messages, thinking }: NarrationCardsProps) {
 
       {turns.length === 0 && <EmptyNarrationState />}
 
-      {thinking && <ThinkingIndicator className="py-4" />}
+      {thinking && <ThinkingIndicator genre={genreSlug} className="py-4" />}
     </div>
   );
 }

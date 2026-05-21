@@ -12,9 +12,11 @@ const STALL_POLL_INTERVAL_MS = 250;
 export interface NarrationScrollProps {
   messages: GameMessage[];
   thinking?: boolean;
+  /** Genre slug — selects which loader pair drives the thinking indicator. */
+  genreSlug?: string | null;
 }
 
-export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
+export function NarrationScroll({ messages, thinking, genreSlug }: NarrationScrollProps) {
   const { streamingNarration } = useGameState();
 
   const segments = useMemo(
@@ -203,10 +205,10 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
             {/* Stall interstitial — shown when a turn has been open for 5+
                 seconds with no chunks and no canonical. Gives the player a
                 clear signal the narrator is working rather than dead silence. */}
-            {shouldShowInterstitial && <NarratorConsidersInterstitial />}
+            {shouldShowInterstitial && <NarratorConsidersInterstitial genre={genreSlug} />}
           </>
         )}
-        {thinking && <ThinkingIndicator />}
+        {thinking && <ThinkingIndicator genre={genreSlug} />}
       </div>
     </div>
   );

@@ -1,0 +1,467 @@
+/* ============================================================================
+ * Genre Loaders — narration-pause dividers, one pair per genre.
+ *
+ * Source of truth: design handoff at
+ * /tmp/design-bundle/sidequest-loading-animations/project/Loaders.html
+ * (Sixteen Quiet Marks — v3 LOCKED). Rendered between narration blocks while
+ * the narrator is thinking. Tuned to feel alive without competing with the
+ * surrounding text — saturation pulled back, peak opacities ~0.55–0.85.
+ *
+ * Each loader assumes a 400×100 stage. Colors are tuned per-genre to read on
+ * that genre's authentic background, which the genre theme injects globally.
+ * ========================================================================== */
+
+.gl-stage {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  height: 100px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
+.gl-stage.gl-center {
+  justify-content: center;
+}
+
+/* ───── 01 · TEA — sage hairline draws itself ───── */
+.l-tea-rule { width: 100%; padding: 0 20px; }
+.l-tea-rule svg { display: block; }
+.l-tea-rule path {
+  fill: none; stroke: #5C7A4F; stroke-width: 1; stroke-linecap: round;
+  stroke-dasharray: 360 360;
+  opacity: 0.65;
+  animation: tea-rule 3.6s cubic-bezier(.55,0,.45,1) infinite;
+}
+@keyframes tea-rule {
+  0%   { stroke-dashoffset: 360; opacity: 0; }
+  5%   { opacity: 0.65; }
+  55%  { stroke-dashoffset: 0;   opacity: 0.65; }
+  85%  { stroke-dashoffset: 0;   opacity: 0.65; }
+  100% { stroke-dashoffset: -360; opacity: 0; }
+}
+
+/* ───── 03 · TEA — hedera ❧ trail ───── */
+.l-tea-trail { position: relative; width: 100%; height: 100%; }
+.l-tea-trail svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.l-tea-trail path {
+  fill: none; stroke: #C9A96E; stroke-width: 1.1; stroke-linecap: round;
+  stroke-dasharray: 440;
+  stroke-dashoffset: 440;
+  opacity: 0.7;
+  animation: tea-trail 4s ease-in-out infinite;
+}
+@keyframes tea-trail {
+  0%   { stroke-dashoffset: 440; opacity: 0.7; }
+  60%  { stroke-dashoffset: 0;   opacity: 0.7; }
+  80%  { stroke-dashoffset: 0;   opacity: 0.7; }
+  100% { stroke-dashoffset: 0;   opacity: 0; }
+}
+.l-tea-trail .glyph {
+  position: absolute;
+  font-family: "Lora", serif; font-style: italic;
+  color: #5C7A4F; font-size: 22px;
+  opacity: 0;
+  animation: tea-trail-glyph 4s ease-in-out infinite;
+}
+@keyframes tea-trail-glyph {
+  0%, 55% { opacity: 0; }
+  65%     { opacity: 0.6; }
+  80%     { opacity: 0.6; }
+  100%    { opacity: 0; }
+}
+
+/* ───── CA · CAVERNS — spell name calligraphy ───── */
+.l-cav-spell {
+  font-family: "IM Fell English", serif;
+  font-style: italic;
+  font-size: 30px;
+  color: rgba(212,168,67,0.82);
+  letter-spacing: 1px;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+}
+.l-cav-spell .ch {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(5px);
+  transform: translateY(2px);
+}
+.l-cav-spell .ch.in  { animation: cav-spell-in  720ms cubic-bezier(.2,.7,.3,1) forwards; }
+.l-cav-spell .ch.out { animation: cav-spell-out 540ms ease-in forwards; }
+@keyframes cav-spell-in {
+  0%   { opacity: 0;    filter: blur(5px); transform: translateY(2px); }
+  100% { opacity: 0.82; filter: blur(0);   transform: translateY(0);   }
+}
+@keyframes cav-spell-out {
+  0%   { opacity: 0.82; filter: blur(0);   }
+  100% { opacity: 0;    filter: blur(4px); }
+}
+
+/* ───── CB · CAVERNS — old-school D&D room sketch ───── */
+.l-cav-room { width: 100%; height: 100%; position: relative; }
+.l-cav-room svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.l-cav-room path {
+  fill: none; stroke: #D4A843; stroke-width: 1.4;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.l-cav-room .walls {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0.78;
+  animation: cav-room-walls 4.6s ease-in-out infinite;
+}
+@keyframes cav-room-walls {
+  0%   { stroke-dashoffset: 100; opacity: 0.78; }
+  42%  { stroke-dashoffset: 0;   opacity: 0.78; }
+  82%  { stroke-dashoffset: 0;   opacity: 0.78; }
+  100% { stroke-dashoffset: 0;   opacity: 0;    }
+}
+.l-cav-room .door path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: 0;
+}
+.l-cav-room .door.d1 path { animation: cav-room-d1 4.6s ease-in-out infinite; }
+.l-cav-room .door.d2 path { animation: cav-room-d2 4.6s ease-in-out infinite; }
+@keyframes cav-room-d1 {
+  0%, 44%  { stroke-dashoffset: 100; opacity: 0; }
+  48%      { stroke-dashoffset: 100; opacity: 0.78; }
+  58%      { stroke-dashoffset: 0;   opacity: 0.78; }
+  82%      { stroke-dashoffset: 0;   opacity: 0.78; }
+  100%     { stroke-dashoffset: 0;   opacity: 0; }
+}
+@keyframes cav-room-d2 {
+  0%, 58%  { stroke-dashoffset: 100; opacity: 0; }
+  62%      { stroke-dashoffset: 100; opacity: 0.78; }
+  72%      { stroke-dashoffset: 0;   opacity: 0.78; }
+  82%      { stroke-dashoffset: 0;   opacity: 0.78; }
+  100%     { stroke-dashoffset: 0;   opacity: 0; }
+}
+
+/* ───── 07 · WASTELAND — hazard bar ───── */
+.l-wst-bar {
+  width: 360px; height: 8px; margin: 0 auto;
+  position: relative; overflow: hidden;
+  border-top: 1px solid rgba(255,102,0,0.18);
+  border-bottom: 1px solid rgba(255,102,0,0.18);
+  background: rgba(255,102,0,0.03);
+}
+.l-wst-bar::before {
+  content:''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    -68deg,
+    rgba(255,102,0,0.22) 0 8px,
+    transparent 8px 16px
+  );
+  animation: wst-bar-move 2.6s linear infinite;
+}
+@keyframes wst-bar-move {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-32px); }
+}
+
+/* ───── 08 · WASTELAND — geiger spike scroll ───── */
+.l-wst-wave { width: 100%; height: 100%; position: relative; overflow: hidden; }
+.l-wst-wave .baseline {
+  position: absolute; top: 50%; left: 20px; right: 20px;
+  height: 1px; background: rgba(74,124,46,0.25);
+}
+.l-wst-wave svg {
+  position: absolute; top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 800px; height: 100%;
+  animation: wst-wave-scroll 6s linear infinite;
+}
+.l-wst-wave svg path {
+  fill: none; stroke: #4a7c2e; stroke-width: 1.2; stroke-linejoin: miter;
+  opacity: 0.55;
+}
+@keyframes wst-wave-scroll {
+  from { transform: translate(0, -50%); }
+  to   { transform: translate(-400px, -50%); }
+}
+
+/* ───── 09 · SPACE OPERA — targeting computer HUD ───── */
+.l-so-hud { position: relative; width: 360px; height: 84px; margin: 0 auto; }
+.l-so-hud svg { display: block; }
+.l-so-hud .reticle {
+  animation: so-hud-reticle 1.8s ease-in-out infinite;
+  transform-origin: 180px 36px;
+}
+@keyframes so-hud-reticle {
+  0%,100% { opacity: 0.7; }
+  50%     { opacity: 1; transform: scale(1.08); }
+}
+.l-so-hud .scan { animation: so-hud-scan 2.4s linear infinite; }
+@keyframes so-hud-scan {
+  0%   { transform: translateX(-160px); opacity: 0; }
+  30%  { opacity: 0.8; }
+  100% { transform: translateX( 160px); opacity: 0; }
+}
+.l-so-hud .readout {
+  position: absolute; left: 50%; bottom: 0;
+  transform: translateX(-50%);
+  display: flex; gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid rgba(255,48,48,0.45);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.5);
+  font-family: "Share Tech Mono", monospace;
+  color: rgba(255,48,48,0.75);
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.l-so-hud .readout b { font-weight: normal; }
+
+/* ───── 10 · SPACE OPERA — lightspeed jump ───── */
+.l-so-hyper {
+  position: relative; width: 100%; height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(74,144,217,0.10), transparent 65%);
+}
+.l-so-hyper .core {
+  position: absolute; top: 50%; left: 50%;
+  width: 5px; height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  background: rgba(255,255,255,0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255,255,255,0.4), 0 0 16px rgba(74,144,217,0.35);
+  animation: so-core 2s ease-in-out infinite;
+}
+@keyframes so-core {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.18); }
+}
+.l-so-hyper i {
+  position: absolute; top: 50%; left: 50%;
+  width: 0; height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.55));
+  transform-origin: 0 50%;
+  animation: so-hyper 1.4s linear infinite;
+}
+@keyframes so-hyper {
+  0%   { width: 0;     opacity: 0; }
+  15%  { opacity: 1; }
+  100% { width: 260px; opacity: 0; }
+}
+
+/* ───── 12 · ELEMENTAL — sumi-e brush horizontal ───── */
+.l-ele-brush { width: 100%; height: 100%; position: relative; }
+.l-ele-brush svg { width: 100%; height: 100%; display: block; }
+.l-ele-brush path.s {
+  fill: none; stroke: #1F5038; stroke-linecap: round;
+  stroke-width: 6;
+  stroke-dasharray: 480;
+  stroke-dashoffset: 480;
+  opacity: 0.75;
+  animation: ele-brush 3.6s cubic-bezier(.5,0,.5,1) infinite;
+}
+@keyframes ele-brush {
+  0%   { stroke-dashoffset: 480; opacity: 0.75; }
+  55%  { stroke-dashoffset: 0;   opacity: 0.75; }
+  80%  { stroke-dashoffset: 0;   opacity: 0.75; }
+  100% { stroke-dashoffset: 0;   opacity: 0; }
+}
+.l-ele-brush .seal {
+  position: absolute;
+  right: 30px; top: 50%; margin-top: -7px;
+  width: 12px; height: 12px;
+  background: #9E3520;
+  opacity: 0;
+  animation: ele-seal 3.6s ease-out infinite;
+}
+@keyframes ele-seal {
+  0%, 56%   { opacity: 0; transform: scale(0.5) rotate(-12deg); }
+  62%       { opacity: 0.85; transform: scale(1.1) rotate(0); }
+  80%, 100% { opacity: 0.75; transform: scale(1) rotate(0); }
+}
+
+/* ───── 13 · ELEMENTAL — ripples on baseline ───── */
+.l-ele-ripple { position: relative; width: 100%; height: 100%; }
+.l-ele-ripple .baseline {
+  position: absolute; top: 50%; left: 24px; right: 24px;
+  height: 1px; background: rgba(31,80,56,0.25);
+}
+.l-ele-ripple .drop {
+  position: absolute; top: 50%; left: 50%;
+  width: 14px; height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 1px solid #1F5038;
+  opacity: 0;
+  animation: ele-ripple 2.4s ease-out infinite;
+}
+.l-ele-ripple .drop:nth-child(3) { animation-delay: 0.8s; left: 30%; }
+.l-ele-ripple .drop:nth-child(4) { animation-delay: 1.6s; left: 70%; }
+@keyframes ele-ripple {
+  0%   { transform: scale(0.3); opacity: 0; }
+  20%  { opacity: 0.5; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+/* ───── 15 · LOW FANTASY — quill scrape ───── */
+.l-lf-quill { position: relative; width: 100%; height: 100%; }
+.l-lf-quill .line {
+  position: absolute; top: 50%; left: 30px; right: 30px;
+  height: 1.5px; background: rgba(107,68,35,0.15);
+}
+.l-lf-quill .ink {
+  position: absolute; top: 50%; left: 30px;
+  height: 1.5px; background: #2D2418;
+  width: 0;
+  opacity: 0.8;
+  transform: translateY(-50%);
+  animation: lf-ink 4s linear infinite;
+}
+@keyframes lf-ink {
+  0%   { width: 0; opacity: 0.8; }
+  60%  { width: 340px; opacity: 0.8; }
+  80%  { width: 340px; opacity: 0.8; }
+  100% { width: 340px; opacity: 0; }
+}
+.l-lf-quill .nib {
+  position: absolute; top: 50%; left: 30px;
+  transform: translate(-2px, -100%) rotate(28deg);
+  transform-origin: 0 100%;
+  width: 4px; height: 28px;
+  background: linear-gradient(180deg, #2D2418, #6B4423);
+  border-radius: 0 50% 50% 50%;
+  animation: lf-nib 4s linear infinite;
+}
+@keyframes lf-nib {
+  0%   { left: 30px; opacity: 1; }
+  60%  { left: 370px; opacity: 1; }
+  65%  { opacity: 0; }
+  100% { left: 30px; opacity: 0; }
+}
+
+/* ───── LB · LOW FANTASY — illuminated initial ───── */
+.l-lf-initial {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+}
+.l-lf-initial .frame {
+  position: absolute; top: 50%; left: 50%;
+  width: 78px; height: 78px;
+  transform: translate(-50%,-50%);
+  border: 1px solid rgba(107,68,35,0.25);
+}
+.l-lf-initial .frame::before,
+.l-lf-initial .frame::after {
+  content:''; position: absolute;
+  width: 10px; height: 10px;
+  border: 1px solid rgba(107,68,35,0.35);
+}
+.l-lf-initial .frame::before { top: -4px;    left: -4px;    border-right: none; border-bottom: none; }
+.l-lf-initial .frame::after  { bottom: -4px; right: -4px;   border-left: none;  border-top: none;    }
+.l-lf-initial .letter {
+  position: relative;
+  font-family: "EB Garamond", serif;
+  font-weight: 400;
+  font-size: 64px;
+  line-height: 1;
+  color: rgba(107,68,35,0);
+  -webkit-text-stroke: 1px rgba(107,68,35,0.7);
+  text-shadow: 0 0 0 transparent;
+  animation: lf-initial 3.8s ease-in-out infinite;
+}
+@keyframes lf-initial {
+  0%   { color: rgba(107,68,35,0);    -webkit-text-stroke-color: rgba(107,68,35,0);    }
+  12%  {                              -webkit-text-stroke-color: rgba(107,68,35,0.7);  }
+  55%  { color: rgba(107,68,35,0.72); -webkit-text-stroke-color: rgba(107,68,35,0.7);  }
+  82%  { color: rgba(107,68,35,0.72); }
+  100% { color: rgba(107,68,35,0);    -webkit-text-stroke-color: rgba(107,68,35,0);    }
+}
+
+/* ───── 17 · NEON — ASCII bar fill ───── */
+.l-neon-ascii {
+  font-family: "Share Tech Mono", monospace;
+  color: rgba(0,255,255,0.6);
+  font-size: 18px;
+  letter-spacing: 1px;
+  white-space: pre;
+  text-align: center;
+  width: 100%;
+}
+.l-neon-ascii .label {
+  font-family: "Orbitron", monospace;
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  color: rgba(57,255,20,0.5);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  display: block;
+}
+
+/* ───── 18 · NEON — hex decrypt ───── */
+.l-neon-hex {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 16px;
+  color: rgba(255,0,255,0.5);
+  letter-spacing: 2px;
+  text-align: center;
+  width: 100%;
+}
+.l-neon-hex .resolved { color: rgba(0,255,255,0.8); }
+.l-neon-hex .label {
+  font-family: "Orbitron", monospace;
+  font-size: 9px; letter-spacing: 0.3em;
+  color: rgba(57,255,20,0.5); margin-bottom: 6px;
+  text-transform: uppercase;
+  display: block;
+}
+
+/* ───── 19 · NOIR — typewriter ───── */
+.l-noir-type {
+  font-family: "Special Elite", "Limelight", serif;
+  color: rgba(196,163,90,0.78);
+  font-size: 19px;
+  letter-spacing: 1px;
+  text-align: center;
+  width: 100%;
+}
+.l-noir-type .label {
+  display: block;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 9px; letter-spacing: 0.3em;
+  color: rgba(196,163,90,0.4);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.l-noir-type .cur {
+  display: inline-block; width: 0.5em; background: rgba(196,163,90,0.78);
+  height: 0.95em; vertical-align: -0.1em;
+  animation: noir-blink 0.7s steps(2,start) infinite;
+  margin-left: 1px;
+}
+@keyframes noir-blink { 50% { opacity: 0; } }
+
+/* ───── 20 · NOIR — redacted blocks ───── */
+.l-noir-redact {
+  display: flex; gap: 6px; justify-content: center;
+  align-items: center;
+  width: 100%; height: 100%;
+}
+.l-noir-redact i {
+  display: block;
+  height: 12px;
+  background: rgba(196,163,90,0.6);
+  opacity: 0.6;
+  animation: noir-redact 3.2s ease-in-out infinite;
+}
+/* Design HTML referenced `noir-redact` without defining the keyframes.
+ * Adding a quiet scale-in/out so the bars register as breathing dividers
+ * rather than dead static. (Design author note: this matches the intent
+ * implied by the JS that sets per-bar `transformOrigin` alternating
+ * left/right; without scaleX the transformOrigin is meaningless.) */
+@keyframes noir-redact {
+  0%, 100% { transform: scaleX(0.15); opacity: 0.35; }
+  50%      { transform: scaleX(1);    opacity: 0.7;  }
+}
