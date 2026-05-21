@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BookOpen, User, Map, Package, BookMarked, Image } from "lucide-react";
+import { BookOpen, User, Map, MapPin, Package, BookMarked, Image } from "lucide-react";
 import type { WidgetId } from "./widgetRegistry";
 
 interface MobileTab {
@@ -12,6 +12,11 @@ const TABS: MobileTab[] = [
   { id: "narrative", label: "Story", icon: <BookOpen size={18} /> },
   { id: "character", label: "Character", icon: <User size={18} /> },
   { id: "map", label: "Map", icon: <Map size={18} /> },
+  // Capability-gated like every non-narrative tab: only renders when
+  // `location` is in availableWidgets (region / room_graph worlds). Kept in
+  // sync with the desktop dockview rightGroupOrder so the Location tab has
+  // layout parity instead of being desktop-only.
+  { id: "location", label: "Location", icon: <MapPin size={18} /> },
   { id: "inventory", label: "Items", icon: <Package size={18} /> },
   { id: "gallery", label: "Gallery", icon: <Image size={18} /> },
   { id: "knowledge", label: "Journal", icon: <BookMarked size={18} /> },

@@ -2033,6 +2033,11 @@ function AppInner() {
                 companions={partyCompanions}
                 genreSlug={currentGenre ?? undefined}
                 worldSlug={currentWorld ?? undefined}
+                navMode={
+                  genres[currentGenre ?? ""]?.worlds.find(
+                    (w) => w.slug === currentWorld,
+                  )?.navigation_mode ?? undefined
+                }
                 turnStatusEntries={turnStatusEntries}
                 layoutMode={layoutMode}
                 magicState={gameState.magicState ?? null}

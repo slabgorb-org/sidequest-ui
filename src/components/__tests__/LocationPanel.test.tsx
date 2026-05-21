@@ -38,6 +38,16 @@ describe("LocationPanel (Story 54-9)", () => {
     expect(screen.getByTestId("location-empty")).toBeTruthy();
   });
 
+  it("renders a loading-flavored empty state (tab is present before content arrives)", () => {
+    // The Location tab is now gated on the world's stable navigation mode,
+    // so it appears before any LOCATION_DESCRIPTION has arrived. The null
+    // state must read as "loading", not "there is no location here".
+    render(<LocationPanel data={null} />);
+    expect(
+      screen.getByTestId("location-empty").textContent?.toLowerCase(),
+    ).toContain("gathering your bearings");
+  });
+
   it("renders the region_id as a header", () => {
     render(<LocationPanel data={payload()} />);
     expect(screen.getByTestId("location-header")).toBeTruthy();

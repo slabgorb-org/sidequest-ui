@@ -148,6 +148,15 @@ export interface GameBoardProps {
    * that state (dataGated, gated in availableWidgets below).
    */
   currentLocation?: LocationDescriptionPayload | null;
+  /**
+   * The active world's cartography navigation mode (`"region"` /
+   * `"room_graph"` / `"hierarchical"`), or undefined when the world has no
+   * location capability. Sourced from the `/api/genres` WorldMeta. The
+   * Location tab's *existence* is gated on this STABLE signal rather than on
+   * `currentLocation` presence, so it does not flicker in/out when a reconnect
+   * re-baselines `currentLocation` to null (2026-05-21 glenross playtest).
+   */
+  navMode?: string;
   audio?: ReturnType<typeof useAudio>;
   nowPlaying?: NowPlaying | null;
   // journalEntries prop removed playtest 2026-04-11 along with the Handouts
@@ -251,6 +260,7 @@ export function GameBoard({
   companions = [],
   genreSlug,
   worldSlug,
+  navMode,
   depletions,
   resourceAlerts,
   magicState,
@@ -298,14 +308,21 @@ export function GameBoard({
     available.add("gallery");
     available.add("audio");
     if (worldSlug === "coyote_star") available.add("ship");
-    // Story 54-9 / ADR-109: Location tab appears only when a manifest
-    // has been delivered. Hidden during chargen, on legacy saves with
-    // no manifest yet, and in pre-54 worlds. The post-mount sync effect
-    // below adds the panel to dockview when currentLocation transitions
-    // null → non-null mid-session.
-    if (currentLocation) available.add("location");
+    // Story 54-9 / ADR-109: the Location tab is gated on the world's STABLE
+    // navigation mode (region / room_graph), NOT on whether a
+    // LOCATION_DESCRIPTION has arrived. Gating on the transient
+    // `currentLocation` made the tab blink in/out on every reconnect (a
+    // --reload restart re-baselines it to null) — Keith flagged this as
+    // "confusing ui" in the 2026-05-21 glenross playtest. With a stable
+    // signal the tab is present from mount for cartography worlds and the
+    // panel renders a loading state until content arrives; worlds with no
+    // cartography (navMode undefined) never show the tab. `hierarchical` is
+    // not yet wired into any live world, so it is intentionally excluded.
+    if (navMode === "region" || navMode === "room_graph") {
+      available.add("location");
+    }
     return available;
-  }, [worldSlug, currentLocation]);
+  }, [worldSlug, navMode]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
