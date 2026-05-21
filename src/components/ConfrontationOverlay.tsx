@@ -45,6 +45,13 @@ export interface BeatOption {
   resolution?: boolean;
   /** Tag created when this beat resolves; required for kind=angle. */
   target_tag?: string;
+  /**
+   * Optional one-line italic flavor hint, authored per beat in pack YAML
+   * and threaded through `BeatDef.flavor` on the server (D2 confrontation
+   * panel, 2026-05-13). Takes precedence over the per-beat-id fallback
+   * library below; when both are absent the flavor row collapses.
+   */
+  flavor?: string;
 }
 
 export interface StatValue {
@@ -199,13 +206,12 @@ const SIDE_LABEL: Record<MetricSide, string> = {
 
 // Player edge cool blue; opponent edge amber/red — matches the UX addendum
 // recommendation (Adora Belle Dearheart, 2026-04-25) and the D2 mock palette.
-const SIDE_FILL_CLASS: Record<MetricSide, string> = {
-  player: "bg-sky-500",
-  opponent: "bg-amber-500",
-};
-const SIDE_TEXT_CLASS: Record<MetricSide, string> = {
-  player: "text-sky-400",
-  opponent: "text-amber-400",
+// Backed by --encounter-player / --encounter-opponent tokens (D2 handoff,
+// 2026-05-13). Inline-styled because the oklch hues sit outside the
+// Tailwind palette; switching to the tokens keeps theme overrides honest.
+const SIDE_COLOR_VAR: Record<MetricSide, string> = {
+  player: "var(--encounter-player)",
+  opponent: "var(--encounter-opponent)",
 };
 
 function EdgeBar({
@@ -227,7 +233,8 @@ function EdgeBar({
       className="flex-1 flex items-center gap-1.5 min-w-0"
     >
       <span
-        className={`text-[9px] uppercase tracking-wider font-semibold flex-shrink-0 ${SIDE_TEXT_CLASS[side]}`}
+        className="text-[9px] uppercase tracking-wider font-semibold flex-shrink-0"
+        style={{ color: SIDE_COLOR_VAR[side] }}
         aria-label={`${side === "player" ? "Player" : "Opponent"} edge`}
       >
         {SIDE_LABEL[side]}
@@ -235,8 +242,12 @@ function EdgeBar({
       <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden min-w-[24px]">
         <div
           data-testid="metric-bar-fill"
-          className={`h-full transition-all duration-300 ${SIDE_FILL_CLASS[side]} ${atThreshold ? "animate-pulse" : ""}`}
-          style={{ width: `${fillPct}%` }}
+          className={`h-full transition-all duration-300 ${atThreshold ? "animate-pulse" : ""}`}
+          style={{
+            width: `${fillPct}%`,
+            background: SIDE_COLOR_VAR[side],
+            boxShadow: atThreshold ? `0 0 8px ${SIDE_COLOR_VAR[side]}` : undefined,
+          }}
         />
       </div>
       <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
@@ -249,7 +260,13 @@ function EdgeBar({
 
 function StatusLine({ data }: { data: ConfrontationData }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-1.5 rounded-md bg-muted/30 border border-border/30 mb-2">
+    <div
+      className="flex items-center gap-3 px-3 py-1.5 rounded-md mb-2 border"
+      style={{
+        background: "oklch(0.21 0.008 80)",
+        borderColor: "var(--border-soft)",
+      }}
+    >
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {data.actors.map((a, i) => (
           <span key={a.name} className="flex items-center gap-1.5">
@@ -288,11 +305,20 @@ function BeatTile({
   const base = beat.base ?? 1;
   const color = riskColor(base);
   const finisher = !!beat.resolution;
-  const flavor = BEAT_FLAVOR[beat.id];
+  // Pack-authored flavor wins; fall back to the local id-keyed library so
+  // beats that ship without a wire-side flavor still render with character.
+  const flavor = beat.flavor ?? BEAT_FLAVOR[beat.id];
   const tooltip = beat.risk
     ? `${beat.label} (${beat.stat_check}) — ${beat.risk}`
     : `${beat.label} (${beat.stat_check})`;
 
+  // Surfaces are inline because the spec hues sit outside the Tailwind
+  // scale. Hover swaps the bg via a CSS variable so the rule stays in one
+  // place instead of two near-duplicate Tailwind classes.
+  const normalBg = "oklch(0.22 0.008 80)";
+  const normalHover = "oklch(0.24 0.008 80)";
+  const finisherBg = "color-mix(in oklab, var(--accent-finisher) 7%, var(--card))";
+  const finisherHover = "color-mix(in oklab, var(--accent-finisher) 11%, var(--card))";
   return (
     <button
       type="button"
@@ -301,15 +327,18 @@ function BeatTile({
       data-resolution={finisher ? "true" : undefined}
       data-risk={Math.min(1, Math.abs(base) / 10).toFixed(2)}
       onClick={() => onSelect?.(beat.id)}
-      className={[
-        "relative text-left cursor-pointer rounded-md transition-colors",
-        "grid gap-1 min-h-[84px] px-2.5 pl-3.5 py-2",
-        "border bg-muted/20 hover:bg-muted/40",
-        finisher ? "border-amber-400/60 bg-amber-500/5" : "border-border/50",
-      ].join(" ")}
+      className="relative text-left cursor-pointer rounded-md transition-colors grid gap-1 min-h-[84px] px-2.5 pl-3.5 py-2 border"
       style={{
         gridTemplateRows: "auto auto 1fr auto",
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
+        background: finisher ? finisherBg : normalBg,
+        borderColor: finisher ? "var(--accent-finisher)" : "var(--border)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = finisher ? finisherHover : normalHover;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = finisher ? finisherBg : normalBg;
       }}
     >
       {/* Risk color stripe — dynamic hue, inline */}
@@ -333,7 +362,8 @@ function BeatTile({
           <span
             aria-label="resolution beat"
             title="Resolution — can end the confrontation"
-            className="text-amber-400 text-[12px] font-bold leading-none flex-shrink-0"
+            className="text-[12px] font-bold leading-none flex-shrink-0"
+            style={{ color: "var(--accent-finisher)" }}
           >
             ✦
           </span>
@@ -521,10 +551,15 @@ export function ConfrontationOverlay({
       data-genre={data.genre_slug}
       className="confrontation-panel bg-card/60 border-t border-border/40 px-3 pt-2 pb-1"
     >
-      {/* Phase 5 (Story 47-3): branch-explicit outcome reveal. */}
-      {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
-
       <StatusLine data={data} />
+
+      {/*
+       * Phase 5 (Story 47-3): branch-explicit outcome reveal.
+       * D2 handoff (2026-05-13) re-anchors the reveal between the status
+       * line and the beat grid so it reads as "what just resolved" sitting
+       * above the next move-set rather than detached above the dial row.
+       */}
+      {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
 
       <BeatGrid beats={data.beats} onSelect={onBeatSelect} />
 
