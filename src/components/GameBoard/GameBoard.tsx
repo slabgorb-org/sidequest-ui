@@ -408,7 +408,7 @@ export function GameBoard({
   const renderWidgetContent = useCallback((id: WidgetId): ReactNode => {
     switch (id) {
       case "narrative":
-        return <NarrativeWidget messages={messages} thinking={thinking} />;
+        return <NarrativeWidget messages={messages} thinking={thinking} genreSlug={genreSlug} />;
       case "character":
         return characterSheet ? (
           <CharacterWidget

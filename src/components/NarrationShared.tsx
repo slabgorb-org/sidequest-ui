@@ -1,4 +1,32 @@
-export function ThinkingIndicator({ className }: { className?: string }) {
+import { GenreLoader } from "./GenreLoader";
+import { hasGenreLoader } from "./GenreLoader.constants";
+
+/**
+ * The narrator-thinking divider that sits between user input and the next
+ * narration block. When a genre with designed loaders is active (any of the 8
+ * genres covered by the "Sixteen Quiet Marks" handoff), the GenreLoader
+ * renders one of that genre's two loaders, randomised per mount. Otherwise we
+ * fall back to the diamond triplet — an explicit, documented fallback for
+ * genres that haven't received a designed pair yet (road_warrior,
+ * spaghetti_western, heavy_metal).
+ */
+export function ThinkingIndicator({
+  genre,
+  className,
+}: {
+  genre?: string | null;
+  className?: string;
+}) {
+  if (hasGenreLoader(genre)) {
+    return (
+      <div
+        data-testid="thinking-indicator"
+        className={`flex items-center justify-center ${className ?? "py-2"}`}
+      >
+        <GenreLoader genre={genre as string} />
+      </div>
+    );
+  }
   return (
     <div
       data-testid="thinking-indicator"
@@ -21,7 +49,24 @@ export function EmptyNarrationState() {
   );
 }
 
-export function NarratorConsidersInterstitial({ className }: { className?: string }) {
+export function NarratorConsidersInterstitial({
+  genre,
+  className,
+}: {
+  genre?: string | null;
+  className?: string;
+}) {
+  if (hasGenreLoader(genre)) {
+    return (
+      <div
+        data-testid="narrator-considers"
+        className={`flex flex-col items-center justify-center gap-2 text-muted-foreground/40 ${className ?? "py-2"}`}
+      >
+        <GenreLoader genre={genre as string} />
+        <span className="text-sm italic">The narrator considers...</span>
+      </div>
+    );
+  }
   return (
     <div
       data-testid="narrator-considers"

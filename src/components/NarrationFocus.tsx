@@ -7,6 +7,8 @@ import { ThinkingIndicator } from "./NarrationShared";
 export interface NarrationFocusProps {
   messages: GameMessage[];
   thinking?: boolean;
+  /** Genre slug — selects which loader pair drives the thinking indicator. */
+  genreSlug?: string | null;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface NarrationFocusProps {
  * gallery notice, raw player action text) was its own page — so the player
  * read one sentence at a time and typically landed on a side-effect toast.
  */
-export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
+export function NarrationFocus({ messages, thinking, genreSlug }: NarrationFocusProps) {
   const pages = useMemo(
     () => buildTurnPages(buildSegments(messages)),
     [messages],
@@ -61,7 +63,7 @@ export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
         )}
       </div>
 
-      {thinking && <ThinkingIndicator />}
+      {thinking && <ThinkingIndicator genre={genreSlug} />}
 
       <div className="flex items-center justify-center gap-4 py-4 border-t border-border/30">
         <button

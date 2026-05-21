@@ -9,9 +9,11 @@ export interface NarrativeViewProps {
   thinking?: boolean;
   /** When provided, overrides the hook-based layout mode (single source of truth from parent). */
   layoutMode?: LayoutMode;
+  /** Genre slug — passes through to the narrator-thinking indicator. */
+  genreSlug?: string | null;
 }
 
-export function NarrativeView({ messages, thinking, layoutMode }: NarrativeViewProps) {
+export function NarrativeView({ messages, thinking, layoutMode, genreSlug }: NarrativeViewProps) {
   const { mode: hookMode } = useLayoutMode();
   const mode = layoutMode ?? hookMode;
 
@@ -22,7 +24,7 @@ export function NarrativeView({ messages, thinking, layoutMode }: NarrativeViewP
 
   return (
     <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
-      <LayoutComponent messages={messages} thinking={thinking} />
+      <LayoutComponent messages={messages} thinking={thinking} genreSlug={genreSlug} />
     </div>
   );
 }
