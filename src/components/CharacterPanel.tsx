@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { CSSProperties } from "react";
-import type { CharacterSheetData, AbilityDefinition } from "./CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition, ClassMove } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
@@ -862,7 +862,7 @@ export function AbilitiesContent({
   characterId,
 }: {
   abilities: AbilityDefinition[];
-  class_moves: string[];
+  class_moves: ClassMove[];
   magicState: MagicState | null;
   characterId: string;
 }) {
@@ -902,7 +902,8 @@ export function AbilitiesContent({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {class_moves.map((m) => (
               <span
-                key={m}
+                key={m.id}
+                title={m.description ?? undefined}
                 style={{
                   padding: "2px 8px",
                   background: FOLIO.paper2,
@@ -910,9 +911,10 @@ export function AbilitiesContent({
                   fontFamily: FONT_BODY,
                   fontSize: 13,
                   color: FOLIO.ink,
+                  cursor: m.description ? "help" : "default",
                 }}
               >
-                {m}
+                {m.label}
               </span>
             ))}
           </div>

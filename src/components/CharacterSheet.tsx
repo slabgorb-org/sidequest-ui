@@ -10,6 +10,15 @@ export interface AbilityDefinition {
   reference_url?: string | null;
 }
 
+/** A resolved class move (confrontation beat) for the Abilities panel.
+ *  Mirrors the server's protocol `ClassMove` (id + label + optional
+ *  description). The UI renders `label` with `description` as a tooltip. */
+export interface ClassMove {
+  id: string;
+  label: string;
+  description?: string;
+}
+
 export interface CharacterSheetData {
   name: string;
   class: string;
@@ -35,7 +44,11 @@ export interface CharacterSheetData {
   hp_max?: number;
   stats: Record<string, number>;
   abilities: AbilityDefinition[];
-  class_moves: string[];
+  /** Resolved confrontation-beat choices for the Abilities panel. Each carries
+   *  the human label + an optional description (server resolves the bare beat
+   *  id via /api/.. CharacterSheetDetails.class_moves). Playtest 2026-05-21:
+   *  these used to render as raw snake_case ids. */
+  class_moves: ClassMove[];
   backstory: string;
   portrait_url?: string;
   current_location?: string;

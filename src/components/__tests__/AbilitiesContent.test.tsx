@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AbilitiesContent } from "../CharacterPanel";
-import type { AbilityDefinition } from "../CharacterSheet";
+import type { AbilityDefinition, ClassMove } from "../CharacterSheet";
 
 const cleric_turn_undead: AbilityDefinition = {
   name: "Turn Undead",
@@ -10,6 +10,12 @@ const cleric_turn_undead: AbilityDefinition = {
   involuntary: false,
   source: "Class",
 };
+
+const move = (id: string, label: string, description?: string): ClassMove => ({
+  id,
+  label,
+  description,
+});
 
 describe("AbilitiesContent — four-section restructure", () => {
   it("never renders 'No abilities.'", () => {
@@ -28,7 +34,7 @@ describe("AbilitiesContent — four-section restructure", () => {
     render(
       <AbilitiesContent
         abilities={[cleric_turn_undead]}
-        class_moves={["pray", "shield_bash", "turn_undead"]}
+        class_moves={[move("pray", "Pray")]}
         magicState={null}
         characterId="c1"
       />,
@@ -37,25 +43,46 @@ describe("AbilitiesContent — four-section restructure", () => {
     expect(screen.getByText(/raises the holy symbol/i)).toBeInTheDocument();
   });
 
-  it("renders class_moves as a chip row", () => {
+  it("renders class_moves as labeled chips, not raw snake_case ids", () => {
     render(
       <AbilitiesContent
         abilities={[]}
-        class_moves={["pray", "shield_bash", "turn_undead"]}
+        class_moves={[
+          move("cross_examine", "Cross-Examine"),
+          move("present_argument", "Present Argument"),
+        ]}
         magicState={null}
         characterId="c1"
       />,
     );
-    expect(screen.getByText("pray")).toBeInTheDocument();
-    expect(screen.getByText("shield_bash")).toBeInTheDocument();
-    expect(screen.getByText("turn_undead")).toBeInTheDocument();
+    // Human labels render…
+    expect(screen.getByText("Cross-Examine")).toBeInTheDocument();
+    expect(screen.getByText("Present Argument")).toBeInTheDocument();
+    // …and the raw beat ids do NOT leak into the DOM.
+    expect(screen.queryByText("cross_examine")).not.toBeInTheDocument();
+    expect(screen.queryByText("present_argument")).not.toBeInTheDocument();
+  });
+
+  it("surfaces a class-move description as a tooltip (title attribute)", () => {
+    render(
+      <AbilitiesContent
+        abilities={[]}
+        class_moves={[
+          move("cross_examine", "Cross-Examine", "Pick apart the testimony."),
+        ]}
+        magicState={null}
+        characterId="c1"
+      />,
+    );
+    const chip = screen.getByText("Cross-Examine");
+    expect(chip.getAttribute("title")).toContain("Pick apart the testimony.");
   });
 
   it("hides Class signature header when no Class-source abilities", () => {
     render(
       <AbilitiesContent
         abilities={[]}
-        class_moves={["cast_spell"]}
+        class_moves={[move("cast_spell", "Cast Spell")]}
         magicState={null}
         characterId="c1"
       />,
@@ -67,7 +94,7 @@ describe("AbilitiesContent — four-section restructure", () => {
     render(
       <AbilitiesContent
         abilities={[cleric_turn_undead]}
-        class_moves={["pray"]}
+        class_moves={[move("pray", "Pray")]}
         magicState={null}
         characterId="c1"
       />,
