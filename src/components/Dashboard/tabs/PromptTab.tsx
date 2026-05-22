@@ -11,14 +11,17 @@ interface ZoneSection {
   token_estimate: number;
   category: string;
   content?: string;
-  cached?: boolean;
-  mis_zoned?: boolean;
+  // Server (_compute_zones_payload) always emits cached + mis_zoned on every
+  // section row; typed required to match the contract and let the compiler
+  // reject a never-fires `=== undefined` guard.
+  cached: boolean;
+  mis_zoned: boolean;
 }
 
 interface Zone {
   zone: string;
   total_tokens: number;
-  cached?: boolean;
+  cached: boolean;
   sections: ZoneSection[];
 }
 
@@ -94,7 +97,7 @@ export function PromptTab({ promptEvents }: Props) {
             const f = ev.fields as unknown as PromptFields;
             return (
               <option key={i} value={i}>
-                T{f.turn_number ?? "?"} · {f.agent_name || f.agent || "?"} · {f.total_tokens || 0} tokens{f.bounded ? " · bounded" : ""}
+                T{f.turn_number ?? "?"} · {f.agent_name || f.agent || "?"} · {f.total_tokens ?? 0} tokens{f.bounded ? " · bounded" : ""}
               </option>
             );
           })}
@@ -196,7 +199,7 @@ export function PromptTab({ promptEvents }: Props) {
             </tbody>
           </table>
           <div style={{ marginTop: 8, fontSize: 11, color: THEME.muted, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span>Total: {fields.total_tokens || 0} tokens</span>
+            <span>Total: {fields.total_tokens ?? 0} tokens</span>
             {(fields.system_len != null || fields.user_len != null) && (
               <span>
                 system: {fields.system_len != null ? `${(fields.system_len / 1024).toFixed(1)}KB` : "—"}

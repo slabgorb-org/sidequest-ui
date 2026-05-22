@@ -192,7 +192,10 @@ describe("PromptTab — cache attribution (Story 60-2)", () => {
     render(<PromptTab promptEvents={events} />);
     selectTurn(1);
     const body = document.body.textContent ?? "";
-    expect(body).not.toMatch(/wasted/i);
+    // Block both drift VALUES — "wasted" (cached block changed) and "changed"
+    // (uncached block changed) — not just "wasted". ("drift" is excluded: it is
+    // the literal "Drift" column header, always present.)
+    expect(body).not.toMatch(/wasted|changed/i);
   });
 
   // --- AC-4: mis-zoned state flag -----------------------------------------
