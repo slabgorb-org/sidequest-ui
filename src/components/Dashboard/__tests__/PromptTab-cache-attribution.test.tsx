@@ -138,11 +138,12 @@ describe("PromptTab — cache attribution (Story 60-2)", () => {
   it("labels each zone as cached or uncached", () => {
     render(<PromptTab promptEvents={[makeEvent({ turn: 0 })]} />);
     selectTurn(0);
-    const body = document.body.textContent ?? "";
-    // \bcached\b does not match inside "uncached" (no word boundary between
-    // n|c), so these two assertions are independent.
-    expect(body).toMatch(/\bcached\b/i);
-    expect(body).toMatch(/\buncached\b/i);
+    // Query individual cells: body.textContent concatenates adjacent table
+    // cells ("Valleyuncached"), which defeats a \bword\b regex. Anchored
+    // getAllByText matches each cell's exact text node and keeps "cached" and
+    // "uncached" independent.
+    expect(screen.getAllByText(/^cached$/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^uncached$/i).length).toBeGreaterThan(0);
   });
 
   // --- AC-2: real usage joined --------------------------------------------
@@ -215,7 +216,7 @@ describe("PromptTab — cache attribution (Story 60-2)", () => {
     // All three new field groups must be reflected in the rendered output —
     // proving PromptTab actually reads zones.cached, cache_usage, and
     // cache_blocks.digest rather than ignoring the new contract.
-    expect(body).toMatch(/\buncached\b/i);
+    expect(screen.getAllByText(/^uncached$/i).length).toBeGreaterThan(0);
     expect(body).toMatch(/11[,.]?168/);
     expect(body).toContain("feedface");
   });
