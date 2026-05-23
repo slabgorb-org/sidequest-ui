@@ -367,7 +367,18 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
                   margin: 0,
                 }}
               >
-                {entry.content}
+                {entry.reference_url ? (
+                  <a
+                    href={entry.reference_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'inherit', textDecoration: 'underline' }}
+                  >
+                    {entry.content}
+                  </a>
+                ) : (
+                  entry.content
+                )}
               </p>
               <div
                 className="flex gap-2 text-xs text-muted-foreground/50 mt-0.5"
