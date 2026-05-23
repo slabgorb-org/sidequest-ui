@@ -15,6 +15,7 @@ import {
 import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
+import { ReferenceLinks } from "@/components/ReferenceLinks";
 
 export interface ConnectScreenProps {
   /**
@@ -415,6 +416,10 @@ export function ConnectScreen({
                   />
                 </div>
               </section>
+              {/* Reference surface — always visible; disabled until a world
+                  is selected (which sets both genreSlug and worldSlug
+                  simultaneously via handleSelectWorld). */}
+              <ReferenceLinks pack={genreSlug} world={worldSlug} />
             </div>
 
             {/* Right column — mode picker + world preview. Mode sits above

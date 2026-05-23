@@ -19,14 +19,19 @@ describe("ReferenceLinks", () => {
     expect(rules).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
 
-  it("renders nothing when pack is missing", () => {
-    const { container } = render(<ReferenceLinks pack={null} world="glenross" />);
-    expect(container).toBeEmptyDOMElement();
+  it("renders the container with both buttons disabled when pack is missing", () => {
+    render(<ReferenceLinks pack={null} world="glenross" />);
+    expect(screen.getByTestId("reference-links")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^rules$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^lore$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/^rules$/i).closest('[aria-disabled="true"]')).not.toBeNull();
+    expect(screen.getByText(/^lore$/i).closest('[aria-disabled="true"]')).not.toBeNull();
   });
 
-  it("renders only Rules link when world is missing", () => {
+  it("renders Rules as a link and Lore as disabled when world is missing", () => {
     render(<ReferenceLinks pack="tea_and_murder" world={null} />);
-    expect(screen.queryByRole("link", { name: /^rules$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^rules$/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^lore$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/^lore$/i).closest('[aria-disabled="true"]')).not.toBeNull();
   });
 });
