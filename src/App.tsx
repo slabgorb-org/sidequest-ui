@@ -866,6 +866,7 @@ function AppInner() {
           const built: CharacterSheetData = {
             name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
             class: (rawLocal.class as string) ?? "",
+            class_reference_url: (rawLocal.class_reference_url as string | null | undefined) ?? null,
             race: (sheetFacet.race as string) || undefined,
             level: (rawLocal.level as number) ?? 1,
             hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
