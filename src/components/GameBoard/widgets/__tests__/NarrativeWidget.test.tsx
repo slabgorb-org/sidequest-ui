@@ -21,8 +21,18 @@ describe("NarrativeWidget — reference links wiring", () => {
     ).toHaveAttribute("href", "/reference/lore/tea_and_murder/glenross");
   });
 
-  it("does not render reference links when genreSlug is missing", () => {
+  it("renders ReferenceLinks as disabled spans when genreSlug is missing", () => {
     render(<NarrativeWidget messages={[]} />);
-    expect(screen.queryByTestId("reference-links")).not.toBeInTheDocument();
+    // Per reference-pages v2: the wrapper always renders so the affordance
+    // stays visible; missing pack/world degrade to aria-disabled spans.
+    expect(screen.getByTestId("reference-links")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^rules$/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^lore$/i })).toBeNull();
+    expect(
+      screen.getByText(/^rules$/i).closest('[aria-disabled="true"]'),
+    ).not.toBeNull();
+    expect(
+      screen.getByText(/^lore$/i).closest('[aria-disabled="true"]'),
+    ).not.toBeNull();
   });
 });
