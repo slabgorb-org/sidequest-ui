@@ -61,6 +61,8 @@ export interface PartyMemberPayload {
   current_location?: string;
   sheet?: Record<string, unknown>;
   inventory?: Record<string, unknown>;
+  /** URL to the reference page anchor for the character's class; null when no anchor exists. */
+  class_reference_url?: string | null;
 }
 
 export interface ResourcePoolPayload {
@@ -738,6 +740,8 @@ export interface LocationEntity {
   provenance: LocationEntityProvenance;
   promoted_at_turn: number | null;
   promoted_canon: string | null;
+  /** URL to the reference page anchor; null when no anchor exists. */
+  reference_url?: string | null;
 }
 
 export interface LocationDescriptionOverlaySummary {

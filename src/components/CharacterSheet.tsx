@@ -6,6 +6,8 @@ export interface AbilityDefinition {
   mechanical_effect: string;
   involuntary: boolean;
   source: AbilitySource;
+  /** URL to the reference page anchor; null when no anchor exists. */
+  reference_url?: string | null;
 }
 
 export interface CharacterSheetData {

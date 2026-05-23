@@ -43,6 +43,8 @@ export interface KnowledgeEntry {
   learned_turn: number;
   source: FactSource;
   confidence: Confidence;
+  /** URL to the reference page anchor; null when no anchor exists. */
+  reference_url?: string | null;
 }
 
 export interface ItemDepletion {
