@@ -880,6 +880,9 @@ function AppInner() {
             player_id: isMultiplayer
               ? ((rawLocal.player_id as string) || undefined)
               : undefined,
+            rig_composure_current: typeof rawLocal.rig_composure_current === "number" ? rawLocal.rig_composure_current as number : undefined,
+            rig_composure_max: typeof rawLocal.rig_composure_max === "number" ? rawLocal.rig_composure_max as number : undefined,
+            injury_tags: Array.isArray(rawLocal.injury_tags) ? rawLocal.injury_tags as string[] : undefined,
           };
           setCharacterSheet(built);
         }

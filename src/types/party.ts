@@ -9,6 +9,9 @@ export interface CharacterSummary {
   class: string;
   level: number;
   current_location: string;
+  rig_composure_current?: number;
+  rig_composure_max?: number;
+  injury_tags?: string[];
 }
 
 /**
