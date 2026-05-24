@@ -45,6 +45,12 @@ export interface CharacterSheetData {
    *  leaves this undefined in single-player so the header renders the
    *  character name only. Story 56-1. */
   player_id?: string;
+  /** Current rig composure. Absent/undefined when character has no rig. */
+  rig_composure_current?: number;
+  /** Maximum rig composure. Absent/undefined when character has no rig. */
+  rig_composure_max?: number;
+  /** Crash-related injury statuses (e.g. 'injury', 'dismounted'). */
+  injury_tags?: string[];
 }
 
 export interface CharacterSheetProps {
@@ -112,6 +118,45 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
               <span className="font-mono">{value}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {(data.rig_composure_current != null && data.rig_composure_max != null) && (
+        <div data-testid="rig-composure-section" className="space-y-2">
+          <h3 className="text-sm font-semibold mb-1">Composure</h3>
+          <div className="flex gap-4">
+            {data.hp != null && data.hp_max != null && (
+              <div className="flex-1">
+                <span className="text-xs text-muted-foreground">Edge</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded bg-[var(--muted)]">
+                    <div
+                      className="h-2 rounded bg-[var(--primary)]"
+                      style={{ width: `${(data.hp / data.hp_max) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono">{data.hp}/{data.hp_max}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex-1">
+              <span className="text-xs text-muted-foreground">Rig</span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 rounded bg-[var(--muted)]">
+                  <div
+                    className="h-2 rounded bg-[var(--accent)]"
+                    style={{ width: `${(data.rig_composure_current / data.rig_composure_max) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono">{data.rig_composure_current}/{data.rig_composure_max}</span>
+              </div>
+            </div>
+          </div>
+          {data.injury_tags && data.injury_tags.length > 0 && (
+            <div data-testid="injury-tags" className="text-xs text-[var(--accent)]">
+              Injuries: {data.injury_tags.map((tag) => toDisplayName(tag)).join(', ')}
+            </div>
+          )}
         </div>
       )}
 
