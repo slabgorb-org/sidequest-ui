@@ -52,10 +52,10 @@ export function PeerRevealList({
           data-testid={`peer-reveal-row-${r.player_id}`}
           data-status={r.status}
           data-effective-submitted={effectiveSubmitted ? "true" : "false"}
-          className={`flex flex-col gap-0.5 px-3 py-1.5 rounded-md text-sm border-l-4 motion-reduce:transition-none ${
+          className={`flex flex-col gap-0.5 px-3 py-1.5 rounded-md text-sm border-l-4 motion-reduce:transition-none text-foreground ${
             effectiveSubmitted
-              ? "border-l-emerald-500 bg-emerald-500/5 text-emerald-100/90"
-              : "border-l-amber-500/60 bg-amber-500/5 text-amber-100/80"
+              ? "border-l-emerald-500 bg-emerald-500/10"
+              : "border-l-amber-500 bg-amber-500/10"
           }`}
         >
           <span
