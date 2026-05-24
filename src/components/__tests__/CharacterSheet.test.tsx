@@ -200,3 +200,131 @@ describe('CharacterSheet — Story 56-1: controlling player name (MP)', () => {
     expect(within(sheet).getByText(/James/)).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 53-5: RigComposure + Edge + injury tags on CharacterSheet
+//
+// AC-3: CharacterSheet renders a "Composure" section with Edge and
+//       RigComposure bars side-by-side, plus injury tag display.
+// AC-2: CharacterSheetData carries optional rig_composure_current,
+//       rig_composure_max, and injury_tags fields.
+// ---------------------------------------------------------------------------
+
+describe('CharacterSheet — Story 53-5: RigComposure + Edge + injury tags', () => {
+  const RIG_DATA: CharacterSheetData = {
+    ...BASE_DATA,
+    hp: 4,
+    hp_max: 5,
+    rig_composure_current: 8,
+    rig_composure_max: 12,
+    injury_tags: [],
+  };
+
+  const CRASHED_RIG_DATA: CharacterSheetData = {
+    ...BASE_DATA,
+    hp: 3,
+    hp_max: 5,
+    rig_composure_current: 0,
+    rig_composure_max: 10,
+    injury_tags: ['injury', 'dismounted'],
+  };
+
+  // --- AC-3: RigComposure bar renders when data is present ---
+
+  it('AC-3: renders RigComposure section when rig_composure fields are present', () => {
+    render(<CharacterSheet data={RIG_DATA} />);
+    const sheet = screen.getByTestId('character-sheet');
+    expect(within(sheet).getByTestId('rig-composure-section')).toBeInTheDocument();
+  });
+
+  it('AC-3: renders rig composure current and max values', () => {
+    render(<CharacterSheet data={RIG_DATA} />);
+    const section = screen.getByTestId('rig-composure-section');
+    expect(within(section).getByText(/8/)).toBeInTheDocument();
+    expect(within(section).getByText(/12/)).toBeInTheDocument();
+  });
+
+  it('AC-3: renders Edge bar in composure section when hp fields are present', () => {
+    render(<CharacterSheet data={RIG_DATA} />);
+    const section = screen.getByTestId('rig-composure-section');
+    expect(within(section).getByText(/Edge/i)).toBeInTheDocument();
+  });
+
+  it('AC-3: renders RigComposure label distinct from Edge', () => {
+    render(<CharacterSheet data={RIG_DATA} />);
+    const section = screen.getByTestId('rig-composure-section');
+    expect(within(section).getByText(/Rig/i)).toBeInTheDocument();
+  });
+
+  // --- AC-3: Conditional rendering — absent rig pool ---
+
+  it('AC-3: does NOT render rig composure section when rig fields are absent', () => {
+    render(<CharacterSheet data={BASE_DATA} />);
+    expect(screen.queryByTestId('rig-composure-section')).not.toBeInTheDocument();
+  });
+
+  it('AC-3: does NOT render rig composure section when fields are null', () => {
+    const dataNoRig: CharacterSheetData = {
+      ...BASE_DATA,
+      hp: 4,
+      hp_max: 5,
+      rig_composure_current: undefined,
+      rig_composure_max: undefined,
+    };
+    render(<CharacterSheet data={dataNoRig} />);
+    expect(screen.queryByTestId('rig-composure-section')).not.toBeInTheDocument();
+  });
+
+  // --- AC-3: Zero composure (wrecked rig) ---
+
+  it('AC-3: renders rig composure at zero (wrecked) as a valid state', () => {
+    render(<CharacterSheet data={CRASHED_RIG_DATA} />);
+    const section = screen.getByTestId('rig-composure-section');
+    expect(within(section).getByText(/0/)).toBeInTheDocument();
+    expect(within(section).getByText(/10/)).toBeInTheDocument();
+  });
+
+  // --- AC-3: Injury tags ---
+
+  it('AC-3: renders injury tags when present', () => {
+    render(<CharacterSheet data={CRASHED_RIG_DATA} />);
+    const tags = screen.getByTestId('injury-tags');
+    expect(tags).toBeInTheDocument();
+    expect(within(tags).getByText(/injury/i)).toBeInTheDocument();
+    expect(within(tags).getByText(/dismounted/i)).toBeInTheDocument();
+  });
+
+  it('AC-3: does NOT render injury tags section when empty', () => {
+    render(<CharacterSheet data={RIG_DATA} />);
+    expect(screen.queryByTestId('injury-tags')).not.toBeInTheDocument();
+  });
+
+  it('AC-3: does NOT render injury tags section when absent', () => {
+    render(<CharacterSheet data={BASE_DATA} />);
+    expect(screen.queryByTestId('injury-tags')).not.toBeInTheDocument();
+  });
+
+  // --- Wiring: CharacterSheetData type accepts rig fields ---
+
+  it('AC-6 (wiring): an App-shaped CharacterSheetData with rig pool renders correctly', () => {
+    const appShaped: CharacterSheetData = {
+      name: 'Dusty',
+      class: 'Road Warrior',
+      level: 4,
+      hp: 5,
+      hp_max: 5,
+      rig_composure_current: 10,
+      rig_composure_max: 15,
+      injury_tags: [],
+      stats: { grit: 14, reflex: 16, nerve: 12 },
+      abilities: [makeAbility('Turbo Boost')],
+      class_moves: [],
+      backstory: 'Last of the V8 interceptors.',
+      portrait_url: undefined,
+    };
+    render(<CharacterSheet data={appShaped} />);
+    const sheet = screen.getByTestId('character-sheet');
+    expect(within(sheet).getByTestId('rig-composure-section')).toBeInTheDocument();
+    expect(within(sheet).getByText('Dusty')).toBeInTheDocument();
+  });
+});
