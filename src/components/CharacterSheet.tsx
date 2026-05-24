@@ -6,11 +6,17 @@ export interface AbilityDefinition {
   mechanical_effect: string;
   involuntary: boolean;
   source: AbilitySource;
+  /** URL to the reference page anchor; null when no anchor exists. */
+  reference_url?: string | null;
 }
 
 export interface CharacterSheetData {
   name: string;
   class: string;
+  /** Server-attached URL into /reference/rules/<pack>#class-<slug>;
+   *  populated when the class is a known classes.yaml entry on the
+   *  active genre pack. Null/absent when no anchor exists. */
+  class_reference_url?: string | null;
   /** Race label ("Uplifted Animal", "Beastkin", "Human"). Server emits this on
    *  PARTY_STATUS as `members[].sheet.race`. Used as the sheet subtitle —
    *  previously the subtitle showed the genre slug, which is wrong (the genre
@@ -76,7 +82,19 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
             ) : null}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Level {data.level} {toDisplayName(data.class)}
+            Level {data.level}{' '}
+            {data.class_reference_url ? (
+              <a
+                href={data.class_reference_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline"
+              >
+                {toDisplayName(data.class)}
+              </a>
+            ) : (
+              toDisplayName(data.class)
+            )}
           </p>
           {data.current_location && (
             <p data-testid="character-location" className="text-sm text-muted-foreground/80 mt-1">
@@ -101,9 +119,25 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <div>
           <h3 className="text-sm font-semibold mb-1">Abilities</h3>
           <ul className="list-disc list-inside text-sm">
-            {data.abilities.map((ability) => (
-              <li key={ability.name}>{toDisplayName(ability.name)}</li>
-            ))}
+            {data.abilities.map((ability) => {
+              const label = toDisplayName(ability.name);
+              return (
+                <li key={ability.name}>
+                  {ability.reference_url ? (
+                    <a
+                      href={ability.reference_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:no-underline"
+                    >
+                      {label}
+                    </a>
+                  ) : (
+                    label
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
