@@ -18,6 +18,10 @@ import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
+import {
+  computeSubmittedPlayerIds,
+  mergePeerRevealsWithSubmittedStatus,
+} from "@/lib/turnStatusDerivation";
 import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { ExploredLocation, MapState } from "@/components/MapOverlay";
@@ -1208,6 +1212,21 @@ function AppInner() {
   peerRevealsApplyRef.current = peerReveals.apply;
   peerRevealsClearRef.current = peerReveals.clear;
 
+  // Merge TURN_STATUS authoritative submitted status into the ACTION_REVEAL
+  // peer-reveal map. ACTION_REVEAL is a best-effort visibility channel; a
+  // late-fire composing event can race past the submitted event and pin the
+  // PeerRevealList row on "<peer> is composing" even after the server has
+  // emitted TURN_STATUS{submitted} for that peer (sq-playtest 2026-05-12
+  // [BUG-LOW] mid-flight TURN_STATUS mislabel). TURN_STATUS is the
+  // server-authoritative signal — when it says submitted, the row must
+  // show submitted regardless of what the ACTION_REVEAL state machine
+  // last saw.
+  const mergedPeerReveals = useMemo(
+    () => mergePeerRevealsWithSubmittedStatus(peerReveals.reveals, turnStatusEntries),
+    [peerReveals.reveals, turnStatusEntries],
+  );
+
+
   // ADR-036: Outbound ACTION_REVEAL — broadcast composing/submitted reveals to peers.
   // Sourced from partyMembers; character_name falls back to name if missing.
   const localCharacterName = useMemo(
@@ -1800,12 +1819,17 @@ function AppInner() {
   //   - 'waiting-on-narrator': local submitted AND all peers submitted —
   //     merged dispatch is running, narration is being generated.
   //
-  // Heuristic: turnStatusEntries is server-emitted, one entry per submission,
-  // cleared on TURN_STATUS{status="resolved"}. partyMembers.length is the
-  // visible playing peer count. When entries.length >= partyMembers.length,
-  // every peer has submitted and we're waiting on Claude.
+  // Heuristic: turnStatusEntries is server-emitted, server-authoritative,
+  // cleared on TURN_STATUS{status="resolved"}. The canonical-roster fix
+  // (sidequest-server 2026-05-12) makes the roster carry every PLAYING
+  // peer with `pending` / `submitted` / `auto_resolved` per recipient;
+  // filtering by status here is required because a pending peer is in
+  // the roster but has NOT sealed — counting them as submitted snaps the
+  // banner past "waiting-on-peers" the moment the first broadcast lands
+  // (sq-playtest 2026-05-12 host-asymmetry bug). auto_resolved counts
+  // as submitted: the barrier has already advanced past those peers.
   const submittedPlayerIds = useMemo(
-    () => new Set(turnStatusEntries.map((e) => e.player_id)),
+    () => computeSubmittedPlayerIds(turnStatusEntries),
     [turnStatusEntries],
   );
   const peersOutstanding = useMemo(
@@ -2044,7 +2068,7 @@ function AppInner() {
                 lastOrbitalChart={lastOrbitalChart}
                 sendOrbitalIntent={sendOrbitalIntent}
                 sessionBoundEpoch={sessionBoundEpoch}
-                peerReveals={peerReveals.reveals}
+                peerReveals={mergedPeerReveals}
                 partyOrder={partyOrder}
                 onReveal={handleReveal}
                 round={currentRound}
