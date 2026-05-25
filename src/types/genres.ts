@@ -28,6 +28,14 @@ export interface WorldMeta {
    * in the null case.
    */
   hero_image: string | null;
+  /**
+   * Stable location-capability signal. The world's cartography navigation
+   * mode (`"region"` / `"room_graph"` / `"hierarchical"`), or `null` when the
+   * world has no cartography at all. GameBoard gates the Location tab on this
+   * so the tab is stable per session instead of blinking with transient
+   * LOCATION_DESCRIPTION traffic.
+   */
+  navigation_mode: string | null;
 }
 
 export interface GenreMeta {

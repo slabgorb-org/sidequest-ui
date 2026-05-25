@@ -18,7 +18,7 @@ import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
-import type { CharacterSheetData, AbilityDefinition } from "@/components/CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
@@ -878,7 +878,7 @@ function AppInner() {
             hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
             stats: (sheetFacet.stats as Record<string, number>) ?? {},
             abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
-            class_moves: (sheetFacet.class_moves as string[]) ?? [],
+            class_moves: (sheetFacet.class_moves as ClassMove[]) ?? [],
             backstory: (sheetFacet.backstory as string) ?? "",
             portrait_url: (rawLocal.portrait_url as string) || undefined,
             current_location: (rawLocal.current_location as string) ?? "",
@@ -2033,6 +2033,11 @@ function AppInner() {
                 companions={partyCompanions}
                 genreSlug={currentGenre ?? undefined}
                 worldSlug={currentWorld ?? undefined}
+                navMode={
+                  genres[currentGenre ?? ""]?.worlds.find(
+                    (w) => w.slug === currentWorld,
+                  )?.navigation_mode ?? undefined
+                }
                 turnStatusEntries={turnStatusEntries}
                 layoutMode={layoutMode}
                 magicState={gameState.magicState ?? null}

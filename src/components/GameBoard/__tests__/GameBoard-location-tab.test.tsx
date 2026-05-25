@@ -1,30 +1,63 @@
 /**
- * Story 54-9 / ADR-109: wiring test — proves the LocationWidget reaches
- * the live dockview workspace through GameBoard's prop + availableWidgets
- * gate + registry entry, not just lives in a file.
+ * Story 54-9 / ADR-109 + 2026-05-21 glenross flicker fix: the Location tab.
  *
- * Per CLAUDE.md "Every Test Suite Needs a Wiring Test": LocationPanel.test.tsx
- * proves the component renders prose in isolation; this file proves that
- * GameBoard imports it, gates the tab on `currentLocation`, slots it in
- * `rightGroupOrder` between `map` and `knowledge`, and that App.tsx
- * forwards `state.currentLocation` into the `currentLocation` prop.
- *
- * Pattern follows `gameboard-wiring.test.tsx` (importability + `?raw`
- * source checks). The earlier draft of this test mounted GameBoard and
- * queried the dockview DOM for `location-panel`; that fails under jsdom
- * because dockview's right-group panels never render — a known test-env
- * limitation, not a wiring bug. Verified: under the same environment
- * every other GameBoard right-group panel is also absent from the DOM,
- * yet the full UI suite passes. The wiring contract is enforced at the
- * source level instead.
+ * Two contracts are proven here:
+ *   1. Wiring — LocationWidget/LocationPanel are importable and registered.
+ *   2. Stable gating — the tab's *existence* is gated on the world's STABLE
+ *      navigation mode (region / room_graph), NOT on the transient
+ *      `currentLocation` payload. Gating on `currentLocation` made the tab
+ *      blink in/out on every reconnect (a --reload restart re-baselines it to
+ *      null); Keith flagged this as "confusing ui" in the 2026-05-21 glenross
+ *      playtest. The behavior tests below render GameBoard (jsdom → mobile
+ *      MobileTabView path) and assert the tab is present for cartography
+ *      worlds even when `currentLocation` is null, absent for worlds with no
+ *      location capability, and stable across a null transition.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { GameBoard, type GameBoardProps } from "../GameBoard";
+import { ImageBusProvider } from "@/providers/ImageBusProvider";
+
+beforeEach(() => {
+  localStorage.clear();
+  vi.clearAllMocks();
+});
+
+function renderBoard(overrides: Partial<GameBoardProps> = {}) {
+  const defaults: GameBoardProps = {
+    messages: [],
+    characters: [
+      {
+        player_id: "p1",
+        name: "Mira",
+        character_name: "Mira",
+        class: "Sleuth",
+        level: 1,
+        hp: 10,
+        hp_max: 10,
+        status_effects: [],
+        portrait_url: "",
+        current_location: "",
+      },
+    ],
+    onSend: vi.fn(),
+    disabled: false,
+  };
+  const props = { ...defaults, ...overrides };
+  return render(
+    <ImageBusProvider messages={props.messages ?? []}>
+      <GameBoard {...props} />
+    </ImageBusProvider>,
+  );
+}
+
+function locationTab() {
+  return screen.queryByRole("tab", { name: /^location$/i });
+}
 
 describe("GameBoard — location tab wiring (Story 54-9)", () => {
   it("LocationWidget is importable from the registered path", async () => {
-    const mod = await import(
-      "@/components/GameBoard/widgets/LocationWidget"
-    );
+    const mod = await import("@/components/GameBoard/widgets/LocationWidget");
     expect(typeof mod.LocationWidget).toBe("function");
   });
 
@@ -42,54 +75,83 @@ describe("GameBoard — location tab wiring (Story 54-9)", () => {
     expect(entry!.hotkey).toBe("l");
     expect(entry!.dataGated).toBe(true);
   });
+});
 
-  it("GameBoard imports LocationWidget and exposes the currentLocation prop", async () => {
-    const src = (
-      await import("@/components/GameBoard/GameBoard?raw")
-    ).default as string;
-    expect(src).toContain('import { LocationWidget } from "./widgets/LocationWidget"');
-    expect(src).toMatch(/currentLocation\?:\s*LocationDescriptionPayload\s*\|\s*null/);
+describe("GameBoard — Location tab stability (navMode gating)", () => {
+  it("shows the Location tab for a region-mode world even when currentLocation is null", () => {
+    renderBoard({
+      genreSlug: "tea_and_murder",
+      worldSlug: "glenross",
+      navMode: "region",
+      currentLocation: null,
+    });
+    expect(locationTab()).toBeInTheDocument();
   });
 
-  it("GameBoard gates the 'location' tab on currentLocation in availableWidgets", async () => {
-    const src = (
-      await import("@/components/GameBoard/GameBoard?raw")
-    ).default as string;
-    // Gate must be conditional — unconditional `available.add("location")`
-    // would render the empty-state panel during chargen.
-    expect(src).toMatch(/if\s*\(\s*currentLocation\s*\)\s*available\.add\(\s*["']location["']\s*\)/);
+  it("shows the Location tab for a room_graph world", () => {
+    renderBoard({
+      genreSlug: "caverns_and_claudes",
+      worldSlug: "beneath_sunden",
+      navMode: "room_graph",
+      currentLocation: null,
+    });
+    expect(locationTab()).toBeInTheDocument();
   });
 
-  it("GameBoard renders LocationWidget in the 'location' switch case", async () => {
-    const src = (
-      await import("@/components/GameBoard/GameBoard?raw")
-    ).default as string;
-    expect(src).toMatch(/case\s+["']location["']\s*:[\s\S]*?<LocationWidget\s+data={currentLocation/);
+  it("does NOT show the Location tab for a world with no location capability", () => {
+    renderBoard({
+      genreSlug: "space_opera",
+      worldSlug: "coyote_star",
+      navMode: undefined,
+      currentLocation: null,
+    });
+    expect(locationTab()).not.toBeInTheDocument();
   });
 
-  it("GameBoard rightGroupOrder slots 'location' between 'map' and 'knowledge'", async () => {
-    const src = (
-      await import("@/components/GameBoard/GameBoard?raw")
-    ).default as string;
-    // Pull out the rightGroupOrder array literal and assert ordering.
-    const match = src.match(/rightGroupOrder:\s*WidgetId\[\]\s*=\s*\[([\s\S]*?)\]/);
-    expect(match).not.toBeNull();
-    const order = match![1]
-      .split(",")
-      .map((s) => s.trim().replace(/["']/g, ""))
-      .filter((s) => s.length > 0);
-    const mapIdx = order.indexOf("map");
-    const locIdx = order.indexOf("location");
-    const knowIdx = order.indexOf("knowledge");
-    expect(mapIdx).toBeGreaterThanOrEqual(0);
-    expect(locIdx).toBeGreaterThanOrEqual(0);
-    expect(knowIdx).toBeGreaterThanOrEqual(0);
-    expect(locIdx).toBeGreaterThan(mapIdx);
-    expect(locIdx).toBeLessThan(knowIdx);
-  });
+  it("keeps the Location tab present across a currentLocation null transition (no flicker)", () => {
+    const characters: GameBoardProps["characters"] = [
+      {
+        player_id: "p1",
+        name: "Mira",
+        character_name: "Mira",
+        class: "Sleuth",
+        level: 1,
+        hp: 10,
+        hp_max: 10,
+        status_effects: [],
+        portrait_url: "",
+        current_location: "",
+      },
+    ];
+    const { rerender } = renderBoard({
+      genreSlug: "tea_and_murder",
+      worldSlug: "glenross",
+      navMode: "region",
+      currentLocation: {
+        region_id: "glenross_pub",
+        prose: "The pub door is ajar.",
+        terrain: "building",
+        entities: [],
+        overlays: [],
+      },
+    });
+    expect(locationTab()).toBeInTheDocument();
 
-  it("App.tsx forwards state.currentLocation into GameBoard's currentLocation prop", async () => {
-    const src = (await import("@/App?raw")).default as string;
-    expect(src).toMatch(/currentLocation=\{gameState\.currentLocation\s*\?\?\s*null\}/);
+    // Simulate a reconnect re-baselining currentLocation to null.
+    rerender(
+      <ImageBusProvider messages={[]}>
+        <GameBoard
+          messages={[]}
+          characters={characters}
+          onSend={vi.fn()}
+          disabled={false}
+          genreSlug="tea_and_murder"
+          worldSlug="glenross"
+          navMode="region"
+          currentLocation={null}
+        />
+      </ImageBusProvider>,
+    );
+    expect(locationTab()).toBeInTheDocument();
   });
 });

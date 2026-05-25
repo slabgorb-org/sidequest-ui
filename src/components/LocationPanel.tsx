@@ -41,7 +41,7 @@ export function LocationPanel({ data }: LocationPanelProps) {
           minHeight: "100%",
         }}
       >
-        <p>No location yet.</p>
+        <p>Gathering your bearings…</p>
       </div>
     );
   }
