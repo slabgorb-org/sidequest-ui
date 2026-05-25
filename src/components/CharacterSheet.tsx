@@ -91,7 +91,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <div>
           <h2 className="text-2xl font-bold text-[var(--primary)]">
             {data.name}
-            {data.player_id ? (
+            {data.player_id && data.player_id !== data.name ? (
               <span
                 data-testid="character-sheet-player-name"
                 className="ml-2 text-sm font-normal text-muted-foreground"
