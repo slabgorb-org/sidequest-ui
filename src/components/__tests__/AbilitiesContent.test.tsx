@@ -30,6 +30,35 @@ describe("AbilitiesContent — four-section restructure", () => {
     expect(container.textContent).not.toContain("No abilities.");
   });
 
+  it("shows an empty-state message when nothing renders (no blank tab)", () => {
+    // Playtest 2026-05-25: a Lv1 Scavenger with no materialized abilities,
+    // moves, or sensitivities rendered a COMPLETELY BLANK tab. Show a
+    // neutral empty-state instead of nothing. (The deeper gap — that a
+    // non-magical class should HAVE an ADR-095 signature — is content,
+    // tracked separately in epic 66; this is just the UI floor.)
+    render(
+      <AbilitiesContent
+        abilities={[]}
+        class_moves={[]}
+        magicState={null}
+        characterId="c1"
+      />,
+    );
+    expect(screen.getByTestId("abilities-empty-state")).toBeInTheDocument();
+  });
+
+  it("does NOT show the empty-state when any ability section renders", () => {
+    render(
+      <AbilitiesContent
+        abilities={[cleric_turn_undead]}
+        class_moves={[]}
+        magicState={null}
+        characterId="c1"
+      />,
+    );
+    expect(screen.queryByTestId("abilities-empty-state")).toBeNull();
+  });
+
   it("renders Class signature card with prose for a Cleric", () => {
     render(
       <AbilitiesContent
