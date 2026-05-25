@@ -188,6 +188,34 @@ describe('AC1: Renders for any confrontation type', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// Regression: beatless confrontation must not crash the table
+//
+// A confrontation can be opened/broadcast before its beats are
+// materialized (backend dispatch produced zero beats). The wire
+// payload then arrives with `beats` undefined. Previously
+// `sortedBeats([...beats])` threw "beats is not iterable", crashing
+// the GameBoard ErrorBoundary for every connected client.
+// ═══════════════════════════════════════════════════════════
+
+describe('Regression: beatless confrontation', () => {
+  it('renders an empty beat grid instead of crashing when beats is undefined', () => {
+    const beatless = { ...STANDOFF_DATA, beats: undefined } as unknown as ConfrontationData;
+    render(<ConfrontationOverlay data={beatless} />);
+    const overlay = screen.getByTestId('confrontation-overlay');
+    expect(overlay).toBeInTheDocument();
+    const grid = within(overlay).getByTestId('beat-grid');
+    expect(grid).toBeEmptyDOMElement();
+  });
+
+  it('renders an empty beat grid when beats is an empty array', () => {
+    const beatless: ConfrontationData = { ...STANDOFF_DATA, beats: [] };
+    render(<ConfrontationOverlay data={beatless} />);
+    expect(screen.getByTestId('confrontation-overlay')).toBeInTheDocument();
+    expect(screen.getByTestId('beat-grid')).toBeEmptyDOMElement();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
 // AC2: Dual-dial metric bars (player + opponent edges)
 // ═══════════════════════════════════════════════════════════
 
