@@ -171,8 +171,8 @@ const BEAT_FLAVOR: Record<string, string> = {
 };
 
 // Sort: defenders first, then by risk ascending, finishers pinned right.
-function sortedBeats(beats: BeatOption[]): BeatOption[] {
-  return [...beats].sort((a, b) => {
+function sortedBeats(beats: BeatOption[] | undefined | null): BeatOption[] {
+  return [...(beats ?? [])].sort((a, b) => {
     if (!!a.resolution !== !!b.resolution) return a.resolution ? 1 : -1;
     const ka = a.kind === "soak" ? -1 : 0;
     const kb = b.kind === "soak" ? -1 : 0;
@@ -561,7 +561,7 @@ export function ConfrontationOverlay({
        */}
       {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
 
-      <BeatGrid beats={data.beats} onSelect={onBeatSelect} />
+      <BeatGrid beats={data.beats ?? []} onSelect={onBeatSelect} />
 
       {/* Yield — only when the player has spent edge to refund. */}
       {onYield !== undefined &&
