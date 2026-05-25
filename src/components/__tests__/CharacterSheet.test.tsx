@@ -161,6 +161,21 @@ describe('CharacterSheet — Story 56-1: controlling player name (MP)', () => {
     expect(sheet.textContent ?? '').not.toMatch(/—\s*null/i);
   });
 
+  it('collapses to a single name when player_id equals the character name (no "X — X")', () => {
+    // Playtest 2026-05-25: a player whose handle == their character name
+    // (Baldrick/Baldrick) rendered "Baldrick — Baldrick". When the two are
+    // identical the suffix is noise — suppress it (and the separator).
+    const data: CharacterSheetData = {
+      ...BASE_DATA,
+      name: 'Baldrick',
+      player_id: 'Baldrick',
+    };
+    render(<CharacterSheet data={data} />);
+    const sheet = screen.getByTestId('character-sheet');
+    expect(within(sheet).queryByTestId('character-sheet-player-name')).toBeNull();
+    expect(sheet.textContent ?? '').not.toMatch(/Baldrick\s*—\s*Baldrick/);
+  });
+
   it('AC-4: absent player_id renders no player-name treatment (single-player path)', () => {
     // The load-bearing SP regression lock: BASE_DATA has no player_id, so
     // this is the canonical SP shape App.tsx assembles in single-player
