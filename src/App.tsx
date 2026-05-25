@@ -544,6 +544,11 @@ function AppInner() {
     ) {
       setThinking(false);
       setMessages((prev) => [...prev, msg]);
+      // ADR-107: aside answer is the terminal message for an aside —
+      // re-enable input immediately. No NARRATION_END will follow.
+      if (msg.type === MessageType.ASIDE_ANSWER) {
+        setCanType(true);
+      }
       // Turn-end signal: unlock input once the narrator has responded.
       // Paired with setCanType(false) in handleSend. Without this, the input
       // stays sealed after every turn until the player disconnects or leaves.
