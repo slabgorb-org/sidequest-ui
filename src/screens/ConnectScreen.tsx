@@ -87,6 +87,27 @@ export function ConnectScreen({
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
+  // Scene Library — fixture metadata from GET /dev/scenes.
+  const [scenes, setScenes] = useState<
+    { name: string; genre: string; world: string; description: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/dev/scenes")
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setScenes(data);
+      })
+      .catch(() => {
+        /* Scene library fetch failure is non-fatal — section stays empty. */
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
   // the preview. Polls /api/sessions every 15s while the lobby is open.
@@ -448,6 +469,42 @@ export function ConnectScreen({
             prettyWorld={prettyWorldName}
           />
         )}
+
+        {/* Scene Library — fixture picker for quick scene loading. */}
+        <section className="w-full max-w-4xl">
+          <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
+            Scene Library
+          </h2>
+          {scenes.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {scenes.map((scene) => (
+                <button
+                  key={scene.name}
+                  type="button"
+                  onClick={() => navigate(`/?scene=${scene.name}`)}
+                  className="text-left p-3 rounded-md border border-muted-foreground/20
+                             hover:border-muted-foreground/40 hover:bg-muted/20
+                             transition-colors cursor-pointer bg-transparent"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-foreground/90">
+                      {scene.name}
+                    </span>
+                    <span className="text-[0.65rem] uppercase tracking-wider px-1.5 py-0.5
+                                     rounded bg-muted/40 text-muted-foreground/70">
+                      {prettify(scene.genre)}
+                    </span>
+                  </div>
+                  {scene.description && (
+                    <p className="text-xs text-muted-foreground/60 line-clamp-2">
+                      {scene.description}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Error — covers both the prop-passed connection error and start() failures.
             Both sources are joined so neither silently masks the other. */}
