@@ -410,7 +410,7 @@ export function GameBoard({
     () => ({
       knowledge: knowledgeEntries?.length ?? 0,
       gallery: galleryImages?.length ?? 0,
-      map: mapData?.explored.length ?? 0,
+      map: mapData?.explored?.length ?? 0,
       inventory: inventoryData
         ? inventoryData.items.length * INVENTORY_GOLD_CAP + inventoryData.gold
         : 0,
