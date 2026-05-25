@@ -5,7 +5,7 @@ import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar
 import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
-import type { MagicState } from "@/types/magic";
+import { getCharacterBars, type MagicState } from "@/types/magic";
 import { SensitivitiesSection } from "./SensitivitiesSection";
 
 type TabId = "stats" | "abilities" | "status";
@@ -879,6 +879,15 @@ export function AbilitiesContent({
   const showItem = itemAbilities.length > 0;
   const showEarned = playAbilities.length > 0;
 
+  // SensitivitiesSection self-hides (renders null) when there is no magic
+  // state or no ledger bars for this character — mirror its predicate so the
+  // empty-state below only fires when the WHOLE panel would otherwise render
+  // blank (the Lv1-Scavenger "completely empty tab" playtest report).
+  const showSensitivities =
+    magicState != null && getCharacterBars(magicState, characterId).length > 0;
+  const hasAnything =
+    showClassSig || showClassMoves || showItem || showEarned || showSensitivities;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {showClassSig && (
@@ -948,6 +957,21 @@ export function AbilitiesContent({
       )}
 
       <SensitivitiesSection magicState={magicState} characterId={characterId} />
+
+      {!hasAnything && (
+        <p
+          data-testid="abilities-empty-state"
+          style={{
+            fontFamily: FONT_BODY,
+            fontSize: 14,
+            fontStyle: "italic",
+            color: FOLIO.inkSoft,
+            margin: 0,
+          }}
+        >
+          No special abilities yet.
+        </p>
+      )}
     </div>
   );
 }
