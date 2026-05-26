@@ -295,7 +295,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
   const needed = diceRequest ? diceRequest.difficulty - diceRequest.modifier + 1 : 0;
 
   return (
-    <div data-testid="inline-dice-tray" className="mt-3 flex flex-col" style={{ flex: 1 }}>
+    <div data-testid="inline-dice-tray" className="flex flex-col">
       {/* Target banner — prominent so the table can read it before the roll.
           Shows DC (the number the total beats) as the big target; modifier
           is secondary context. Stays visible through the roll and result,
@@ -317,12 +317,17 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
         </div>
       )}
 
-      {/* 3D dice canvas — transparent background, die rolls on the panel surface */}
+      {/* 3D dice canvas — transparent background, die rolls on the panel
+          surface. Fixed, roughly-square height (no flex:1) so the die lives
+          in a stable side lane that never reflows the beats and never
+          flashes in/out: the settled die persists here and re-tumbles in
+          place on the next beat commit (Klinger design, 2026-05-26). The
+          ~180px square preserves the calibrated top-down frame (camera
+          y=2.4 → ~1.84-unit square frame) so the landed face stays legible. */}
       <div
         style={{
           position: "relative",
-          flex: 1,
-          minHeight: 200,
+          height: 180,
           borderRadius: 8,
           overflow: "hidden",
         }}
