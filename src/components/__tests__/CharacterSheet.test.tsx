@@ -259,13 +259,15 @@ describe('CharacterSheet — Story 53-5: RigComposure + Edge + injury tags', () 
     expect(within(section).getByText(/12/)).toBeInTheDocument();
   });
 
-  it('AC-3: renders Edge bar in composure section when hp fields are present', () => {
+  it('AC-3: renders HP bar in composure section when hp fields are present', () => {
+    // ADR-114: the hp/hp_max pool is the character's survivability HP and is
+    // labeled "HP" (not the confrontation Edge metric).
     render(<CharacterSheet data={RIG_DATA} />);
     const section = screen.getByTestId('rig-composure-section');
-    expect(within(section).getByText(/Edge/i)).toBeInTheDocument();
+    expect(within(section).getByText(/^HP$/i)).toBeInTheDocument();
   });
 
-  it('AC-3: renders RigComposure label distinct from Edge', () => {
+  it('AC-3: renders RigComposure label distinct from HP', () => {
     render(<CharacterSheet data={RIG_DATA} />);
     const section = screen.getByTestId('rig-composure-section');
     expect(within(section).getByText(/Rig/i)).toBeInTheDocument();

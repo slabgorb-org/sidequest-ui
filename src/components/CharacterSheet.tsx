@@ -140,7 +140,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           <div className="flex gap-4">
             {data.hp != null && data.hp_max != null && (
               <div className="flex-1">
-                <span className="text-xs text-muted-foreground">Edge</span>
+                <span className="text-xs text-muted-foreground" title="HP / Vitality">HP</span>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 rounded bg-[var(--muted)]">
                     <div
