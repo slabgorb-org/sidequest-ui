@@ -1160,6 +1160,22 @@ function AppInner() {
     [send],
   );
 
+  // Story 67-1: when the GameBoard render subtree crashes, the ErrorBoundary
+  // calls this to signal the server over the still-open socket. The server
+  // drops this player from the submit-and-wait turn barrier so a render crash
+  // never orphans the whole table's in-flight turn. player_id is "" — the
+  // server attributes the crash to this socket's own player.
+  const handleGameCrash = useCallback(
+    (info: { name?: string; error: Error }) => {
+      send({
+        type: MessageType.CLIENT_ERROR,
+        payload: { reason: "render_crash", component: info.name ?? "GameBoard" },
+        player_id: "",
+      });
+    },
+    [send],
+  );
+
   // Send handler with slash command interception
   const handleSend = useCallback(
     (text: string, aside: boolean) => {
@@ -2016,7 +2032,7 @@ function AppInner() {
           </ErrorBoundary>
         )}
         {sessionPhase === "game" && (
-          <ErrorBoundary name="Game">
+          <ErrorBoundary name="Game" onCrashReport={handleGameCrash}>
             <ImageBusProvider messages={gameMessages}>
               <GameBoard
                 // `key` forces React to unmount + remount GameBoard (and with
