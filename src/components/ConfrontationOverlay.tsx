@@ -48,8 +48,10 @@ export interface BeatOption {
   /**
    * Optional one-line italic flavor hint, authored per beat in pack YAML
    * and threaded through `BeatDef.flavor` on the server (D2 confrontation
-   * panel, 2026-05-13). Takes precedence over the per-beat-id fallback
-   * library below; when both are absent the flavor row collapses.
+   * panel, 2026-05-13). No longer rendered on the tile as of 2026-05-26 —
+   * the player's typed InputBar action now carries the flavor, and a second
+   * authored flavor line competed with it. Field retained on the wire shape
+   * for back-compat / potential reuse (e.g. hover detail).
    */
   flavor?: string;
 }
@@ -145,29 +147,6 @@ const KIND_LABEL: Record<string, string> = {
   soak: "defend",
   angle: "angle",
   finisher: "finish",
-};
-
-// Flavor copy per beat id — one sentence of italic character for the tile.
-// Keyed by beat.id so genre packs can opt-in; falls back silently when
-// missing (tile still renders, just without the flavor line). Library
-// content lives here rather than on the wire so we don't bloat every
-// CONFRONTATION message with cosmetic strings.
-const BEAT_FLAVOR: Record<string, string> = {
-  attack: "A clean swing, no theatrics.",
-  defend: "Plant your feet. Read the next move.",
-  grapple: "Get inside the reach. Hold on.",
-  feint: "Sell the wrong angle.",
-  shove: "Push them into furniture.",
-  flee: "Choose the door, not the window.",
-  finish: "End it before they get back up.",
-  stare_down: "Make them look away first.",
-  taunt: "Bait the draw.",
-  draw: "Clear leather. Trust your hand.",
-  pressure: "Lean in until the room tilts.",
-  concede: "Give a little. Keep the rest.",
-  bluff: "Say it like you mean it.",
-  floor_it: "Pedal down. Pray the rod holds.",
-  swerve: "Choose your scratch.",
 };
 
 // Sort: defenders first, then by risk ascending, finishers pinned right.
@@ -305,9 +284,6 @@ function BeatTile({
   const base = beat.base ?? 1;
   const color = riskColor(base);
   const finisher = !!beat.resolution;
-  // Pack-authored flavor wins; fall back to the local id-keyed library so
-  // beats that ship without a wire-side flavor still render with character.
-  const flavor = beat.flavor ?? BEAT_FLAVOR[beat.id];
   const tooltip = beat.risk
     ? `${beat.label} (${beat.stat_check}) — ${beat.risk}`
     : `${beat.label} (${beat.stat_check})`;
@@ -327,9 +303,8 @@ function BeatTile({
       data-resolution={finisher ? "true" : undefined}
       data-risk={Math.min(1, Math.abs(base) / 10).toFixed(2)}
       onClick={() => onSelect?.(beat.id)}
-      className="relative text-left cursor-pointer rounded-md transition-colors grid gap-1 min-h-[84px] px-2.5 pl-3.5 py-2 border"
+      className="relative text-left cursor-pointer rounded-md transition-colors flex flex-col justify-center gap-0.5 min-h-[40px] px-2.5 pl-3.5 py-1.5 border"
       style={{
-        gridTemplateRows: "auto auto 1fr auto",
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
         background: finisher ? finisherBg : normalBg,
         borderColor: finisher ? "var(--accent-finisher)" : "var(--border)",
@@ -348,7 +323,10 @@ function BeatTile({
         style={{ background: color }}
       />
 
-      {/* Row 1 — label + finisher star */}
+      {/* Row 1 — label + finisher star. The player's typed action carries
+          the flavor now (beats are submit verbs for the InputBar draft),
+          so the per-tile italic flavor line was dropped 2026-05-26 — it
+          competed with the player's own prose and cost ~44px of height. */}
       <div className="flex items-center gap-1.5 min-w-0">
         <span
           className={[
@@ -370,48 +348,29 @@ function BeatTile({
         )}
       </div>
 
-      {/* Row 2 — stat in caps */}
-      <div className="text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-        {beat.stat_check}
-      </div>
-
-      {/* Row 3 — flavor (D2) */}
-      <div
-        className="font-serif italic text-[12px] leading-snug text-muted-foreground/90 line-clamp-2"
-        aria-hidden={flavor ? undefined : "true"}
-      >
-        {flavor ?? ""}
-      </div>
-
-      {/* Row 4 — kind · +base / risk · ▾ */}
+      {/* Row 2 — mechanical signal kept legible for the crunch players:
+          kind · stat · +base on the left, risk dot on the right. */}
       <div className="flex items-center justify-between gap-1.5 min-w-0">
-        <span className="text-[10px] text-muted-foreground tabular-nums">
+        <span className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground font-semibold truncate min-w-0">
           {KIND_LABEL[beat.kind ?? ""] ?? beat.kind ?? ""}
           {beat.kind && <span className="opacity-50"> · </span>}
-          <span className="text-foreground/70">+{base}</span>
+          {beat.stat_check}
+          <span className="opacity-50"> · </span>
+          <span className="text-foreground/70 tracking-normal normal-case">+{base}</span>
         </span>
-        <div className="flex items-center gap-1.5 min-w-0">
-          {beat.risk && (
-            <span
-              className="inline-flex items-center gap-1 text-[10.5px] italic truncate min-w-0"
-              style={{ color }}
-            >
-              <span
-                aria-hidden="true"
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: color }}
-              />
-              {beat.risk}
-            </span>
-          )}
+        {beat.risk && (
           <span
-            aria-hidden="true"
-            title="Details (coming soon)"
-            className="text-foreground/40 text-[11px] leading-none flex-shrink-0"
+            className="inline-flex items-center gap-1 text-[10px] italic truncate min-w-0 flex-shrink-0"
+            style={{ color }}
           >
-            ▾
+            <span
+              aria-hidden="true"
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ background: color }}
+            />
+            {beat.risk}
           </span>
-        </div>
+        )}
       </div>
     </button>
   );
@@ -427,8 +386,8 @@ function BeatGrid({
   return (
     <div
       data-testid="beat-grid"
-      className="grid gap-1.5"
-      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+      className="grid gap-1.5 content-start"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
     >
       {sortedBeats(beats).map((beat) => (
         <BeatTile key={beat.id} beat={beat} onSelect={onSelect} />
@@ -561,26 +520,42 @@ export function ConfrontationOverlay({
        */}
       {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
 
-      <BeatGrid beats={data.beats ?? []} onSelect={onBeatSelect} />
+      {/*
+       * Commit row — beats (the submit verbs for the InputBar draft) on the
+       * left, the persistent die lane on the right (Klinger design,
+       * 2026-05-26). Side-by-side rather than stacked so the die gets a
+       * stable, examinable home that never reflows the beats and never
+       * flashes in/out: it shares the row's height instead of adding to it.
+       * When the dice tray isn't wired (no onDiceThrow/playerId, e.g. in
+       * isolation tests) the beats reclaim the full width.
+       */}
+      <div className="flex gap-3 items-start">
+        <div className="flex-1 min-w-0">
+          <BeatGrid beats={data.beats ?? []} onSelect={onBeatSelect} />
 
-      {/* Yield — only when the player has spent edge to refund. */}
-      {onYield !== undefined &&
-        data.player_metric.current > data.player_metric.starting && (
-          <div className="mt-2">
-            <YieldButton onYield={onYield} disabled={false} />
+          {/* Yield — only when the player has spent edge to refund. */}
+          {onYield !== undefined &&
+            data.player_metric.current > data.player_metric.starting && (
+              <div className="mt-2">
+                <YieldButton onYield={onYield} disabled={false} />
+              </div>
+            )}
+        </div>
+
+        {/* Persistent die lane — rolls here on beat commit, then the settled
+            die stays put (examinable, no flash) until the next commit. */}
+        {onDiceThrow && playerId && (
+          <div className="flex-shrink-0" style={{ width: 200 }}>
+            <InlineDiceTray
+              diceRequest={diceRequest ?? null}
+              diceResult={diceResult ?? null}
+              playerId={playerId}
+              onThrow={onDiceThrow}
+              genreSlug={data.genre_slug}
+            />
           </div>
         )}
-
-      {/* Inline dice tray — rolls right here when a beat is selected. */}
-      {onDiceThrow && playerId && (
-        <InlineDiceTray
-          diceRequest={diceRequest ?? null}
-          diceResult={diceResult ?? null}
-          playerId={playerId}
-          onThrow={onDiceThrow}
-          genreSlug={data.genre_slug}
-        />
-      )}
+      </div>
 
       {/* Secondary stats — chase rigs, ship pools, etc. */}
       {data.secondary_stats && <SecondaryStatsPanel stats={data.secondary_stats} />}
