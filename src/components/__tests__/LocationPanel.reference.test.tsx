@@ -22,14 +22,11 @@ import { render, screen } from "@testing-library/react";
 import { LocationPanel } from "../LocationPanel";
 import type { LocationDescriptionPayload } from "../../types/payloads";
 
-// The `reference_url` field is added to LocationDescriptionPayload by this
-// story (AC2). The intersection keeps the factory typed before and after that
-// change lands; once the field is on the type it is simply redundant.
-type PayloadWithRef = LocationDescriptionPayload & {
-  reference_url?: string | null;
-};
-
-function payload(over: Partial<PayloadWithRef> = {}): PayloadWithRef {
+// `reference_url` is part of LocationDescriptionPayload (AC2), so the factory
+// types directly against it.
+function payload(
+  over: Partial<LocationDescriptionPayload> = {},
+): LocationDescriptionPayload {
   return {
     region_id: "glenross_pub",
     prose: "The pub door is ajar.",
