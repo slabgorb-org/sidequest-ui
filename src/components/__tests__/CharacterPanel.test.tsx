@@ -387,30 +387,30 @@ describe("CharacterPanel — AC-6: integrated party list", () => {
     expect(screen.queryByTestId("party-section")).not.toBeInTheDocument();
   });
 
-  it("renders inline Edge per party row sourced from CharacterSummary.hp/hp_max", () => {
-    // ADR-014 / ADR-078: HP was removed from CreatureCore in favor of EdgePool.
-    // The wire field on CharacterSummary is still hp/hp_max (legacy name) but
-    // the value is the edge pool, and the UI label must read "Edge".
+  it("renders inline HP per party row sourced from CharacterSummary.hp/hp_max", () => {
+    // ADR-114 (ablative HP substrate): this pool IS the character's HP — the
+    // engine logs hp=N/M — and the UI label must read "HP". (This is the
+    // survivability pool, distinct from the confrontation Edge dual-dial.)
     render(<CharacterPanel character={CHARACTER} characters={PARTY} />);
     // Kael at 24/30 — full opacity tone
     const kaelEdge = screen.getByTestId("party-member-edge-p1");
-    expect(kaelEdge).toHaveTextContent("Edge 24/30");
+    expect(kaelEdge).toHaveTextContent("HP 24/30");
     // Lyra at 8/40 = 20% — at or below the 25% threshold, should show
-    // destructive tone class for at-a-glance "one push from yielding" signal.
+    // destructive tone class for at-a-glance "one push from down" signal.
     const lyraEdge = screen.getByTestId("party-member-edge-p2");
-    expect(lyraEdge).toHaveTextContent("Edge 8/40");
+    expect(lyraEdge).toHaveTextContent("HP 8/40");
     expect(lyraEdge.className).toMatch(/destructive/);
   });
 
-  it("renders no legacy 'HP N/M' text in any party row (ADR-014 schema lock)", () => {
+  it("renders no stale 'Edge N/M' text in any party row (ADR-114 schema lock)", () => {
     render(<CharacterPanel character={CHARACTER} characters={PARTY} />);
     const partySection = screen.getByTestId("party-section");
-    // Lock the rename: a stray "HP " prefix on a number/number row would mean
-    // someone re-introduced the legacy label.
-    expect(partySection.textContent ?? "").not.toMatch(/\bHP\s*\d+\s*\/\s*\d+/);
+    // Lock the rename: a stray "Edge " prefix on a number/number row would
+    // mean someone re-introduced the pre-ADR-114 survivability label.
+    expect(partySection.textContent ?? "").not.toMatch(/\bEdge\s*\d+\s*\/\s*\d+/);
   });
 
-  it("hides inline Edge for genres that don't model edge (both 0)", () => {
+  it("hides inline HP for genres that don't model the pool (both 0)", () => {
     const NO_EDGE_PARTY = [
       {
         ...PARTY[0],
@@ -625,27 +625,28 @@ describe("CharacterPanel — S2-UX: turn-state badges are legible and unambiguou
 });
 
 // ---------------------------------------------------------------------------
-// Edge badge in the header — Sebastien-axis (mechanical visibility)
+// HP badge in the header — mechanics-first players (Sebastien/Jade)
 //
-// ADR-014 ("Diamonds and Coal") + ADR-078 ("Edge / Composure") removed the
-// hit-points field from CreatureCore. The character-panel header used to
-// render an "HP N/M" badge that pulled from edge.current under a misleading
-// label; the rename below locks the badge to the actual schema.
+// ADR-114 (ablative HP substrate) reclaims this pool as the character's HP —
+// the engine logs hp=N/M. The header badge had been labeled "Edge" (a misread
+// of the pool as the confrontation composure metric); these tests lock the
+// badge to the "HP" label. The genuine confrontation Edge dual-dial lives in
+// ConfrontationOverlay and is unaffected.
 // ---------------------------------------------------------------------------
 
-describe("CharacterPanel — Edge badge in header (ADR-014 schema)", () => {
-  it("renders Edge badge when hp + hp_max are present (legacy wire fields, edge value)", () => {
+describe("CharacterPanel — HP badge in header (ADR-114 substrate)", () => {
+  it("renders HP badge when hp + hp_max are present", () => {
     render(
       <CharacterPanel
         character={{ ...CHARACTER, hp: 18, hp_max: 30 }}
       />,
     );
     const badge = screen.getByTestId("character-edge-badge");
-    expect(badge).toHaveTextContent("Edge 18/30");
-    expect(badge).toHaveAttribute("aria-label", "Edge 18 of 30");
+    expect(badge).toHaveTextContent("HP 18/30");
+    expect(badge).toHaveAttribute("aria-label", "HP 18 of 30");
   });
 
-  it("flags Edge badge as destructive when current is at/below 25% of max", () => {
+  it("flags HP badge as destructive when current is at/below 25% of max", () => {
     render(
       <CharacterPanel
         character={{ ...CHARACTER, hp: 5, hp_max: 30 }}
@@ -655,7 +656,7 @@ describe("CharacterPanel — Edge badge in header (ADR-014 schema)", () => {
     expect(badge.className).toMatch(/destructive/);
   });
 
-  it("does not render Edge badge when hp/hp_max are absent (genres without edge)", () => {
+  it("does not render HP badge when hp/hp_max are absent (genres without the pool)", () => {
     render(<CharacterPanel character={CHARACTER} />);
     expect(screen.queryByTestId("character-edge-badge")).not.toBeInTheDocument();
   });

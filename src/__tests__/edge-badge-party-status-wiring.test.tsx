@@ -1,14 +1,16 @@
 /**
- * S2-BUG (playtest 2026-04-26) — wiring lock for ADR-014 / ADR-078 schema.
+ * S2-BUG (playtest 2026-04-26) — wiring lock for the survivability-pool schema.
  *
- * Server emits PARTY_STATUS with `members[].current_hp` / `members[].max_hp`
- * (legacy wire field names — the values are the EdgePool, not HP). App.tsx
- * fans those into CharacterSummary.hp / hp_max, which the CharacterPanel
- * renders as the Edge badge in the header AND as the inline party-row Edge.
+ * Server emits PARTY_STATUS with `members[].current_hp` / `members[].max_hp`.
+ * App.tsx fans those into CharacterSummary.hp / hp_max, which the
+ * CharacterPanel renders as the HP badge in the header AND as the inline
+ * party-row HP. Per ADR-114 (ablative HP substrate) this pool IS HP — the
+ * engine logs hp=N/M — so the UI labels it "HP". (This is the survivability
+ * pool, NOT the confrontation Edge metric in ConfrontationOverlay.)
  *
  * This wiring test drives that whole pipeline through the React tree so that
- * a regression that re-introduces an "HP" label anywhere in the path is
- * caught at the integration boundary, not just in the component unit tests.
+ * a regression that re-introduces a stale "Edge" label anywhere in the path
+ * is caught at the integration boundary, not just in the component unit tests.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
@@ -60,11 +62,11 @@ function partyStatusToSheet(m: Record<string, unknown>): CharacterSheetData {
 }
 
 describe("CharacterPanel — PARTY_STATUS wiring (ADR-014 schema)", () => {
-  it("renders Edge label end-to-end from a synthetic PARTY_STATUS payload", () => {
+  it("renders HP label end-to-end from a synthetic PARTY_STATUS payload", () => {
     // Synthetic PARTY_STATUS members payload as the server actually emits it
     // (sidequest/server/session_handler.py:_build_session_start_party_status).
-    // current_hp / max_hp are pulled from character.core.edge.current/.max
-    // — see ADR-014 / ADR-078.
+    // current_hp / max_hp are the character's survivability pool (engine hp,
+    // ADR-114) — surfaced in the UI as "HP".
     const members = [
       {
         player_id: "kael-pid",
@@ -105,29 +107,23 @@ describe("CharacterPanel — PARTY_STATUS wiring (ADR-014 schema)", () => {
       />,
     );
 
-    // Header badge: "Edge", not "HP".
+    // Header badge: "HP N/M" (ADR-114), not the stale "Edge" label.
     const badge = screen.getByTestId("character-edge-badge");
-    expect(badge).toHaveTextContent("Edge 18/30");
-    expect(screen.queryByTestId("character-hp-badge")).not.toBeInTheDocument();
+    expect(badge).toHaveTextContent("HP 18/30");
+    expect(badge).toHaveAttribute("aria-label", "HP 18 of 30");
 
-    // Inline party rows: "Edge N/M", not "HP N/M".
+    // Inline party rows: "HP N/M".
     const kaelRow = screen.getByTestId("party-member-edge-kael-pid");
-    expect(kaelRow).toHaveTextContent("Edge 18/30");
+    expect(kaelRow).toHaveTextContent("HP 18/30");
     const lyraRow = screen.getByTestId("party-member-edge-lyra-pid");
-    expect(lyraRow).toHaveTextContent("Edge 7/40");
+    expect(lyraRow).toHaveTextContent("HP 7/40");
     // Lyra at 17.5% should hit the destructive threshold (≤25%).
     expect(lyraRow.className).toMatch(/destructive/);
 
-    // Old testids must not exist anywhere — catches a half-rename.
-    expect(
-      screen.queryByTestId("party-member-hp-kael-pid"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("party-member-hp-lyra-pid"),
-    ).not.toBeInTheDocument();
-
-    // No "HP N/M" text appears anywhere in the panel.
+    // The stale "Edge N/M" survivability label must not appear anywhere in
+    // the panel — catches a half-rename. (The confrontation Edge dual-dial
+    // lives in ConfrontationOverlay, not this panel.)
     const panel = screen.getByTestId("character-panel");
-    expect(panel.textContent ?? "").not.toMatch(/\bHP\s*\d+\s*\/\s*\d+/);
+    expect(panel.textContent ?? "").not.toMatch(/\bEdge\s*\d+\s*\/\s*\d+/);
   });
 });

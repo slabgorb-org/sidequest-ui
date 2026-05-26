@@ -34,7 +34,15 @@ const DEFAULTS: CharacterPanelPrefs = {
 // of a fixed dark palette that clashed with the rest of the page.
 const FOLIO = {
   ink: "var(--card-foreground)",
-  inkSoft: "var(--muted-foreground)",
+  // Side-panel secondary text (party class/level, subtitle, status badges)
+  // was sitting on raw --muted-foreground, which lands near background
+  // luminance in several genre themes (UX review 2026-05-25 needed 1.8–3×
+  // brightness to read names/tab labels). Lift it toward the readable ink
+  // colour by mixing 55% card-foreground into the muted token — stays
+  // theme-driven (both ends resolve through useGenreTheme / ADR-079) instead
+  // of hardcoding a colour, but clears the contrast floor.
+  inkSoft:
+    "color-mix(in oklch, var(--card-foreground) 55%, var(--muted-foreground))",
   paper: "var(--card)",
   paper2: "var(--muted)",
   crimson: "var(--accent)",
@@ -280,13 +288,14 @@ export function CharacterPanel({
           >
             Lv {character.level}
           </div>
-          {/* Edge badge — load-bearing for Sebastien-axis players (mechanical
-              visibility). ADR-014 / ADR-078: HP was removed from CreatureCore
-              in favor of EdgePool (composure currency). Server emits current/max
-              on PARTY_STATUS members as current_hp/max_hp (legacy wire field
-              names — protocol rename is a follow-up); App.tsx fans them out
-              into hp/hp_max on CharacterSheetData. Hidden when both are absent
-              (genres that don't model edge) so we never render a fake "0/0". */}
+          {/* HP / Vitality badge — load-bearing for the mechanics-first
+              players (Sebastien/Jade). ADR-114 (ablative HP substrate)
+              reclaims this pool as HP: the engine logs hp=N/M and this is the
+              character's survivability/vitality, NOT the confrontation Edge
+              metric (that lives in ConfrontationOverlay's dual-dial). Server
+              emits current/max on PARTY_STATUS members as current_hp/max_hp;
+              App.tsx fans them into hp/hp_max on CharacterSheetData. Hidden
+              when both are absent so we never render a fake "0/0". */}
           {hasEdge && (
             <EdgeBadge current={character.hp!} max={character.hp_max!} />
           )}
@@ -332,7 +341,7 @@ export function CharacterPanel({
                 border: "none",
                 cursor: "pointer",
                 color: active ? FOLIO.gold : FOLIO.ink,
-                opacity: active ? 1 : 0.85,
+                opacity: active ? 1 : 0.95,
                 borderBottom: active
                   ? `2px solid ${FOLIO.gold}`
                   : "2px solid transparent",
@@ -546,7 +555,7 @@ export function CharacterPanel({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          Edge {c.hp}/{c.hp_max}
+                          HP {c.hp}/{c.hp_max}
                         </span>
                       </>
                     )}
@@ -687,7 +696,8 @@ function EdgeBadge({ current, max }: { current: number; max: number }) {
     <div
       data-testid="character-edge-badge"
       className={`px-2 py-0.5 rounded-md text-xs border font-mono ${tone}`}
-      aria-label={`Edge ${current} of ${max}`}
+      aria-label={`HP ${current} of ${max}`}
+      title="HP / Vitality"
       style={{
         borderColor: danger ? FOLIO.crimson : FOLIO.gold,
         color: danger ? FOLIO.crimson : FOLIO.ink,
@@ -697,7 +707,7 @@ function EdgeBadge({ current, max }: { current: number; max: number }) {
         borderRadius: 2,
       }}
     >
-      Edge {current}/{max}
+      HP {current}/{max}
     </div>
   );
 }
@@ -723,14 +733,17 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
       }}
     >
       <span
+        title="HP / Vitality"
         style={{
           fontFamily: FONT_LABEL,
           fontSize: 14,
           color: FOLIO.gold,
           letterSpacing: 1,
+          whiteSpace: "nowrap",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
-        Edge
+        HP {current}/{cap}
       </span>
       <div
         style={{
