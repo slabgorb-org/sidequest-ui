@@ -21,6 +21,11 @@ export const MessageType = {
   CHARACTER_CREATION: "CHARACTER_CREATION",
   SESSION_EVENT: "SESSION_EVENT",
   ERROR: "ERROR",
+  // Story 67-1: outbound crash signal. When a render subtree (e.g. GameBoard)
+  // throws and its ErrorBoundary catches it, the boundary reports the crash
+  // over the still-open socket so the server can release this player from the
+  // submit-and-wait turn barrier instead of orphaning the whole table's turn.
+  CLIENT_ERROR: "CLIENT_ERROR",
   IMAGE: "IMAGE",
   AUDIO_CUE: "AUDIO_CUE",
   NARRATION_END: "NARRATION_END",
