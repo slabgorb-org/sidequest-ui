@@ -80,7 +80,21 @@ export function LocationPanel({ data }: LocationPanelProps) {
           flexWrap: "wrap",
         }}
       >
-        <span>{prettifyRegionId(data.region_id)}</span>
+        {data.reference_url ? (
+          // Story 63-6: deep-link the region header into the /reference/lore
+          // wiki (mirrors the CharacterSheet class-subtitle anchor). Plain
+          // text when no anchor exists.
+          <a
+            href={data.reference_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: FOLIO.ink, textDecoration: "underline" }}
+          >
+            {prettifyRegionId(data.region_id)}
+          </a>
+        ) : (
+          <span>{prettifyRegionId(data.region_id)}</span>
+        )}
         {data.terrain ? (
           <span data-testid="location-terrain-badge" style={badgeStyle()}>
             {data.terrain}

@@ -756,6 +756,9 @@ export interface LocationDescriptionPayload {
   terrain: string | null;
   entities: LocationEntity[];
   overlays: LocationDescriptionOverlaySummary[];
+  /** Story 63-6: deep-link from the region header into the /reference/lore
+   * wiki; null/absent when the region has no lore-page anchor. */
+  reference_url?: string | null;
 }
 
 // Story 54-7 / ADR-109: delta-channel payload for encounter location
