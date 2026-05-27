@@ -436,7 +436,7 @@ export function CharacterPanel({
                   "flex items-center gap-2 p-2 rounded-md bg-card border border-border/50",
                   "transition-all duration-300",
                   isActing ? "ring-2 ring-primary" : "",
-                  isWaiting ? "opacity-65" : "",
+                  isWaiting ? "opacity-90" : "",
                 ].filter(Boolean).join(" ")}
                 style={{
                   background: FOLIO.paper2,
@@ -504,7 +504,7 @@ export function CharacterPanel({
                             className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
                             style={{ background: FOLIO.crimson }}
                           />
-                          ACTING
+                          Composing
                         </span>
                       </>
                     )}
@@ -513,15 +513,16 @@ export function CharacterPanel({
                         {" "}
                         <span
                           data-testid={`party-member-waiting-badge-${c.player_id}`}
-                          className="ml-1 inline-block align-middle rounded-sm border border-muted-foreground/30 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                          className="ml-1 inline-flex items-center gap-1 align-middle rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                           style={{
-                            borderColor: FOLIO.rule,
-                            color: FOLIO.inkSoft,
+                            background: "color-mix(in srgb, #047857 12%, transparent)",
+                            border: "1px solid color-mix(in srgb, #047857 45%, transparent)",
+                            color: "#047857",
                             fontFamily: FONT_DISPLAY,
                             letterSpacing: 1.2,
                           }}
                         >
-                          Waiting
+                          ✓ Sealed
                         </span>
                       </>
                     )}

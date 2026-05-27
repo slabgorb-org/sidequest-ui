@@ -27,7 +27,7 @@ describe("PeerRevealList", () => {
   it("renders a composing row with header + action text", () => {
     const map = new Map([["p2", reveal({ action: "I creep" })]]);
     render(<PeerRevealList reveals={map} partyOrder={partyOrder} />);
-    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Composing/i)).toBeInTheDocument();
     expect(screen.getByText(/I creep/)).toBeInTheDocument();
   });
 
@@ -36,7 +36,7 @@ describe("PeerRevealList", () => {
       ["p2", reveal({ status: "submitted", action: "I draw my pistol" })],
     ]);
     render(<PeerRevealList reveals={map} partyOrder={partyOrder} />);
-    expect(screen.getByText(/Bob.*submitted/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Sealed/)).toBeInTheDocument();
     expect(screen.getByText(/I draw my pistol/)).toBeInTheDocument();
   });
 
@@ -74,8 +74,8 @@ describe("PeerRevealList", () => {
       ],
     ]);
     render(<PeerRevealList reveals={map} partyOrder={partyOrder} />);
-    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
-    expect(screen.getByText(/Carol.*submitted/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Composing/i)).toBeInTheDocument();
+    expect(screen.getByText(/Carol.*Sealed/)).toBeInTheDocument();
     expect(screen.getByText(/step left/)).toBeInTheDocument();
     expect(screen.getByText(/draw blade/)).toBeInTheDocument();
   });
@@ -106,8 +106,8 @@ describe("PeerRevealList", () => {
         sealedPlayerIds={new Set(["p2"])}
       />,
     );
-    expect(screen.getByText(/Bob.*submitted/)).toBeInTheDocument();
-    expect(screen.queryByText(/Bob is composing/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Sealed/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bob.*Composing/i)).not.toBeInTheDocument();
     expect(screen.getByText(/I draw my torch/)).toBeInTheDocument();
     const row = screen.getByTestId("peer-reveal-row-p2");
     expect(row.getAttribute("data-effective-submitted")).toBe("true");
@@ -125,7 +125,7 @@ describe("PeerRevealList", () => {
         sealedPlayerIds={new Set(["p3"])}
       />,
     );
-    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Composing/i)).toBeInTheDocument();
     const row = screen.getByTestId("peer-reveal-row-p2");
     expect(row.getAttribute("data-effective-submitted")).toBe("false");
   });

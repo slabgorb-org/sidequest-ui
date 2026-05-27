@@ -557,6 +557,24 @@ export function GameBoard({
         peersOutstanding={peersOutstanding}
       />
       {confrontationPanel}
+      {/* Slow-typist reassurance (sq-playtest 2026-05-27, for Alex): when a
+          peer has already sealed and the local player is still composing,
+          a calm, TIMER-FREE line tells them they aren't holding the table
+          up. Never a countdown/progress bar — the submit-and-wait barrier
+          exists precisely to remove time pressure (ADR-036). */}
+      {isMultiplayer &&
+        mpInputState === "free" &&
+        sealedPlayerIds &&
+        [...sealedPlayerIds].some((id) => id !== currentPlayerId) && (
+          <p
+            data-testid="slow-typist-reassurance"
+            role="note"
+            className="px-3 py-1 mb-1 text-xs italic text-foreground/75"
+          >
+            Sealed actions are waiting with you — take your time. The story
+            continues once everyone&apos;s ready.
+          </p>
+        )}
       <InputBar
         ref={inputBarRef}
         onSend={onSend}

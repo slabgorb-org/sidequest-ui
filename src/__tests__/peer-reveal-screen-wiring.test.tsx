@@ -49,12 +49,12 @@ describe("PeerRevealList + usePeerReveals wiring", () => {
     act(() => {
       getByTestId("apply").click();
     });
-    expect(queryByText(/Bob is composing/)).not.toBeNull();
+    expect(queryByText(/Bob.*Composing/i)).not.toBeNull();
     expect(queryByText(/I sneak/)).not.toBeNull();
 
     act(() => {
       getByTestId("advance").click();
     });
-    expect(queryByText(/Bob is composing/)).toBeNull();
+    expect(queryByText(/Bob.*Composing/i)).toBeNull();
   });
 });

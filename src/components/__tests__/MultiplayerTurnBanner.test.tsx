@@ -176,10 +176,15 @@ describe("MultiplayerTurnBanner", () => {
       expect(banner).toHaveTextContent(/waiting for the narrator/i);
     });
 
-    it("'free' + peer has acted reframes from 'their turn' to 'your move'", () => {
-      // Critical playtest 2026-04-29 fix: the prior banner said "It's
-      // Shirley's turn…" when Shirley submitted but Laverne hadn't, which
-      // implied alternating-turn (wrong for the simultaneous server model).
+    it("'free' + peer has sealed cues the LOCAL player only — no peer echo", () => {
+      // Playtest 2026-04-29 fix: the prior banner said "It's Shirley's
+      // turn…" when Shirley submitted but Laverne hadn't, implying
+      // alternating turns (wrong for the simultaneous server model).
+      // Playtest 2026-05-27 follow-up: the interim "Shirley acted —
+      // declare your action" was a THIRD amber echo of Shirley's sealed
+      // state (already shown, with her action text, in the PeerRevealList
+      // card). The banner now carries only the LOCAL call-to-action in the
+      // "you" voice; the peer's status is not repeated here.
       render(
         <MultiplayerTurnBanner
           isMultiplayer={true}
@@ -193,8 +198,9 @@ describe("MultiplayerTurnBanner", () => {
         />,
       );
       const banner = screen.getByTestId("multiplayer-turn-banner");
-      expect(banner).toHaveAttribute("data-tone", "peer");
-      expect(banner).toHaveTextContent(/shirley acted — declare your action/i);
+      expect(banner).toHaveAttribute("data-tone", "you");
+      expect(banner).toHaveTextContent(/laverne — declare your action/i);
+      expect(banner).not.toHaveTextContent(/shirley acted/i);
       expect(banner).not.toHaveTextContent(/it's shirley's turn/i);
     });
 
