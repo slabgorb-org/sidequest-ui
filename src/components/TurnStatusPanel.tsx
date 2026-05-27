@@ -131,7 +131,7 @@ export function TurnStatusPanel({
         );
       })}
       {isStructured && !allResolved && (
-        <span className="text-muted-foreground ml-2">({sealedCount}/{deduped.length})</span>
+        <span className="text-foreground/70 ml-2">{sealedCount} of {deduped.length} ready</span>
       )}
       {isStructured && allResolved && (
         <span className="text-emerald-400 ml-2 font-medium">All letters sealed — resolving…</span>

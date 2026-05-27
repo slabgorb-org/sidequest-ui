@@ -180,7 +180,7 @@ describe("ACTION_REVEAL end-to-end wiring", () => {
       );
     });
 
-    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Composing/i)).toBeInTheDocument();
     expect(screen.getByText("I draw")).toBeInTheDocument();
   });
 
@@ -218,7 +218,7 @@ describe("ACTION_REVEAL end-to-end wiring", () => {
       );
     });
 
-    expect(screen.getByText(/Bob is composing/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Composing/i)).toBeInTheDocument();
 
     // Now flip to submitted with a higher seq.
     act(() => {
@@ -242,6 +242,6 @@ describe("ACTION_REVEAL end-to-end wiring", () => {
     });
 
     // PeerRevealList renders "Bob ✓ submitted" for submitted status.
-    expect(screen.getByText(/Bob.*submitted/)).toBeInTheDocument();
+    expect(screen.getByText(/Bob.*Sealed/)).toBeInTheDocument();
   });
 });

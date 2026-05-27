@@ -494,7 +494,9 @@ describe("CharacterPanel — S2-UX: turn-state badges are legible and unambiguou
     );
     const actingBadge = screen.getByTestId("party-member-acting-badge-p2");
     expect(actingBadge).toBeInTheDocument();
-    expect(actingBadge).toHaveTextContent(/ACTING/);
+    // Verb chain unified to Composing → Sealed → Resolving (sq-playtest
+    // 2026-05-27): the active-player badge reads "Composing", not "ACTING".
+    expect(actingBadge).toHaveTextContent(/Composing/);
     // The pulse dot is the kinetic signal Alex needs to see at a glance
     // that someone is mid-turn (per S2-UX (b)).
     expect(within(actingBadge).getByTestId("party-member-acting-pulse-p2")).toBeInTheDocument();

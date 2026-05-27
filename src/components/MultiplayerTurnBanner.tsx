@@ -96,13 +96,14 @@ export function MultiplayerTurnBanner({
       label = "Waiting on your party to act…";
     }
     tone = "peer";
-  } else if (mpInputState === "free" && activePlayerName && !localIsActive) {
-    // A peer has acted but local hasn't yet — simultaneous model: not
-    // their "turn", their declaration. Cue the local player to act
-    // rather than telling them to wait.
-    label = `${activePlayerName} acted — declare your action`;
-    tone = "peer";
   } else if (mpInputState === "free") {
+    // Local hasn't sealed yet. Whether or not a peer has already sealed,
+    // cue the LOCAL player to act in their own ("you") voice. A peer's
+    // sealed status is shown — once, with its action text — in the
+    // PeerRevealList card above, so the old amber "<peer> acted — declare
+    // your action" line here was a third, color-conflicting echo of the
+    // same fact (sq-playtest 2026-05-27: peer-state told 3× in 3 places).
+    // The banner's job is the local call-to-action, not peer status.
     label = localCharacterName
       ? `${localCharacterName} — declare your action`
       : "Declare your action";

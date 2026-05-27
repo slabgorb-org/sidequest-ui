@@ -60,11 +60,13 @@ export function PeerRevealList({
         >
           <span
             data-testid="peer-reveal-header"
-            className="text-xs uppercase tracking-wide opacity-70"
+            className={`text-xs uppercase tracking-wide font-medium ${
+              effectiveSubmitted ? "text-emerald-300" : "text-amber-300"
+            }`}
           >
             {effectiveSubmitted
-              ? `${r.character_name} ✓ submitted`
-              : `${r.character_name} is composing`}
+              ? `${r.character_name} ✓ Sealed`
+              : `${r.character_name} Composing…`}
           </span>
           <span
             data-aside={r.aside ? "true" : "false"}
