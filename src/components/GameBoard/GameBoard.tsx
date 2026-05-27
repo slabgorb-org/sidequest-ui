@@ -52,6 +52,7 @@ import type {
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
 import { PeerRevealList } from "@/components/PeerRevealList";
+import { HpPipScale } from "@/components/HpPipScale";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 import type { MagicState } from "@/types/magic";
 import type { OrbitalIntent, OrbitalIntentResponse } from "@/types/orbital-intent";
@@ -532,7 +533,7 @@ export function GameBoard({
   ) : null;
 
   const inputBar = (
-    <div className="flex flex-col">
+    <div data-testid="gameboard-input-region" className="flex flex-col w-full">
       <PeerRevealList
         reveals={peerReveals ?? new Map()}
         partyOrder={partyOrder}
@@ -567,6 +568,10 @@ export function GameBoard({
         round={round}
         confrontationActive={confrontationData != null}
       />
+      {/* Co-located high-contrast HP pip scale (Story 69-2): keeps the local
+          player's HP glanceable right at the input for mechanics-first
+          players, without a Dockview tab switch. Hierarchy: input → HP. */}
+      <HpPipScale characters={characters} currentPlayerId={currentPlayerId} />
     </div>
   );
 
