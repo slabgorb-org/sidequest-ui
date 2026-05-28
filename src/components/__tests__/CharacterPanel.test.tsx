@@ -1014,3 +1014,154 @@ describe("CharacterPanel — Story 56-1: controlling player name (MP)", () => {
     expect((row as HTMLElement).textContent ?? "").not.toMatch(/—\s*[A-Za-z]/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 67-4: MP identity mapping — stop rendering the doubled "X — X" header
+//
+// Regression: Story 56-1 (commit 173f5b1) appended "— {player_id}" after the
+// character name in the MP header, where `player_id` carries the controlling
+// player's display string. When a player's handle equals their character name
+// (a common, legitimate identity collision — players name a PC after their own
+// handle), the header reads "Kael — Kael". CharacterSheet.tsx already guards
+// this with `player_id !== name`; CharacterPanel.tsx does NOT — it gates the
+// suffix only on `player_id && characters.length > 1`. These tests lock the
+// player-vs-character identity contract (ADR-037): the controlling-player
+// suffix renders ONLY when it adds information, i.e. when it differs from the
+// character name. Both components must agree.
+// ---------------------------------------------------------------------------
+describe("CharacterPanel — Story 67-4: no doubled player==character header (MP)", () => {
+  it("suppresses the controlling-player suffix when player_id equals the character name", () => {
+    // The bug case: handle == character name. The "— Kael" suffix would
+    // duplicate the name already shown. It must NOT render.
+    const character: CharacterSheetData = {
+      ...CHARACTER, // name: "Kael"
+      player_id: "Kael",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Kael",
+            name: "Kael",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Kael"
+      />,
+    );
+    // The suffix span must be absent — there is no distinct player identity
+    // to surface.
+    expect(
+      screen.queryByTestId("character-panel-player-name"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the character name exactly once when player_id equals it (no 'X — X')", () => {
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Kael",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Kael",
+            name: "Kael",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Kael"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    // The doubled "Kael — Kael" rendering is the defect. The header must
+    // carry the name once, with no em-dash attribution duplicating it.
+    expect(header.textContent ?? "").not.toMatch(/Kael\s*—\s*Kael/);
+    expect(header.textContent ?? "").not.toMatch(/—\s*Kael/);
+  });
+
+  it("PROTECTIVE LOCK: still renders the suffix when player_id differs from the character name", () => {
+    // The fix must SUPPRESS only the redundant (equal) case — it must not
+    // over-correct and drop the genuinely-informative suffix. Sebastien
+    // controlling "Kael" must still read "Kael — Sebastien".
+    const character: CharacterSheetData = {
+      ...CHARACTER, // name: "Kael"
+      player_id: "Sebastien",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const suffix = screen.getByTestId("character-panel-player-name");
+    expect(suffix).toBeInTheDocument();
+    expect(suffix.textContent ?? "").toMatch(/Sebastien/);
+  });
+
+  it("wiring: MP party where the local player's handle == character name renders no doubled header", () => {
+    // End-to-end-shaped: a full MP roster (>1 PC) where the focused player's
+    // controlling identity collides with their character name. Proves the
+    // suppression holds through the same prop path production uses (App.tsx
+    // builds CharacterSheetData.player_id from the PARTY_STATUS member and
+    // gates on characters.length > 1).
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      name: "Rux",
+      player_id: "Rux",
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Rux",
+            name: "Rux",
+            character_name: "Rux",
+            hp: 20,
+            hp_max: 20,
+            status_effects: [],
+            class: "Ranger",
+            level: 2,
+            current_location: "The Rusty Cantina",
+          },
+          { ...SECOND_PC_SUMMARY, player_id: "Jade", name: "Jade", character_name: "Vesper" },
+        ]}
+        currentPlayerId="Rux"
+      />,
+    );
+    const header = screen.getByTestId("character-header");
+    expect(header.textContent ?? "").not.toMatch(/Rux\s*—\s*Rux/);
+    expect(screen.queryByTestId("character-panel-player-name")).not.toBeInTheDocument();
+  });
+});

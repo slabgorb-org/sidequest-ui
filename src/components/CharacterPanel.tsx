@@ -239,8 +239,12 @@ export function CharacterPanel({
                 multiplayer signal App.tsx uses; the canonical isMultiplayer
                 in GameBoard.tsx:456-458 is broader). Defense in depth
                 alongside App.tsx, which already leaves player_id undefined
-                in SP. AC-4 single-player suppression is the load-bearing AC. */}
-            {character.player_id && characters && characters.length > 1 ? (
+                in SP. AC-4 single-player suppression is the load-bearing AC.
+                Story 67-4: also suppress when player_id == name — a player
+                whose identity equals their character name would render a
+                doubled "Kael — Kael" header. Mirrors CharacterSheet.tsx's
+                `player_id !== data.name` guard so the two surfaces agree. */}
+            {character.player_id && character.player_id !== character.name && characters && characters.length > 1 ? (
               <span
                 data-testid="character-panel-player-name"
                 className="ml-2 text-xs font-normal"
