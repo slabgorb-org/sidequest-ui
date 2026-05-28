@@ -408,11 +408,18 @@ function AppInner() {
   // resolution). Gates the AC-2 NARRATION_END clear so that a NARRATION_END
   // resolving a turn the local player did NOT submit into (e.g. another
   // player's round-trip / an auto-resolved barrier in MP) cannot wipe THIS
-  // player's transient error. Armed on local submit (handleSend) and on the
-  // server's authoritative "waiting" SESSION_EVENT (which means this player
-  // already submitted); disarmed when the local action bounces (transient
-  // error set) and after every NARRATION_END turn boundary. A ref, not state —
-  // read synchronously inside handleMessage without a re-render.
+  // player's transient error.
+  //   ARMED on every genuine local submit that round-trips to NARRATION_END:
+  //     - handleSend (text PLAYER_ACTION, non-aside)
+  //     - handleDiceThrow's beat-roll block (DICE_THROW with a beat_id)
+  //     - handleYield (YIELD)
+  //   DISARMED when the local action bounces (both transient-error set sites)
+  //   and at every NARRATION_END turn boundary (unconditional reset).
+  //   auto_resolved never arms — the server resolved for the player, so none
+  //   of those handlers ran — so an auto-resolved player's stale error survives
+  //   the round (AC-4 hole stays closed).
+  // A ref, not state — read synchronously inside handleMessage without a
+  // re-render.
   const localTurnInFlightRef = useRef(false);
 
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
@@ -636,10 +643,6 @@ function AppInner() {
         // lock input until narration arrives (NarrationEnd re-enables it).
         setCanType(false);
         setThinking(true);
-        // Story 71-3 (AC-4): authoritative "this player submitted" signal —
-        // arm the in-flight gate so the upcoming NARRATION_END (the local
-        // player's own round-trip) is allowed to clear a stale transient error.
-        localTurnInFlightRef.current = true;
       }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
@@ -1455,6 +1458,11 @@ function AppInner() {
       if (beatId) {
         setCanType(false);
         setThinking(true);
+        // Story 71-3 (AC-2/AC-4): a beat roll is a genuine local turn
+        // submission that round-trips to NARRATION_END — arm the in-flight
+        // gate so a stale transient error clears when the beat resolves
+        // (confrontation play, where Sebastien/Jade live, hits this constantly).
+        localTurnInFlightRef.current = true;
       }
     },
     [diceRequest, send],
@@ -1468,6 +1476,10 @@ function AppInner() {
       payload: {},
       player_id: "",
     });
+    // Story 71-3 (AC-2/AC-4): a yield is a genuine local turn submission that
+    // round-trips to NARRATION_END — arm the in-flight gate so a stale
+    // transient error clears when the yield resolves.
+    localTurnInFlightRef.current = true;
   }, [send]);
 
   const navigate = useNavigate();
