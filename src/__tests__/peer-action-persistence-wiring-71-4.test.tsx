@@ -7,7 +7,7 @@
  *   useGameSocket → onMessage → usePeerReveals.apply (real hook)
  *   → on TURN_STATUS{resolved}: SNAPSHOT the filtered reveals BEFORE clear()
  *     (the ephemeral→persistent bridge — Architect ruling A1)
- *   → real NarrationCards (peerActions prop) → buildSegments → renderSegment
+ *   → real NarrationCards (peerActionsByRound prop) → buildSegments → renderSegment
  *
  * The Host mirrors App.tsx's wiring (the snapshot-before-clear handler Dev
  * implements in GREEN). The load-bearing assertions are on the RENDERED
