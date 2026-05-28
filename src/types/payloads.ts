@@ -164,6 +164,9 @@ export interface PartyStatusPayload {
 export interface PlayerActionPayload {
   action: string;
   aside?: boolean;
+  /** Round (ADR-051) the action was submitted in. Anchors the peer-action
+   * transcript by exact round instead of arrival position (Story 71-10). */
+  round: number;
 }
 
 export interface MapUpdatePayload {
