@@ -581,6 +581,16 @@ function AppInner() {
         // the DC for the next click (playtest-pingpong 2026-04-24).
         setDiceRequest(null);
         setDiceResult(null);
+        // Story 71-3 (AC-2): a completed turn round-trip clears the stale
+        // transient-error banner. If the player's prior action bounced (e.g.
+        // a session_unbound "please retry" notice) and the retry succeeds,
+        // NARRATION_END is the success signal — drop the now-stale error so it
+        // doesn't overlay the fresh narration. Scoped to NARRATION_END (the
+        // turn boundary), NOT streaming NARRATION frames, so peer/MP narration
+        // that isn't a turn completion can't false-clear it (AC-4). Placed at
+        // the end of the branch (order is immaterial — React batches these
+        // setState calls within one handler).
+        setTransientError(null);
       }
       return;
     }
@@ -1142,6 +1152,22 @@ function AppInner() {
     if (!isReconnecting) return;
     const timer = setTimeout(() => setOffline(true), 3000);
     return () => clearTimeout(timer);
+  }, [readyState, isReconnecting]);
+
+  // Story 71-3 (AC-1): clear the stale transient-error banner once the socket
+  // has successfully reconnected. Keyed ONLY on [readyState, isReconnecting]
+  // so it fires on connection-state transitions — never on transientError
+  // changes. A validation rejection that arrives while the socket is healthy
+  // (OPEN, not reconnecting) does NOT re-run this effect, because setting
+  // transientError doesn't touch either dep, so the live error persists for
+  // the user to read/correct. The clear only lands on the OPEN-and-not-
+  // reconnecting transition that marks a *successful* reconnect; a failed
+  // reconnect keeps readyState != OPEN and isReconnecting true, so the guard
+  // stays false and the error survives the failed attempt (AC-4).
+  useEffect(() => {
+    if (!isReconnecting && readyState === WebSocket.OPEN) {
+      setTransientError(null);
+    }
   }, [readyState, isReconnecting]);
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
