@@ -200,16 +200,25 @@ export function renderSegment(
           {seg.text}
         </div>
       );
-    case "player-action":
+    case "player-action": {
+      // Story 71-4: own vs peer contrast hierarchy (AC1/AC3). Own actions use
+      // the high-contrast `text-foreground` token (WCAG AA ≥4.5:1); peer actions
+      // use the lower-contrast `text-muted-foreground` token. The old
+      // `text-muted-foreground/70` opacity (the AC1 readability bug) is removed
+      // from BOTH paths. `data-peer` exposes the discriminator for assertions.
+      const isPeer = seg.is_peer === true;
+      const contrastClass = isPeer ? "text-muted-foreground" : "text-foreground";
       return (
         <div
           key={i}
           data-testid="player-action"
-          className="player-action text-base text-muted-foreground/70 italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20"
+          data-peer={isPeer ? "true" : "false"}
+          className={`player-action text-base ${contrastClass} italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20`}
         >
-          {seg.text}
+          {isPeer && seg.character_name ? `${seg.character_name}: ${seg.text}` : seg.text}
         </div>
       );
+    }
     case "player-aside":
       return (
         <div

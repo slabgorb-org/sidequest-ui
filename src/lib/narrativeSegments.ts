@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
-import type { FootnoteData } from "@/types/payloads";
+import type { FootnoteData, ActionRevealEntry } from "@/types/payloads";
 
 export type { FootnoteData };
 
@@ -18,6 +18,13 @@ export interface NarrativeSegment {
   footnotes?: FootnoteData[];
   portraitImage?: NarrativeSegment;
   adjacentText?: NarrativeSegment;
+  // Story 71-4: peer-action persistence (ADR-036 collaborative visibility).
+  // A `player-action` segment with `is_peer: true` is a peer's submitted action
+  // persisted into the transcript at the turn boundary — own actions omit the
+  // flag (AC1 high contrast) and peer actions set it (AC3 lower contrast). One
+  // render path, flag-differentiated. `character_name` carries peer attribution.
+  is_peer?: boolean;
+  character_name?: string;
 }
 
 export function markdownToHtml(text: string): string {
@@ -36,20 +43,60 @@ export function markdownToHtml(text: string): string {
   return `<p>${result}</p>`;
 }
 
-export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
+export function buildSegments(
+  messages: GameMessage[],
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>,
+): NarrativeSegment[] {
   const segments: NarrativeSegment[] = [];
 
   const seenNarrationTexts = new Set<string>();
   let lastChapterLocation = "";
 
+  // Story 71-4: persisted peer actions (firewall-filtered accumulator). Peer
+  // action TEXT derives ONLY from this map (sourced from usePeerReveals, which
+  // is downstream of the ADR-104/105 perception firewall) — never from a
+  // TURN_STATUS frame or any broader origin. Each round's submitted peers drop
+  // at that round's turn boundary. PLAYER_ACTION carries no round, so we anchor
+  // positionally: the i-th NARRATION_END boundary ← the i-th captured round
+  // (rounds sorted ascending).
+  const sortedPeerRounds = peerActionsByRound
+    ? [...peerActionsByRound.keys()].sort((a, b) => a - b)
+    : [];
+  let turnBoundaryIndex = 0;
+  // Emit the i-th captured round's submitted peers (seq order) as is_peer
+  // player-action segments. The accumulator already deduped per (player_id,
+  // round). No-op when the index is past the captured rounds.
+  const pushPeerRound = (index: number): void => {
+    const roundKey = sortedPeerRounds[index];
+    if (roundKey === undefined || !peerActionsByRound) return;
+    const peers = [...(peerActionsByRound.get(roundKey) ?? [])].sort(
+      (a, b) => a.seq - b.seq,
+    );
+    for (const entry of peers) {
+      segments.push({
+        kind: "player-action",
+        is_peer: true,
+        text: entry.action,
+        character_name: entry.character_name,
+      });
+    }
+  };
+
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
     switch (msg.type) {
-      case MessageType.NARRATION_END:
+      case MessageType.NARRATION_END: {
+        // Story 71-4: emit this boundary's persisted peer actions BEFORE the
+        // separator, so they anchor AFTER the round's own action + narration
+        // (placement: turn boundary, not interleaved). Positional: the i-th
+        // NARRATION_END boundary ← the i-th captured round.
+        pushPeerRound(turnBoundaryIndex);
+        turnBoundaryIndex += 1;
         if (segments.length > 0 && segments[segments.length - 1].kind !== "separator") {
           segments.push({ kind: "separator" });
         }
         break;
+      }
       case MessageType.NARRATION:
         {
           const narText = msg.payload.text as string;
@@ -193,6 +240,14 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
     }
   }
 
+  // Story 71-4: any captured peer rounds not yet anchored to a NARRATION_END
+  // boundary append after all narration — covers a just-resolved turn whose
+  // NARRATION_END isn't (yet) in `messages` and transcripts with no narration
+  // frames at all (e.g. the e2e wiring harness). Still firewall-safe: source is
+  // exclusively the accumulator.
+  for (let index = turnBoundaryIndex; index < sortedPeerRounds.length; index++) {
+    pushPeerRound(index);
+  }
 
   while (segments.length > 0 && segments[0].kind === "separator") {
     segments.shift();
@@ -233,7 +288,9 @@ export function buildTurnPages(segments: NarrativeSegment[]): NarrativeSegment[]
   let current: NarrativeSegment[] = [];
 
   const isTurnStarter = (s: NarrativeSegment): boolean =>
-    s.kind === "player-action" ||
+    // Story 71-4: a PEER (is_peer) player-action must NOT start a new Focus
+    // page — it belongs to the same turn page as the round's own action.
+    (s.kind === "player-action" && !s.is_peer) ||
     s.kind === "player-aside";
 
   for (const seg of segments) {

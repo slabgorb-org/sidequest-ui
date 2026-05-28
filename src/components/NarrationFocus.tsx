@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { buildSegments, buildTurnPages } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
+import type { ActionRevealEntry } from "@/types/payloads";
 import { renderSegment } from "./narrativeRenderers";
 import { ThinkingIndicator } from "./NarrationShared";
 
@@ -9,6 +10,8 @@ export interface NarrationFocusProps {
   thinking?: boolean;
   /** Genre slug — selects which loader pair drives the thinking indicator. */
   genreSlug?: string | null;
+  /** Story 71-4: per-round persisted peer actions (firewall-filtered). */
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
 }
 
 /**
@@ -22,10 +25,10 @@ export interface NarrationFocusProps {
  * gallery notice, raw player action text) was its own page — so the player
  * read one sentence at a time and typically landed on a side-effect toast.
  */
-export function NarrationFocus({ messages, thinking, genreSlug }: NarrationFocusProps) {
+export function NarrationFocus({ messages, thinking, genreSlug, peerActionsByRound }: NarrationFocusProps) {
   const pages = useMemo(
-    () => buildTurnPages(buildSegments(messages)),
-    [messages],
+    () => buildTurnPages(buildSegments(messages, peerActionsByRound)),
+    [messages, peerActionsByRound],
   );
 
   // Reset cursor to the newest page when the page list grows.

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
+import type { ActionRevealEntry } from "@/types/payloads";
 import { renderSegment } from "./narrativeRenderers";
 import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
 
@@ -10,6 +11,12 @@ export interface NarrationCardsProps {
   thinking?: boolean;
   /** Genre slug — selects which loader pair drives the thinking indicator. */
   genreSlug?: string | null;
+  /**
+   * Story 71-4: per-round persisted peer actions (firewall-filtered
+   * accumulator from usePersistedPeerActions). Threaded into buildSegments so
+   * submitted peer actions persist into the transcript post-resolution.
+   */
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
 }
 
 /** Turn boundary kinds — a new turn card starts at these segment types. */
@@ -30,7 +37,9 @@ function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
   let current: NarrativeSegment[] | null = null;
 
   for (const seg of segments) {
-    if (TURN_STARTERS.has(seg.kind)) {
+    // Story 71-4: a PEER (is_peer) player-action must NOT start a new turn
+    // card — it belongs to the same turn as the round's own action.
+    if (TURN_STARTERS.has(seg.kind) && !seg.is_peer) {
       // Flush any in-progress turn, then start a new one
       if (current) turns.push(current);
       current = [seg];
@@ -47,10 +56,10 @@ function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
   return turns;
 }
 
-export function NarrationCards({ messages, thinking, genreSlug }: NarrationCardsProps) {
+export function NarrationCards({ messages, thinking, genreSlug, peerActionsByRound }: NarrationCardsProps) {
   const segments = useMemo(
-    () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
-    [messages],
+    () => groupPortraitSegments(buildSegments(messages, peerActionsByRound)).filter((s) => s.kind !== "separator"),
+    [messages, peerActionsByRound],
   );
 
   const turns = useMemo(() => groupIntoTurns(segments), [segments]);
