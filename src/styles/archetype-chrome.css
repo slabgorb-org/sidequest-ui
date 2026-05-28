@@ -472,7 +472,16 @@
   line-height: 1.55;
 }
 [data-archetype="terminal"] .narr-text em {
-  color: var(--accent);
+  /* Use the purpose-built --em-color channel, NOT the shadcn accent token. The
+     accent token is part of the shadcn palette that .dark redeclares on the
+     app-root element — a closer ancestor than :root[data-genre] — so the genre's
+     bright accent is shadowed by .dark's near-black oklch(0.269...) for every
+     descendant, rendering dialogue/internal-monologue em near-invisible on the
+     dark bridge background. --em-color is declared on [data-archetype="terminal"]
+     (line ~150), is custom (never in the shadcn palette), so .dark cannot shadow
+     it. Fallback literal in case the archetype var is ever out of scope.
+     Regressed by 7d83ffa; original channel intent restored. */
+  color: var(--em-color, #FFD976);
   font-style: normal;
   font-weight: 500;
 }

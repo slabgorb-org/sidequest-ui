@@ -52,7 +52,7 @@ All paths are relative to `src/components/` unless noted.
 | `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), images |
 | `CharacterPanel.tsx`       | Persistent themed sidebar showing active character            |
 | `PartyPanel.tsx`           | Party portraits, Edge bars, status effects, recruited-NPC companions |
-| `CharacterSheet.tsx`       | Stats grid, abilities, backstory, narrative voice (ADR-040). HP is removed (story 45-35); Edge/Composure replaces it (ADR-078) |
+| `CharacterSheet.tsx`       | Stats grid, abilities, backstory, narrative voice (ADR-040). Renders an HP/vitality bar (ADR-114, HP reinstated after ADR-078's removal). Note: some `Edge`-named identifiers persist here from an incomplete rename and now carry HP values |
 | `AbilitiesContent.tsx`     | Lv1 Abilities tab: signature ability + Sensitivities + class_moves + magic block (ADR-095) |
 | `InventoryPanel.tsx`       | Items grouped by type, equipped state, currency               |
 | `MapOverlay.tsx` + `Automapper.tsx` + `DungeonMapRenderer.tsx` + `TacticalGridRenderer.tsx` | SVG / grid map rendering. Cavern renderer revival (ADR-096) adds image-mode PNG tactical maps |

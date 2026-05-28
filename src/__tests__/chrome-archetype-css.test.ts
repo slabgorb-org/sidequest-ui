@@ -254,23 +254,34 @@ describe("archetype CSS wiring", () => {
 // revert of c97acc7. c97acc7 wrongly recolored terminal `em` to --foreground
 // to survive a *missing* genre theme — masking the real defect (unguarded
 // theme_css transport, now loud-failed in useGenreTheme). The correct CRT
-// identity is two distinct channels: emphasis (`em`) on the accent channel,
-// strong (`strong`) on the primary channel. This guards that identity WITHOUT
-// re-encoding the false "em must be --foreground" invariant.
-// (sq-playtest-pingpong [BS-BUG] "theme_css transport has no loud-fail", part 2)
+// identity is two distinct channels: emphasis (`em`) on the --em-color channel,
+// strong (`strong`) on the primary channel.
+//
+// REGRESSION GUARD (this revision): em must NOT use --accent. --accent is a
+// shadcn palette token that the `.dark` class redeclares on the app-root element
+// — a closer ancestor than `:root[data-genre]` — so the genre's bright accent is
+// shadowed by .dark's near-black oklch(0.269...) for descendants. Routing em
+// through --accent (commit 7d83ffa) therefore rendered dialogue/internal em
+// near-invisible even when the genre theme loaded correctly. --em-color is the
+// custom, un-shadowable channel (declared on [data-archetype="terminal"]) built
+// for exactly this. strong stays on --primary, which is bright enough under
+// .dark to remain legible (latent same-shadowing, but not a legibility defect).
+// (sq-playtest-pingpong [BS-BUG] "terminal em invisible — --accent shadowed by .dark")
 // ---------------------------------------------------------------------------
 
 describe("terminal emphasis two-channel identity", () => {
-  it("terminal .narr-text em renders on the accent channel (var(--accent))", () => {
+  it("terminal .narr-text em renders on the un-shadowable --em-color channel", () => {
     const css = loadArchetypeCSS();
     const emBlock = extractRuleBlock(
       css,
       '[data-archetype="terminal"] .narr-text em',
     );
     expect(emBlock).not.toBe("");
-    expect(emBlock).toMatch(/color:\s*var\(--accent\)/);
+    expect(emBlock).toMatch(/color:\s*var\(--em-color/);
     // The false invariant from c97acc7 — must NOT come back.
     expect(emBlock).not.toMatch(/color:\s*var\(--foreground\)/);
+    // The 7d83ffa regression — must NOT come back. --accent is shadowed by .dark.
+    expect(emBlock).not.toMatch(/color:\s*var\(--accent\)/);
   });
 
   it("terminal .narr-text strong renders on the primary channel (var(--primary))", () => {
@@ -293,9 +304,9 @@ describe("terminal emphasis two-channel identity", () => {
       css,
       '[data-archetype="terminal"] .narr-text strong',
     );
-    const emColor = emBlock.match(/color:\s*(var\(--[a-z]+\))/)?.[1];
-    const strongColor = strongBlock.match(/color:\s*(var\(--[a-z]+\))/)?.[1];
-    expect(emColor).toBe("var(--accent)");
+    const emColor = emBlock.match(/color:\s*(var\(--[a-z-]+)/)?.[1];
+    const strongColor = strongBlock.match(/color:\s*(var\(--[a-z-]+\))/)?.[1];
+    expect(emColor).toBe("var(--em-color");
     expect(strongColor).toBe("var(--primary)");
     expect(emColor).not.toBe(strongColor);
   });
