@@ -25,16 +25,9 @@ import type { ActionRevealEntry } from "@/types/payloads";
 
 type PeerSeg = NarrativeSegment & { is_peer?: boolean; character_name?: string };
 
-type PeerAwareBuild = (
-  messages: GameMessage[],
-  peerActionsByRound?: Map<number, ActionRevealEntry[]>,
-) => NarrativeSegment[];
-const buildWithPeers = buildSegments as PeerAwareBuild;
-
-const NarrationCardsWithPeers = NarrationCards as unknown as (props: {
-  messages: GameMessage[];
-  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
-}) => React.ReactElement;
+// buildSegments and NarrationCards already declare the peerActionsByRound
+// parameter/prop (added in 71-4), so we use them directly — no casts needed.
+const buildWithPeers = buildSegments;
 
 // A full turn: own PLAYER_ACTION carrying its exact round, the narrator's reply,
 // and the NARRATION_END boundary that closes the turn.
@@ -219,7 +212,7 @@ describe("71-10 AC-4 — round anchoring through the real NarrationCards path", 
       [3, [submittedReveal({ player_id: "p2", character_name: "Bob", action: "PEER THREE", round: 3 })]],
     ]);
 
-    render(<NarrationCardsWithPeers messages={messages} peerActionsByRound={peers} />);
+    render(<NarrationCards messages={messages} peerActionsByRound={peers} />);
 
     const cards = screen.getAllByTestId("narration-card");
     const ownTwoCard = cards.find((c) => within(c).queryByText(/OWN TWO/));
