@@ -403,6 +403,18 @@ function AppInner() {
   // NARRATION_END to decide whether the encounter has resolved (fix: playtest-2026-04-12).
   const confrontationReceivedThisTurnRef = useRef(false);
 
+  // Story 71-3 (AC-4, Reviewer-flagged MP hazard): tracks whether the LOCAL
+  // player currently has a turn action in flight (submitted, awaiting
+  // resolution). Gates the AC-2 NARRATION_END clear so that a NARRATION_END
+  // resolving a turn the local player did NOT submit into (e.g. another
+  // player's round-trip / an auto-resolved barrier in MP) cannot wipe THIS
+  // player's transient error. Armed on local submit (handleSend) and on the
+  // server's authoritative "waiting" SESSION_EVENT (which means this player
+  // already submitted); disarmed when the local action bounces (transient
+  // error set) and after every NARRATION_END turn boundary. A ref, not state —
+  // read synchronously inside handleMessage without a re-render.
+  const localTurnInFlightRef = useRef(false);
+
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
@@ -582,15 +594,20 @@ function AppInner() {
         setDiceRequest(null);
         setDiceResult(null);
         // Story 71-3 (AC-2): a completed turn round-trip clears the stale
-        // transient-error banner. If the player's prior action bounced (e.g.
-        // a session_unbound "please retry" notice) and the retry succeeds,
-        // NARRATION_END is the success signal — drop the now-stale error so it
-        // doesn't overlay the fresh narration. Scoped to NARRATION_END (the
-        // turn boundary), NOT streaming NARRATION frames, so peer/MP narration
-        // that isn't a turn completion can't false-clear it (AC-4). Placed at
-        // the end of the branch (order is immaterial — React batches these
-        // setState calls within one handler).
-        setTransientError(null);
+        // transient-error banner. If the local player's prior action bounced
+        // (e.g. a session_unbound "please retry" notice) and the retry
+        // succeeds, NARRATION_END is the success signal — drop the now-stale
+        // error so it doesn't overlay the fresh narration. Two AC-4 guards:
+        //   1. Scoped to NARRATION_END (the turn boundary), NOT streaming
+        //      NARRATION frames.
+        //   2. Gated on localTurnInFlightRef — only a NARRATION_END that
+        //      resolves a turn THIS player submitted into clears the error,
+        //      so a peer's round-trip in MP can't wipe my banner. The flag is
+        //      always reset at the turn boundary regardless.
+        if (localTurnInFlightRef.current) {
+          setTransientError(null);
+        }
+        localTurnInFlightRef.current = false;
       }
       return;
     }
@@ -619,6 +636,10 @@ function AppInner() {
         // lock input until narration arrives (NarrationEnd re-enables it).
         setCanType(false);
         setThinking(true);
+        // Story 71-3 (AC-4): authoritative "this player submitted" signal —
+        // arm the in-flight gate so the upcoming NARRATION_END (the local
+        // player's own round-trip) is allowed to clear a stale transient error.
+        localTurnInFlightRef.current = true;
       }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
@@ -1106,6 +1127,10 @@ function AppInner() {
           );
           setThinking(false);
           setCanType(true);
+          // Story 71-3 (AC-4): the local action just bounced — it is no longer
+          // in flight. Disarm so only a *fresh* retry that round-trips to
+          // NARRATION_END clears this error, not an unrelated turn boundary.
+          localTurnInFlightRef.current = false;
           return;
         }
         // No saved session OR no display name — fall through to the
@@ -1122,6 +1147,10 @@ function AppInner() {
       setThinking(false);
       setCreationLoading(false);
       setCanType(true);
+      // Story 71-3 (AC-4): the local action just bounced — disarm the in-flight
+      // gate so an unrelated NARRATION_END can't clear this fresh error before
+      // the player retries.
+      localTurnInFlightRef.current = false;
       return;
     }
 
@@ -1155,17 +1184,21 @@ function AppInner() {
   }, [readyState, isReconnecting]);
 
   // Story 71-3 (AC-1): clear the stale transient-error banner once the socket
-  // has successfully reconnected. Keyed ONLY on [readyState, isReconnecting]
-  // so it fires on connection-state transitions — never on transientError
-  // changes. A validation rejection that arrives while the socket is healthy
-  // (OPEN, not reconnecting) does NOT re-run this effect, because setting
-  // transientError doesn't touch either dep, so the live error persists for
-  // the user to read/correct. The clear only lands on the OPEN-and-not-
-  // reconnecting transition that marks a *successful* reconnect; a failed
-  // reconnect keeps readyState != OPEN and isReconnecting true, so the guard
-  // stays false and the error survives the failed attempt (AC-4).
+  // has *successfully reconnected*. We track the true→false TRANSITION of
+  // isReconnecting (via prevIsReconnectingRef), NOT the bare value, so the
+  // clear fires only on genuine recovery — never on initial mount and never
+  // on an error that arrived while simply connected-and-never-dropped (AC-4,
+  // Reviewer-flagged React edge): on first connect prevIsReconnecting starts
+  // false, so the false→false case is not a recovery and does not clear. The
+  // clear requires (a) we WERE reconnecting, (b) we no longer are, and (c) the
+  // socket is OPEN — a failed reconnect never reaches OPEN and never flips
+  // isReconnecting back to false, so the guard stays shut and the error
+  // survives the failed attempt.
+  const prevIsReconnectingRef = useRef(false);
   useEffect(() => {
-    if (!isReconnecting && readyState === WebSocket.OPEN) {
+    const wasReconnecting = prevIsReconnectingRef.current;
+    prevIsReconnectingRef.current = isReconnecting;
+    if (wasReconnecting && !isReconnecting && readyState === WebSocket.OPEN) {
       setTransientError(null);
     }
   }, [readyState, isReconnecting]);
@@ -1235,6 +1268,14 @@ function AppInner() {
       setMessages((prev) => [...prev, msg]);
       send(msg);
       setCanType(false); // Sealed — wait for narration before typing again
+      // Story 71-3 (AC-4): a real turn action is now in flight from the local
+      // player. Arm the gate so the resulting NARRATION_END is allowed to
+      // clear a stale transient error (AC-2). Asides (ADR-107) are not turn
+      // round-trips — they resolve via ASIDE_ANSWER, not NARRATION_END — so
+      // they must not arm the gate.
+      if (!aside) {
+        localTurnInFlightRef.current = true;
+      }
       // Optimistic thinking indicator: show the three-dinkus pulse + themed
       // placeholder immediately on submit instead of waiting for the server's
       // THINKING message. The server will confirm via its own setThinking(true)

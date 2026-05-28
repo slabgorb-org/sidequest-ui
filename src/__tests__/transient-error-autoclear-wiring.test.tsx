@@ -129,11 +129,18 @@ async function connectAndRaiseError(server: WS) {
 }
 
 describe("transient-error banner auto-clear wiring (71-3)", () => {
-  it("AC-2: clears the banner when NARRATION_END completes a turn round-trip", async () => {
+  it("AC-2: clears the banner when the LOCAL player's turn round-trip completes", async () => {
     const server = new WS(wsUrl, { jsonProtocol: true });
     renderApp();
     await connectAndRaiseError(server);
 
+    // The local player retries and submits — the server confirms with a
+    // "waiting" SESSION_EVENT (barrier active, this player has submitted),
+    // which arms the in-flight gate. The subsequent NARRATION_END is THIS
+    // player's own round-trip, so it clears the stale error.
+    act(() => {
+      server.send({ type: "SESSION_EVENT", payload: { event: "waiting" } });
+    });
     act(() => {
       server.send({ type: "NARRATION_END", payload: {} });
     });
@@ -141,6 +148,38 @@ describe("transient-error banner auto-clear wiring (71-3)", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("transient-error-banner")).toBeNull();
     });
+  });
+
+  it("AC-4: a NARRATION_END for a turn the local player did NOT submit into does NOT clear it (MP cross-player)", async () => {
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    await connectAndRaiseError(server);
+
+    // No local submit precedes this NARRATION_END — it resolves another
+    // player's round-trip (or an auto-resolved barrier) in MP. The local
+    // player's transient error must survive: the in-flight gate is disarmed.
+    act(() => {
+      server.send({ type: "NARRATION_END", payload: {} });
+    });
+
+    await Promise.resolve();
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
+  });
+
+  it("AC-4: an error that arrives while connected-and-never-dropped is NOT cleared by the reconnect effect (initial-mount/React edge)", async () => {
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    // connectAndRaiseError sets the error on a healthy socket that has never
+    // dropped (isReconnecting has never gone true). The AC-1 effect tracks the
+    // true→false TRANSITION of isReconnecting, so a steady OPEN connection must
+    // not trigger a clear.
+    await connectAndRaiseError(server);
+
+    // Let effects flush; the banner must persist (no reconnect recovery
+    // happened, so nothing should clear it).
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
   });
 
   it("AC-3: manual Dismiss still clears the banner (regression)", async () => {
