@@ -52,27 +52,29 @@ export function buildSegments(
   const seenNarrationTexts = new Set<string>();
   let lastChapterLocation = "";
 
-  // Story 71-4: persisted peer actions (firewall-filtered accumulator). Peer
-  // action TEXT derives ONLY from this map (sourced from usePeerReveals, which
-  // is downstream of the ADR-104/105 perception firewall) — never from a
-  // TURN_STATUS frame or any broader origin. Each round's submitted peers drop
-  // at that round's turn boundary. PLAYER_ACTION carries no round, so we anchor
-  // positionally: the i-th NARRATION_END boundary ← the i-th captured round
-  // (rounds sorted ascending).
-  const sortedPeerRounds = peerActionsByRound
-    ? [...peerActionsByRound.keys()].sort((a, b) => a - b)
-    : [];
-  let turnBoundaryIndex = 0;
-  // Emit the i-th captured round's submitted peers (seq order) as is_peer
-  // player-action segments. The accumulator already deduped per (player_id,
-  // round). No-op when the index is past the captured rounds.
-  const pushPeerRound = (index: number): void => {
-    const roundKey = sortedPeerRounds[index];
+  // Story 71-4/71-10: persisted peer actions (firewall-filtered accumulator).
+  // Peer action TEXT derives ONLY from this map (sourced from usePeerReveals,
+  // downstream of the ADR-104/105 perception firewall) — never from a
+  // TURN_STATUS frame or any broader origin.
+  //
+  // Story 71-10: anchor each captured round's peers by EXACT round, not
+  // position. The own PLAYER_ACTION carries its round; at that turn's
+  // NARRATION_END we emit the peers whose round matches. A skipped/empty/
+  // out-of-order/late round therefore no longer shifts later peer blocks onto
+  // the wrong turn. `emittedRounds` guards the trailing pass against double-emit.
+  const emittedRounds = new Set<number>();
+  // Round of the most recent own PLAYER_ACTION — the turn currently being closed.
+  let currentRound: number | undefined;
+  // Emit a round's submitted peers (seq order) as is_peer player-action
+  // segments. The accumulator already deduped per (player_id, round). No-op for
+  // an unknown/undefined round or one already emitted.
+  const pushPeerRound = (roundKey: number | undefined): void => {
     if (roundKey === undefined || !peerActionsByRound) return;
-    const peers = [...(peerActionsByRound.get(roundKey) ?? [])].sort(
-      (a, b) => a.seq - b.seq,
-    );
-    for (const entry of peers) {
+    if (emittedRounds.has(roundKey)) return;
+    const peers = peerActionsByRound.get(roundKey);
+    if (peers === undefined) return;
+    emittedRounds.add(roundKey);
+    for (const entry of [...peers].sort((a, b) => a.seq - b.seq)) {
       segments.push({
         kind: "player-action",
         is_peer: true,
@@ -86,12 +88,10 @@ export function buildSegments(
     const msg = messages[i];
     switch (msg.type) {
       case MessageType.NARRATION_END: {
-        // Story 71-4: emit this boundary's persisted peer actions BEFORE the
-        // separator, so they anchor AFTER the round's own action + narration
-        // (placement: turn boundary, not interleaved). Positional: the i-th
-        // NARRATION_END boundary ← the i-th captured round.
-        pushPeerRound(turnBoundaryIndex);
-        turnBoundaryIndex += 1;
+        // Story 71-10: emit THIS turn's peers (matched by the round carried on
+        // the turn's own PLAYER_ACTION) BEFORE the separator, so they anchor
+        // AFTER the round's own action + narration. Exact-round, not positional.
+        pushPeerRound(currentRound);
         if (segments.length > 0 && segments[segments.length - 1].kind !== "separator") {
           segments.push({ kind: "separator" });
         }
@@ -163,6 +163,9 @@ export function buildSegments(
       case MessageType.PLAYER_ACTION: {
         const action = msg.payload.action as string;
         const aside = msg.payload.aside as boolean | undefined;
+        // Story 71-10: this own action sets the round for the turn now being
+        // narrated; its NARRATION_END will anchor the matching peers.
+        currentRound = msg.payload.round as number | undefined;
         if (action) {
           segments.push({
             kind: aside ? "player-aside" : "player-action",
@@ -240,13 +243,17 @@ export function buildSegments(
     }
   }
 
-  // Story 71-4: any captured peer rounds not yet anchored to a NARRATION_END
-  // boundary append after all narration — covers a just-resolved turn whose
-  // NARRATION_END isn't (yet) in `messages` and transcripts with no narration
-  // frames at all (e.g. the e2e wiring harness). Still firewall-safe: source is
-  // exclusively the accumulator.
-  for (let index = turnBoundaryIndex; index < sortedPeerRounds.length; index++) {
-    pushPeerRound(index);
+  // Story 71-10: any captured rounds not anchored to a NARRATION_END above
+  // append after all narration, in ascending round order — covers a
+  // just-resolved turn whose NARRATION_END isn't (yet) in `messages`, a
+  // roundless legacy PLAYER_ACTION (round undefined never matches a key), and
+  // transcripts with no narration frames at all (the e2e wiring harness).
+  // Still firewall-safe: source is exclusively the accumulator.
+  if (peerActionsByRound) {
+    const remaining = [...peerActionsByRound.keys()]
+      .filter((r) => !emittedRounds.has(r))
+      .sort((a, b) => a - b);
+    for (const roundKey of remaining) pushPeerRound(roundKey);
   }
 
   while (segments.length > 0 && segments[0].kind === "separator") {

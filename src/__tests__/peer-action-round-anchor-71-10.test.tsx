@@ -41,7 +41,9 @@ const NarrationCardsWithPeers = NarrationCards as unknown as (props: {
 function turn(round: number, ownText: string): GameMessage[] {
   return [
     { type: MessageType.PLAYER_ACTION, payload: { action: ownText, round }, player_id: "p1" },
-    { type: MessageType.NARRATION, payload: { text: `narration r${round}: ${ownText}` } },
+    // Narration text must NOT embed the own/peer action strings, or within-card
+    // text queries below would match it ambiguously alongside the action segment.
+    { type: MessageType.NARRATION, payload: { text: `The scene resolves for round ${round}.` } },
     { type: MessageType.NARRATION_END, payload: {} },
   ] as unknown as GameMessage[];
 }

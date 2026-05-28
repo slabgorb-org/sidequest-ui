@@ -1283,7 +1283,7 @@ function AppInner() {
 
       const msg: GameMessage = {
         type: MessageType.PLAYER_ACTION,
-        payload: { action: text, aside },
+        payload: { action: text, aside, round: currentRound },
         player_id: "",
       };
       setMessages((prev) => [...prev, msg]);
@@ -1304,7 +1304,7 @@ function AppInner() {
       // submit-and-server-ack gap that made submits feel like they no-oped.
       setThinking(true);
     },
-    [send, executeSlashCommand, toggleWidget],
+    [send, executeSlashCommand, toggleWidget, currentRound],
   );
 
   const currentPlayerId = useMemo(
