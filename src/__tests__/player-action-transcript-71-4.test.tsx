@@ -2,19 +2,20 @@
  * Story 71-4 — Player-action transcript: own-echo contrast bump + peer-action
  * persistence (ADR-036 collaborative visibility, ADR-104/105 perception firewall).
  *
- * Pinned to the Architect-locked interface (ruling A1):
- *   - buildSegments(messages, peerActions) gains a 2nd param:
- *       peerActions: Map<round, ActionRevealEntry[]>  (per-round accumulator).
- *   - Peer actions reuse the EXISTING "player-action" segment kind with an
- *     `is_peer: true` discriminator. Own action = is_peer false/absent
- *     (AC1 high contrast); peer = is_peer true (AC3 lower contrast).
- *     One render path, flag-differentiated.
- *   - Placement: round-N peer segments drop at round N's turn boundary
- *     (after the narration), anchored on the boundary — not interleaved.
- *   - Focus-mode: a peer (is_peer) player-action must NOT start a new turn page.
+ * Pinned to the Architect CORRECTED-FINAL contract:
+ *   - NarrativeSegment gains `is_peer?: boolean` (snake; peer=true, own omits)
+ *     and `character_name?: string` (peer attribution = ActionRevealEntry.character_name).
+ *   - buildSegments(messages, peerActionsByRound?: Map<number, ActionRevealEntry[]>)
+ *     — positional 2nd param. Own player-action segs come from PLAYER_ACTION
+ *     messages (is_peer omitted). Peer segs come ONLY from peerActionsByRound
+ *     (is_peer:true, text=entry.action, character_name=entry.character_name).
+ *   - Empty/absent peerActionsByRound → byte-identical to today's output.
+ *   - Own renders class `text-foreground` + `data-peer="false"`; peer renders
+ *     `text-muted-foreground` + `data-peer="true"`. The `/70` opacity is DELETED.
+ *   - Placement: sort keys asc; i-th own player-action gets i-th round's peer
+ *     group appended AFTER it. Peer is NOT a turn-page/card starter.
  *
- * The full ACTION_REVEAL → TURN_STATUS{resolved} → persisted-segment flow
- * through the real component lives in the end-to-end wiring test.
+ * own-vs-peer is by SOURCE, not player-id — selfPlayerId is intentionally absent.
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -24,17 +25,16 @@ import { NarrationCards } from "@/components/NarrationCards";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import type { ActionRevealEntry } from "@/types/payloads";
 
-// The `is_peer` discriminator does not exist on NarrativeSegment yet (that is
-// the point of the red phase). Cast through this shape to assert against the
-// locked contract before Dev adds the field.
-type PeerSeg = NarrativeSegment & { is_peer?: boolean };
+// is_peer / character_name don't exist on NarrativeSegment yet (the red phase).
+// Cast through this shape to assert against the locked contract before Dev adds them.
+type PeerSeg = NarrativeSegment & { is_peer?: boolean; character_name?: string };
 
-// buildSegments gains a 2nd param in GREEN. Cast so the test compiles against
-// the locked signature now; the real (optional-2nd-param) signature stays
-// assignable to this type post-impl.
+// buildSegments gains a positional 2nd param in GREEN. Cast so the test compiles
+// against the locked signature now (the real optional-2nd-param signature stays
+// assignable to this type post-impl).
 type PeerAwareBuild = (
   messages: GameMessage[],
-  peerActions?: Map<number, ActionRevealEntry[]>,
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>,
 ) => NarrativeSegment[];
 const buildWithPeers = buildSegments as PeerAwareBuild;
 
@@ -51,30 +51,32 @@ function submittedReveal(
 }
 
 // ---------------------------------------------------------------------------
-// AC1 — own-action contrast bump (renderSegment branches on seg.is_peer)
+// AC1 — own-action contrast bump (renderSegment branches on seg.is_peer,
+// exposes data-peer; own = text-foreground, peer = text-muted-foreground)
 // ---------------------------------------------------------------------------
 
 describe("71-4 AC1 — own-action contrast bump", () => {
-  function classFor(seg: PeerSeg): string {
+  function renderPlayerAction(seg: PeerSeg): HTMLElement {
     render(<>{renderSegment(seg, 0)}</>);
-    return screen.getByTestId("player-action").className;
+    return screen.getByTestId("player-action");
   }
 
-  it("renders an OWN player-action (is_peer absent) at higher contrast than the muted default", () => {
-    const cls = classFor({ kind: "player-action", text: "I kick the door open" });
-    // The current treatment is text-muted-foreground/70 for every action. An
-    // own action must escape that low-contrast token...
-    expect(cls).not.toMatch(/text-muted-foreground/);
-    // ...and use the high-contrast foreground token (WCAG AA 4.5:1 body text).
-    expect(cls).toMatch(/text-foreground/);
+  it("renders an OWN player-action (is_peer omitted) with data-peer=false and the high-contrast token", () => {
+    const el = renderPlayerAction({ kind: "player-action", text: "I kick the door open" });
+    expect(el.getAttribute("data-peer")).toBe("false");
+    expect(el.className).toMatch(/text-foreground/);
+    // The low-contrast muted token (and its /70 opacity drag — the AC1 bug) are gone.
+    expect(el.className).not.toMatch(/text-muted-foreground/);
+    expect(el.className).not.toMatch(/\/70/);
   });
 
-  it("keeps a PEER player-action (is_peer:true) at the lower-contrast muted treatment", () => {
-    const cls = classFor({ kind: "player-action", text: "I draw my blaster", is_peer: true });
-    expect(cls).toMatch(/text-muted-foreground/);
+  it("renders a PEER player-action (is_peer:true) with data-peer=true and the muted token", () => {
+    const el = renderPlayerAction({ kind: "player-action", text: "I draw my blaster", is_peer: true });
+    expect(el.getAttribute("data-peer")).toBe("true");
+    expect(el.className).toMatch(/text-muted-foreground/);
   });
 
-  it("renders own and peer player-actions with distinct contrast classes (own > peer)", () => {
+  it("renders own and peer player-actions with distinct markers and contrast (own > peer)", () => {
     render(
       <>
         {renderSegment({ kind: "player-action", text: "OWN" } as PeerSeg, 0)}
@@ -86,7 +88,10 @@ describe("71-4 AC1 — own-action contrast bump", () => {
     const peer = nodes.find((n) => n.textContent?.includes("PEER"));
     expect(own).toBeDefined();
     expect(peer).toBeDefined();
-    // Same class = no hierarchy. Own must be the higher-contrast token.
+    // Distinct marker...
+    expect(own!.getAttribute("data-peer")).toBe("false");
+    expect(peer!.getAttribute("data-peer")).toBe("true");
+    // ...and distinct contrast, own the stronger token.
     expect(own!.className).not.toEqual(peer!.className);
     expect(own!.className).toMatch(/text-foreground/);
     expect(peer!.className).toMatch(/text-muted-foreground/);
@@ -98,36 +103,52 @@ describe("71-4 AC1 — own-action contrast bump", () => {
 // ---------------------------------------------------------------------------
 
 describe("71-4 AC2 — peer-action persistence (buildSegments accumulator)", () => {
-  it("persists a submitted peer reveal as an is_peer player-action segment at the turn boundary", () => {
+  it("persists a submitted peer reveal as an is_peer player-action with character_name, after the own action", () => {
     const messages = [
       { type: MessageType.PLAYER_ACTION, payload: { action: "I open the door" }, player_id: "p1" },
       { type: MessageType.NARRATION, payload: { text: "The door creaks open." } },
       { type: MessageType.NARRATION_END, payload: {} },
     ] as unknown as GameMessage[];
-    const peerActions = new Map<number, ActionRevealEntry[]>([
+    const peerActionsByRound = new Map<number, ActionRevealEntry[]>([
       [1, [submittedReveal({ player_id: "p2", character_name: "Bob", action: "I cover the hallway", round: 1, seq: 2 })]],
     ]);
 
-    const segments = buildWithPeers(messages, peerActions) as PeerSeg[];
+    const segments = buildWithPeers(messages, peerActionsByRound) as PeerSeg[];
     const peerSegs = segments.filter((s) => s.kind === "player-action" && s.is_peer === true);
 
-    // The peer's submitted action survives into the persistent transcript.
     expect(peerSegs).toHaveLength(1);
     expect(peerSegs[0].text).toContain("I cover the hallway");
+    expect(peerSegs[0].character_name).toBe("Bob");
 
-    // It anchors at the turn boundary — AFTER the own action of that round,
-    // not before it (placement: round boundary, not interleaved).
+    // Placement: peer group appears AFTER the own action of its round.
     const ownIdx = segments.findIndex((s) => s.kind === "player-action" && !s.is_peer);
     const peerIdx = segments.indexOf(peerSegs[0]);
     expect(ownIdx).toBeGreaterThanOrEqual(0);
     expect(peerIdx).toBeGreaterThan(ownIdx);
   });
 
-  it("does NOT persist a peer action absent from the peerActions map, even if its text rides in a broader frame (firewall)", () => {
-    // ADR-104/105: persisted peer text derives ONLY from the perception-filtered
-    // peerActions accumulator. A peer whose action was never revealed (absent
-    // from the map) must not appear — even though its text is present here in a
-    // TURN_STATUS payload (a broader, unfiltered source).
+  it("orders multiple submitted peers within a round by seq", () => {
+    const messages = [
+      { type: MessageType.PLAYER_ACTION, payload: { action: "I take point" }, player_id: "p1" },
+      { type: MessageType.NARRATION_END, payload: {} },
+    ] as unknown as GameMessage[];
+    const peerActionsByRound = new Map<number, ActionRevealEntry[]>([
+      [1, [
+        submittedReveal({ player_id: "p3", character_name: "Cy", action: "second", round: 1, seq: 5 }),
+        submittedReveal({ player_id: "p2", character_name: "Bob", action: "first", round: 1, seq: 2 }),
+      ]],
+    ]);
+
+    const segments = buildWithPeers(messages, peerActionsByRound) as PeerSeg[];
+    const peerTexts = segments
+      .filter((s) => s.kind === "player-action" && s.is_peer === true)
+      .map((s) => s.text);
+    expect(peerTexts).toHaveLength(2);
+    expect(peerTexts[0]).toContain("first");
+    expect(peerTexts[1]).toContain("second");
+  });
+
+  it("does NOT persist a peer action absent from peerActionsByRound, even if its text rides a broader frame (firewall)", () => {
     const HIDDEN = "I slice the captain's comms";
     const messages = [
       { type: MessageType.PLAYER_ACTION, payload: { action: "I hold position" }, player_id: "p1" },
@@ -138,41 +159,39 @@ describe("71-4 AC2 — peer-action persistence (buildSegments accumulator)", () 
       },
       { type: MessageType.NARRATION_END, payload: {} },
     ] as unknown as GameMessage[];
-    const peerActions = new Map<number, ActionRevealEntry[]>(); // nothing was visibly revealed
+    const peerActionsByRound = new Map<number, ActionRevealEntry[]>(); // nothing was visibly revealed
 
-    const segments = buildWithPeers(messages, peerActions) as PeerSeg[];
+    const segments = buildWithPeers(messages, peerActionsByRound) as PeerSeg[];
 
     expect(segments.some((s) => (s.text ?? "").includes(HIDDEN))).toBe(false);
     expect(segments.filter((s) => s.kind === "player-action" && s.is_peer === true)).toHaveLength(0);
   });
 
-  it("leaves single-player behavior unchanged when no peerActions map is supplied", () => {
+  it("produces byte-identical output for an empty map vs no 2nd arg (single-player regression)", () => {
     const messages = [
       { type: MessageType.PLAYER_ACTION, payload: { action: "I light the torch" }, player_id: "p1" },
       { type: MessageType.NARRATION, payload: { text: "Shadows retreat." } },
     ] as unknown as GameMessage[];
 
-    const segments = buildWithPeers(messages) as PeerSeg[];
-    // No peer segments appear without an accumulator.
-    expect(segments.filter((s) => s.kind === "player-action" && s.is_peer === true)).toHaveLength(0);
-    // The own action and narration still render.
-    expect(segments.some((s) => s.kind === "player-action" && s.text === "I light the torch")).toBe(true);
+    const base = buildSegments(messages);
+    const withEmpty = buildWithPeers(messages, new Map());
+    expect(withEmpty).toEqual(base);
+    expect(withEmpty.filter((s) => (s as PeerSeg).is_peer === true)).toHaveLength(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// AC2 — Focus-mode pagination guard
+// AC2 — turn grouping: peer action is not a starter (both gates)
 // ---------------------------------------------------------------------------
 
-describe("71-4 AC2 — peer action does not start a new turn page", () => {
-  it("keeps a peer (is_peer) player-action in the same turn page as the own action", () => {
+describe("71-4 AC2 — peer action does not start a new turn page/card", () => {
+  it("buildTurnPages keeps a peer (is_peer) player-action in the same page as the own action", () => {
     const ownSeg: PeerSeg = { kind: "player-action", text: "I open the door" };
     const narration: NarrativeSegment = { kind: "text", html: "<p>The door opens.</p>" };
-    const peerSeg: PeerSeg = { kind: "player-action", text: "Bob: I cover the hall", is_peer: true };
+    const peerSeg: PeerSeg = { kind: "player-action", text: "I cover the hall", is_peer: true, character_name: "Bob" };
 
     const pages = buildTurnPages([ownSeg, narration, peerSeg]);
 
-    // A peer action is NOT a turn starter — the whole turn stays one page.
     expect(pages).toHaveLength(1);
     expect(pages[0]).toContain(peerSeg);
   });

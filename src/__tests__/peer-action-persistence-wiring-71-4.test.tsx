@@ -24,11 +24,12 @@ import { NarrationCards } from "@/components/NarrationCards";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import type { ActionRevealEntry } from "@/types/payloads";
 
-// NarrationCards gains a peerActions prop in GREEN (Architect ruling A1). Cast
-// so the wiring test compiles against the locked accumulator shape now.
+// NarrationCards gains a `peerActionsByRound` prop in GREEN (Architect
+// CORRECTED-FINAL contract). Cast so the wiring test compiles against the
+// locked accumulator shape now.
 const NarrationCardsWithPeers = NarrationCards as unknown as (props: {
   messages: GameMessage[];
-  peerActions?: Map<number, ActionRevealEntry[]>;
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
 }) => ReactElement;
 
 // ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ function Host({ onConnect }: { onConnect: (fn: () => void) => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <NarrationCardsWithPeers messages={messages} peerActions={persistedPeers} />;
+  return <NarrationCardsWithPeers messages={messages} peerActionsByRound={persistedPeers} />;
 }
 
 function inbound(payload: Record<string, unknown>, type = "ACTION_REVEAL", playerId = "p2") {
