@@ -31,6 +31,7 @@ import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry } from "@/types/payloads";
 import type { InputBarRevealCall } from "@/components/InputBar";
 import { usePeerReveals } from "@/hooks/usePeerReveals";
+import { usePersistedPeerActions } from "@/hooks/usePersistedPeerActions";
 import type {
   OrbitalIntent,
   OrbitalIntentResponse,
@@ -454,6 +455,12 @@ function AppInner() {
   // completes, instead of waiting for the next round's first ACTION_REVEAL.
   // (2026-05-18 MP playtest.)
   const peerRevealsClearRef = useRef<(() => void) | null>(null);
+  // Story 71-4: ref bridges for the ephemeral→persistent peer-action bridge.
+  // `snapshot` captures the firewall-filtered reveals into the persistent
+  // accumulator at TURN_STATUS{resolved} — called BEFORE clear() so it beats
+  // the wipe. `reset` drops the accumulator on the reconnect messages-purge.
+  const peerRevealsSnapshotRef = useRef<(() => void) | null>(null);
+  const persistedPeerActionsResetRef = useRef<(() => void) | null>(null);
 
   // Dice overlay persists after result so the table can see "rolled N vs
   // target M → outcome" through the narrator's resolution. Cleared by:
@@ -660,6 +667,12 @@ function AppInner() {
           setMessages((prev) =>
             prev.filter((m) => m.type === MessageType.SESSION_EVENT),
           );
+          // Story 71-4: the transcript is being purged for the replay — drop
+          // the persisted peer-action accumulator in lockstep. Peer actions
+          // are an ephemeral channel the server does not replay into narration,
+          // so they cannot survive a reconnect (pre-existing limitation, logged
+          // as a delivery finding) — keep them consistent with the wiped scroll.
+          persistedPeerActionsResetRef.current?.();
           // MP-03: messages are about to be re-populated by the server's
           // last_seen_seq replay. Clear the seq-dedupe set in lockstep so
           // replayed events aren't dropped as duplicates of the (now-gone)
@@ -793,6 +806,11 @@ function AppInner() {
         setActivePlayerName(null);
         setTurnStatusEntries([]);
         setNarrationInFlight(false);
+        // Story 71-4: snapshot the perception-filtered peer reveals into the
+        // persistent accumulator BEFORE the clear() below wipes them — the
+        // ephemeral→persistent bridge (Architect ruling A1). Order is the sharp
+        // edge: capture must beat clear, so this line precedes it.
+        peerRevealsSnapshotRef.current?.();
         // Drop peer reveals from the round that just resolved. Without
         // this, "Laverne ✓ submitted — I walk to the winch..." persists
         // into the next turn's compose phase on every other tab.
@@ -1297,6 +1315,15 @@ function AppInner() {
   const peerReveals = usePeerReveals({ selfPlayerId: currentPlayerId, round: currentRound });
   peerRevealsApplyRef.current = peerReveals.apply;
   peerRevealsClearRef.current = peerReveals.clear;
+
+  // Story 71-4: persisted peer-action accumulator + the snapshot/reset bridges.
+  // `snapshot` reads the CURRENT firewall-filtered reveals and captures them;
+  // assigned here (alongside apply/clear) because handleMessage is declared
+  // before peerReveals exists. The snapshot mirrors the e2e Host bridge exactly.
+  const persistedPeerActions = usePersistedPeerActions();
+  peerRevealsSnapshotRef.current = () =>
+    persistedPeerActions.capture(currentRound, peerReveals.reveals);
+  persistedPeerActionsResetRef.current = persistedPeerActions.reset;
 
   // Merge TURN_STATUS authoritative submitted status into the ACTION_REVEAL
   // peer-reveal map. ACTION_REVEAL is a best-effort visibility channel; a
@@ -2152,6 +2179,7 @@ function AppInner() {
                 companions={partyCompanions}
                 genreSlug={currentGenre ?? undefined}
                 worldSlug={currentWorld ?? undefined}
+                peerActionsByRound={persistedPeerActions.byRound}
                 navMode={
                   genres[currentGenre ?? ""]?.worlds.find(
                     (w) => w.slug === currentWorld,

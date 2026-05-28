@@ -49,6 +49,7 @@ import type {
   DiceResultPayload,
   DiceThrowParams,
   LocationDescriptionPayload,
+  ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
 import { PeerRevealList } from "@/components/PeerRevealList";
@@ -201,6 +202,8 @@ export interface GameBoardProps {
   companions?: CompanionSummary[];
   genreSlug?: string;
   worldSlug?: string;
+  /** Story 71-4: per-round persisted peer actions (firewall-filtered) — threaded to the narrative widget. */
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
   /** Magic ledger (Coyote Star Phase 4). Forwarded to CharacterWidget. */
@@ -261,6 +264,7 @@ export function GameBoard({
   companions = [],
   genreSlug,
   worldSlug,
+  peerActionsByRound,
   navMode,
   depletions,
   resourceAlerts,
@@ -426,7 +430,7 @@ export function GameBoard({
   const renderWidgetContent = useCallback((id: WidgetId): ReactNode => {
     switch (id) {
       case "narrative":
-        return <NarrativeWidget messages={messages} thinking={thinking} genreSlug={genreSlug} worldSlug={worldSlug} />;
+        return <NarrativeWidget messages={messages} thinking={thinking} genreSlug={genreSlug} worldSlug={worldSlug} peerActionsByRound={peerActionsByRound} />;
       case "character":
         return characterSheet ? (
           <CharacterWidget
@@ -488,6 +492,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       currentLocation, knowledgeEntries, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
+      peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
       sessionBoundEpoch]);

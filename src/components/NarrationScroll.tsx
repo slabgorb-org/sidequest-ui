@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef, useCallback, useState } from "react";
 import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
+import type { ActionRevealEntry } from "@/types/payloads";
 import { renderSegment } from "./narrativeRenderers";
 import { ThinkingIndicator, EmptyNarrationState, NarratorConsidersInterstitial } from "./NarrationShared";
 import { useGameState } from "@/providers/GameStateProvider";
@@ -14,14 +15,16 @@ export interface NarrationScrollProps {
   thinking?: boolean;
   /** Genre slug — selects which loader pair drives the thinking indicator. */
   genreSlug?: string | null;
+  /** Story 71-4: per-round persisted peer actions (firewall-filtered). */
+  peerActionsByRound?: Map<number, ActionRevealEntry[]>;
 }
 
-export function NarrationScroll({ messages, thinking, genreSlug }: NarrationScrollProps) {
+export function NarrationScroll({ messages, thinking, genreSlug, peerActionsByRound }: NarrationScrollProps) {
   const { streamingNarration } = useGameState();
 
   const segments = useMemo(
-    () => groupPortraitSegments(buildSegments(messages)),
-    [messages],
+    () => groupPortraitSegments(buildSegments(messages, peerActionsByRound)),
+    [messages, peerActionsByRound],
   );
 
   // Find the boundary index that splits history from the current (most recent) turn.
