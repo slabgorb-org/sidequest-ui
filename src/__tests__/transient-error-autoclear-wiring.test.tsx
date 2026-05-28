@@ -12,12 +12,22 @@
 // the live handleMessage / effect paths — not just that setTransientError(null)
 // exists in the source.
 //
+// The AC-2 clear is gated on a real local-submit (localTurnInFlightRef), so
+// the happy-path tests drive REAL submits through the actual handlers
+// (handleSend / handleDiceThrow-beat / handleYield) via a GameBoard stub that
+// forwards App's own callbacks — not a synthetic SESSION_EVENT the server
+// never emits.
+//
 // Coverage:
 //   AC-1  successful reconnect (socket drops 1006 → reconnects OPEN) clears it
-//   AC-2  NARRATION_END (turn round-trip completes) clears it
+//   AC-2  a real text submit (handleSend) round-tripping to NARRATION_END clears it
+//   AC-2  a real beat-roll submit (handleDiceThrow) round-tripping to NARRATION_END clears it
+//   AC-2  a real yield submit (handleYield) round-tripping to NARRATION_END clears it
 //   AC-3  manual Dismiss still clears it (regression guard)
 //   AC-4  a failed/in-progress reconnect does NOT clear it
 //   AC-4  an unrelated streaming NARRATION frame (not a turn boundary) does NOT clear it
+//   AC-4  a NARRATION_END for a turn the local player did NOT submit into (MP cross-player) does NOT clear it
+//   AC-4  an error that arrives while connected-and-never-dropped is NOT cleared by the reconnect effect
 
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,6 +40,35 @@ import {
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
 import App from "../App";
+
+// Stub GameBoard with a minimal surface that exposes the REAL App callbacks
+// (onSend / onBeatSelect / onDiceThrow / onYield) as buttons. Clicking them
+// invokes App's actual handlers — so the local-submit arm paths
+// (localTurnInFlightRef) are exercised genuinely, not simulated. Only the
+// heavy presentational GameBoard render is replaced.
+vi.mock("@/components/GameBoard/GameBoard", () => ({
+  GameBoard: (props: {
+    onSend?: (text: string, aside: boolean) => void;
+    onBeatSelect?: (beatId: string, playerAction?: string) => void;
+    onDiceThrow?: (params: unknown, face: number[]) => void;
+    onYield?: () => void;
+  }) => (
+    <div data-testid="gameboard-stub">
+      <button type="button" onClick={() => props.onSend?.("retry the airlock", false)}>
+        stub-send
+      </button>
+      <button type="button" onClick={() => props.onBeatSelect?.("strike")}>
+        stub-beat
+      </button>
+      <button type="button" onClick={() => props.onDiceThrow?.({ seed: 1 }, [15])}>
+        stub-dice-throw
+      </button>
+      <button type="button" onClick={() => props.onYield?.()}>
+        stub-yield
+      </button>
+    </div>
+  ),
+}));
 
 const SLUG = "2026-04-22-moldharrow-keep";
 const GAME_META = {
@@ -128,11 +167,43 @@ async function connectAndRaiseError(server: WS) {
   });
 }
 
+// Drive the App into the game phase (where GameBoard — here the stub — renders
+// and the local-submit handlers are reachable), then raise a transient error.
+// SESSION_EVENT{event:"ready", has_character:true} is the chargen-bypass path
+// that transitions sessionPhase → "game" directly (see App.tsx).
+async function reachGameAndRaiseError(server: WS) {
+  await server.connected;
+  await server.nextMessage; // consume SESSION_EVENT{connect}
+
+  act(() => {
+    server.send({
+      type: "SESSION_EVENT",
+      payload: { event: "ready", has_character: true },
+    });
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId("gameboard-stub")).toBeInTheDocument();
+  });
+
+  act(() => {
+    server.send(TRANSIENT_ERROR);
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
+  });
+}
+
 describe("transient-error banner auto-clear wiring (71-3)", () => {
-  it("AC-2: clears the banner when NARRATION_END completes a turn round-trip", async () => {
+  it("AC-2: clears the banner after a real text submit (handleSend) round-trips to NARRATION_END", async () => {
+    const user = userEvent.setup();
     const server = new WS(wsUrl, { jsonProtocol: true });
     renderApp();
-    await connectAndRaiseError(server);
+    await reachGameAndRaiseError(server);
+
+    // The local player retries via a REAL submit (handleSend) — this is the
+    // production arm path, not a synthetic SESSION_EVENT. Arms the gate.
+    await user.click(screen.getByRole("button", { name: "stub-send" }));
+    await server.nextMessage; // the PLAYER_ACTION reaches the server
 
     act(() => {
       server.send({ type: "NARRATION_END", payload: {} });
@@ -141,6 +212,90 @@ describe("transient-error banner auto-clear wiring (71-3)", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("transient-error-banner")).toBeNull();
     });
+  });
+
+  it("AC-2: clears the banner after a beat-roll submit (handleDiceThrow) round-trips to NARRATION_END", async () => {
+    const user = userEvent.setup();
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    await reachGameAndRaiseError(server);
+
+    // A live confrontation with a "strike" beat — handleBeatSelect needs an
+    // active confrontation containing the chosen beat.
+    act(() => {
+      server.send({
+        type: "CONFRONTATION",
+        payload: {
+          active: true,
+          label: "Firefight",
+          beats: [{ id: "strike", label: "Strike", stat_check: "Reflex", base: 1 }],
+        },
+      });
+    });
+
+    // Select the beat (sets the pending beat id + a local DiceRequest), then
+    // throw — the beat-roll arm path. Both go through the REAL handlers.
+    await user.click(screen.getByRole("button", { name: "stub-beat" }));
+    await user.click(screen.getByRole("button", { name: "stub-dice-throw" }));
+    await server.nextMessage; // the DICE_THROW reaches the server
+
+    act(() => {
+      server.send({ type: "NARRATION_END", payload: {} });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("transient-error-banner")).toBeNull();
+    });
+  });
+
+  it("AC-2: clears the banner after a yield submit (handleYield) round-trips to NARRATION_END", async () => {
+    const user = userEvent.setup();
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    await reachGameAndRaiseError(server);
+
+    await user.click(screen.getByRole("button", { name: "stub-yield" }));
+    await server.nextMessage; // the YIELD reaches the server
+
+    act(() => {
+      server.send({ type: "NARRATION_END", payload: {} });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("transient-error-banner")).toBeNull();
+    });
+  });
+
+  it("AC-4: a NARRATION_END for a turn the local player did NOT submit into does NOT clear it (MP cross-player)", async () => {
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    await connectAndRaiseError(server);
+
+    // No local submit precedes this NARRATION_END — it resolves another
+    // player's round-trip (or an auto-resolved barrier) in MP. The local
+    // player's transient error must survive: the in-flight gate is disarmed.
+    act(() => {
+      server.send({ type: "NARRATION_END", payload: {} });
+    });
+
+    await Promise.resolve();
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
+  });
+
+  it("AC-4: an error that arrives while connected-and-never-dropped is NOT cleared by the reconnect effect (initial-mount/React edge)", async () => {
+    const server = new WS(wsUrl, { jsonProtocol: true });
+    renderApp();
+    // connectAndRaiseError sets the error on a healthy socket that has never
+    // dropped (isReconnecting has never gone true). The AC-1 effect tracks the
+    // true→false TRANSITION of isReconnecting, so a steady OPEN connection must
+    // not trigger a clear.
+    await connectAndRaiseError(server);
+
+    // Let effects flush; the banner must persist (no reconnect recovery
+    // happened, so nothing should clear it).
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
   });
 
   it("AC-3: manual Dismiss still clears the banner (regression)", async () => {
