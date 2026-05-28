@@ -165,13 +165,28 @@ function sortedBeats(beats: BeatOption[] | undefined | null): BeatOption[] {
 // ═══════════════════════════════════════════════════════════
 
 function ActorChip({ actor }: { actor: EncounterActor }) {
+  // Story 65-6: render the world-scoped portrait when present; fall back to the
+  // name initial for actors without one. Guard on presence so a null/empty URL
+  // never produces a broken <img>.
+  const hasPortrait =
+    typeof actor.portrait_url === "string" && actor.portrait_url.length > 0;
   return (
     <div
       data-testid="actor-portrait"
+      data-has-portrait={hasPortrait ? "true" : "false"}
       title={`${actor.name} — ${actor.role}`}
-      className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0"
+      className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0 overflow-hidden"
     >
-      {actor.name.charAt(0).toUpperCase()}
+      {hasPortrait ? (
+        <img
+          src={actor.portrait_url}
+          alt={actor.name}
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        actor.name.charAt(0).toUpperCase()
+      )}
     </div>
   );
 }
