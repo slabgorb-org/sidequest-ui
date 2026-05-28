@@ -318,16 +318,18 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
       )}
 
       {/* 3D dice canvas — transparent background, die rolls on the panel
-          surface. Fixed, roughly-square height (no flex:1) so the die lives
-          in a stable side lane that never reflows the beats and never
-          flashes in/out: the settled die persists here and re-tumbles in
-          place on the next beat commit (Klinger design, 2026-05-26). The
-          ~180px square preserves the calibrated top-down frame (camera
-          y=2.4 → ~1.84-unit square frame) so the landed face stays legible. */}
+          surface. Fixed height (no flex:1) so the die lives in a stable side
+          lane that never reflows the beats and never flashes in/out: the
+          settled die persists here and re-tumbles in place on the next beat
+          commit (Klinger design, 2026-05-26). 240px (was 180) pulls the roll
+          forward as a legible focal moment (69-1) — a ~33% larger render so
+          the landed face reads at a glance (Alex/Sebastien). Top-down
+          calibration preserved below. */}
       <div
+        data-testid="dice-frame"
         style={{
           position: "relative",
-          height: 180,
+          height: 240,
           borderRadius: 8,
           overflow: "hidden",
         }}
@@ -343,13 +345,13 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
             //
             // FOV 42 (was 50) tightens the lens for legibility — Sebastien
             // reads the number, Alex isn't time-pressured to lean forward.
-            // The tray (1.6 wide) still fits the frame at this distance
-            // (camera y=2.4 → frame width ≈ 1.84 units) with ~0.12 of
-            // padding each side. Combined with D20_RADIUS=0.36 (1.5× the
-            // prior 0.24), the die now occupies ~39% of the frame width
-            // (was ~21%) — roughly 1.86× perceptual size, addressing the
-            // playtest 2026-04-25 readability bug.
-            position: [0, 2.4, 0],
+            // 69-1 pulls the camera in from y=2.4 to y=2.3: the tray (1.6
+            // wide/deep) still fits — at y=2.3/fov=42 the visible extent is
+            // ≈1.77 units, leaving ~0.08 padding past the ±0.8 walls so the
+            // tumbling die never clips. Combined with the 240px frame (above)
+            // and D20_RADIUS=0.36, the landed die is ~40% larger on screen
+            // than the pre-69-1 baseline — a clear focal moment.
+            position: [0, 2.3, 0],
             rotation: [-Math.PI / 2, 0, 0],
             up: [0, 0, -1],
             fov: 42,
