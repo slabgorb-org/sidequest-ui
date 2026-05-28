@@ -84,16 +84,33 @@ function NpcChip({
     friendly: "bg-emerald-950/40 text-emerald-200 border-emerald-800/60",
     neutral: "bg-muted/40 text-muted-foreground border-muted/60",
   };
+  // Story 65-6: NPCs in the world's portrait_manifest carry a world-scoped
+  // portrait URL — render a thumbnail next to the name. Ad-hoc NPCs (no
+  // portrait_url) keep the original dot marker. Guard on presence so a null/
+  // empty URL never produces a broken <img>.
+  const hasPortrait =
+    typeof npc.portrait_url === "string" && npc.portrait_url.length > 0;
   return (
     <span
       data-testid={`scrapbook-npc-chip-${id}-${npc.name}`}
       data-npc-role={npc.role}
+      data-has-portrait={hasPortrait ? "true" : "false"}
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] ${roleClass[npc.role]}`}
     >
-      <span
-        aria-hidden="true"
-        className="w-1 h-1 rounded-full bg-current opacity-70"
-      />
+      {hasPortrait ? (
+        <img
+          data-testid={`scrapbook-npc-portrait-${id}-${npc.name}`}
+          src={npc.portrait_url}
+          alt={npc.name}
+          loading="lazy"
+          className="w-4 h-4 rounded-full object-cover border border-current/40"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="w-1 h-1 rounded-full bg-current opacity-70"
+        />
+      )}
       {npc.name}
     </span>
   );

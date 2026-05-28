@@ -295,6 +295,39 @@ describe("ImageBusProvider — SCRAPBOOK_ENTRY wiring (story 33-18)", () => {
     ]);
   });
 
+  // Story 65-6: world-scoped portrait_url threads through SCRAPBOOK_ENTRY →
+  // legacy ScrapbookNpc so the gallery can render the thumbnail.
+  it("SCRAPBOOK_ENTRY threads portrait_url through to the gallery npc", () => {
+    const url =
+      "https://cdn.slabgorb.com/genre_packs/pulp_noir/worlds/annees_folles/assets/portraits/marcel_devereaux.png";
+    const images = renderBus([
+      scrapbookEntryMessage({
+        turn_id: 3,
+        location: "Le Chat Noir",
+        narrative_excerpt: "Marcel slid a glass across the bar.",
+        npcs_present: [
+          {
+            name: "Marcel Devereaux",
+            role: "bartender",
+            disposition: "wary",
+            portrait_url: url,
+          },
+          {
+            name: "A nameless patron",
+            role: "extra",
+            disposition: "indifferent",
+            // No portrait_url — ad-hoc NPC.
+          },
+        ],
+      }),
+    ]);
+    const [entry] = images;
+    expect(entry.npcs).toEqual([
+      { name: "Marcel Devereaux", role: "neutral", portrait_url: url },
+      { name: "A nameless patron", role: "neutral" },
+    ]);
+  });
+
   it("drops malformed SCRAPBOOK_ENTRY (missing narrative_excerpt) with console.error — no silent fallback", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {

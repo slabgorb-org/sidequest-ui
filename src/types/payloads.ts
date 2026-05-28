@@ -291,6 +291,12 @@ export interface ScrapbookEntryNpcRef {
   name: string;
   role: string;
   disposition: string;
+  /**
+   * World-scoped portrait URL (Story 65-6), present when the invoked NPC
+   * matches a portrait_manifest entry for the current world. `undefined`/`null`
+   * for ad-hoc NPCs with no authored portrait — the UI guards on presence.
+   */
+  portrait_url?: string | null;
 }
 
 export interface ScrapbookEntryPayload {

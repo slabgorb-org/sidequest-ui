@@ -7,6 +7,12 @@ export type NpcRole = "hostile" | "friendly" | "neutral";
 export interface ScrapbookNpc {
   name: string;
   role: NpcRole;
+  /**
+   * World-scoped portrait URL (Story 65-6), present when the invoked NPC is in
+   * the world's portrait_manifest. Undefined for ad-hoc NPCs — the gallery
+   * renders a name-only chip in that case.
+   */
+  portrait_url?: string;
 }
 
 /**
@@ -110,10 +116,14 @@ function readScrapbookNpcRefs(value: unknown): ScrapbookEntryNpcRef[] {
     const role = rec.role;
     const disposition = rec.disposition;
     if (typeof name !== "string" || typeof role !== "string") continue;
+    // Story 65-6: world-scoped portrait URL, present only for manifest NPCs.
+    const portraitUrl =
+      typeof rec.portrait_url === "string" ? rec.portrait_url : undefined;
     out.push({
       name,
       role,
       disposition: typeof disposition === "string" ? disposition : role,
+      portrait_url: portraitUrl,
     });
   }
   return out;
@@ -187,7 +197,12 @@ function projectNpcRefsToLegacy(refs: ScrapbookEntryNpcRef[]): ScrapbookNpc[] {
         : lowered.includes("friend") || lowered.includes("ally")
           ? "friendly"
           : "neutral";
-    out.push({ name: ref.name, role });
+    // Story 65-6: carry the world-scoped portrait URL through to the gallery.
+    out.push({
+      name: ref.name,
+      role,
+      portrait_url: ref.portrait_url ?? undefined,
+    });
   }
   return out;
 }

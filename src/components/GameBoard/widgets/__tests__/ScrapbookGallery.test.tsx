@@ -195,6 +195,47 @@ describe("ScrapbookGallery — NPC chips", () => {
     );
     expect(chips).toHaveLength(0);
   });
+
+  // Story 65-6: world-level NPC portraits render on invocation.
+  it("renders a portrait thumbnail for an NPC that carries a portrait_url", () => {
+    const url =
+      "https://cdn.slabgorb.com/genre_packs/pulp_noir/worlds/annees_folles/assets/portraits/marcel_devereaux.png";
+    const images: ScrapbookEntry[] = [
+      enrichedEntry({
+        render_id: "r-1",
+        npcs: [{ name: "Marcel", role: "neutral", portrait_url: url }],
+      }),
+    ];
+    const { container } = render(<ScrapbookGallery images={images} />);
+    const chip = container.querySelector(
+      '[data-testid="scrapbook-npc-chip-r-1-Marcel"]',
+    );
+    expect(chip?.getAttribute("data-has-portrait")).toBe("true");
+    const img = container.querySelector(
+      '[data-testid="scrapbook-npc-portrait-r-1-Marcel"]',
+    ) as HTMLImageElement | null;
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute("src")).toBe(url);
+    expect(img?.getAttribute("alt")).toBe("Marcel");
+  });
+
+  it("renders no portrait img for an NPC without a portrait_url (ad-hoc NPC)", () => {
+    const images: ScrapbookEntry[] = [
+      enrichedEntry({
+        render_id: "r-1",
+        npcs: [{ name: "Bystander", role: "neutral" }],
+      }),
+    ];
+    const { container } = render(<ScrapbookGallery images={images} />);
+    const chip = container.querySelector(
+      '[data-testid="scrapbook-npc-chip-r-1-Bystander"]',
+    );
+    expect(chip?.getAttribute("data-has-portrait")).toBe("false");
+    const img = container.querySelector(
+      '[data-testid="scrapbook-npc-portrait-r-1-Bystander"]',
+    );
+    expect(img).toBeNull();
+  });
 });
 
 describe("ScrapbookGallery — world facts chips", () => {

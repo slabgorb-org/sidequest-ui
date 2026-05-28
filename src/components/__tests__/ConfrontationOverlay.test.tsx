@@ -338,21 +338,27 @@ describe('AC4: Actor chips', () => {
     expect(chips[1]).toHaveAttribute('title', expect.stringMatching(/Black Bart.*duelist/));
   });
 
-  it('shows the actor initial inside the chip', () => {
+  it('renders the portrait image inside the chip when portrait_url is present (Story 65-6)', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    const overlay = screen.getByTestId('confrontation-overlay');
-    // Both standoff actors start with different letters → both appear inside
-    // the overlay's actor chips.
-    expect(within(overlay).getByText('T')).toBeInTheDocument();
-    expect(within(overlay).getByText('B')).toBeInTheDocument();
+    const chips = screen.getAllByTestId('actor-portrait');
+    // Both standoff actors carry a portrait_url → both render an <img>, not
+    // the name initial.
+    expect(chips[0].getAttribute('data-has-portrait')).toBe('true');
+    const img0 = chips[0].querySelector('img');
+    expect(img0).not.toBeNull();
+    expect(img0?.getAttribute('src')).toBe('/portraits/stranger.png');
+    expect(img0?.getAttribute('alt')).toBe('The Stranger');
   });
 
-  it('renders chips for participants with no portrait_url', () => {
+  it('shows the actor initial when there is no portrait_url (Story 65-6 fallback)', () => {
     render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
     const chips = screen.getAllByTestId('actor-portrait');
     expect(chips).toHaveLength(2);
-    // "Player" (no portrait_url) is still a chip with its title set.
+    // "Player" has no portrait_url → falls back to the initial, no <img>.
+    expect(chips[0].getAttribute('data-has-portrait')).toBe('false');
+    expect(chips[0].querySelector('img')).toBeNull();
     expect(chips[0]).toHaveAttribute('title', expect.stringMatching(/Player/));
+    expect(chips[0].textContent).toContain('P');
   });
 });
 
