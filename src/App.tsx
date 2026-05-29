@@ -1316,7 +1316,7 @@ function AppInner() {
       // submit-and-server-ack gap that made submits feel like they no-oped.
       setThinking(true);
     },
-    [send, executeSlashCommand, toggleWidget],
+    [send, executeSlashCommand, toggleWidget, currentRound],
   );
 
   const currentPlayerId = useMemo(
