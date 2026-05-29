@@ -18,6 +18,7 @@ import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
+import { beatDispatchBlockReason } from "@/lib/beatDispatch";
 import {
   computeSubmittedPlayerIds,
   mergePeerRevealsWithSubmittedStatus,
@@ -437,6 +438,13 @@ function AppInner() {
   // restored from HMR — only this page lifecycle's actual bind events
   // count, otherwise a stale epoch would suppress the recovery fetch.
   const [sessionBoundEpoch, setSessionBoundEpoch] = useState(0);
+  // Story 67-8 (Layer 3): true once the server confirms the session is bound
+  // (SESSION_EVENT connected/ready) on the current socket, false whenever the
+  // socket drops or a (re)handshake is in flight (AwaitingConnect) or a frame
+  // is rejected `session_unbound`. Gates beat-commit so a DICE_THROW is never
+  // issued into an OPEN-but-unbound socket — the churn that stranded
+  // confrontations. NOT a buffer: an unbound commit is refused, not queued.
+  const [sessionBound, setSessionBound] = useState(false);
   // Beat ID pending a client-side dice roll — set when user picks a beat,
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
@@ -654,6 +662,10 @@ function AppInner() {
         // fetches the initial view_map after the bind lands. Same epoch
         // covers mid-session uvicorn --reload zombie-bind recovery.
         setSessionBoundEpoch((n) => n + 1);
+        // Story 67-8 (Layer 3): the server has confirmed Playing — beat-commit
+        // is now safe. Paired with the resets below (socket drop, re-handshake,
+        // session_unbound) so the gate tracks the true bound state.
+        setSessionBound(true);
       }
       if (event === "waiting") {
         // Server says barrier is active and this player already submitted —
@@ -1136,6 +1148,9 @@ function AppInner() {
       // can immediately retry instead of being stuck on a stale
       // overlay or having to refresh the page.
       if (code === "session_unbound") {
+        // Story 67-8 (Layer 3): the session is provably unbound — gate further
+        // beat-commits until the rebind below confirms connected/ready again.
+        setSessionBound(false);
         const saved = loadSession();
         if (saved && displayName) {
           console.info(
@@ -1401,28 +1416,33 @@ function AppInner() {
   // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
     (beatId: string, playerAction?: string) => {
-      if (thinking) {
-        console.warn(
-          `[beat-dispatch] onBeatSelect fired for "${beatId}" while thinking — duplicate suppressed.`,
-        );
+      // Story 67-8 (Layer 3): single gate for every beat-commit precondition —
+      // thinking (duplicate), no active confrontation, unknown beat, and the
+      // load-bearing one: session not bound (AwaitingConnect). A beat issued
+      // while unbound would flush a DICE_THROW into an OPEN-but-unbound socket
+      // and be rejected `session_unbound`, stranding the confrontation. Refuse
+      // (and let the player retry) — never queue (AC4: no buffering).
+      const block = beatDispatchBlockReason(beatId, {
+        thinking,
+        sessionBound,
+        confrontationData,
+      });
+      if (block) {
+        console.warn(`[beat-dispatch] "${beatId}" suppressed: ${block.logReason}`);
+        if (block.code === "session_unbound") {
+          // Surface the same transparent-recovery notice the reactive
+          // session_unbound handler uses — the action bounced, retry shortly.
+          setTransientError("Server reconnecting — please retry your roll in a moment.");
+        }
         return;
       }
-      if (!confrontationData) {
-        console.warn(
-          `[beat-dispatch] onBeatSelect fired for "${beatId}" but no active confrontationData — dropping.`,
-        );
-        return;
-      }
-      // Validate client-side — the server also validates strictly.
-      const beat: BeatOption | undefined = confrontationData.beats.find(
+      // Safe to dispatch — the gate above already proved confrontationData is
+      // present and contains this beat. Re-narrow for the type checker (and as
+      // cheap defense in depth) rather than asserting non-null.
+      const beat: BeatOption | undefined = confrontationData?.beats.find(
         (b) => b.id === beatId,
       );
-      if (!beat) {
-        console.warn(
-          `[beat-dispatch] beat id "${beatId}" not found in active confrontation (${confrontationData.label}) — dropping.`,
-        );
-        return;
-      }
+      if (!beat) return;
       // Build DiceRequest locally — no server round-trip needed.
       // The server will receive beat_id + face + seed in one DiceThrow message.
       const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
@@ -1454,7 +1474,7 @@ function AppInner() {
       setDiceResult(null);
       setDiceRequest(localReq);
     },
-    [confrontationData, thinking, characterSheet, character, currentPlayerId],
+    [confrontationData, thinking, sessionBound, characterSheet, character, currentPlayerId],
   );
 
 
@@ -1838,6 +1858,17 @@ function AppInner() {
       // SessionEvent is authoritative. Blindly enabling input races
       // with barrier state on reconnect (see playtest 2026-04-12).
     }
+  }, [readyState]);
+
+  // (1b) Story 67-8 (Layer 3): the session is bound only while the socket is
+  // OPEN. Any non-OPEN readyState — CONNECTING during a fresh or re-handshake,
+  // CLOSING/CLOSED on a drop — means we are back in AwaitingConnect until the
+  // server re-confirms connected/ready. Block beat-commit until then so a
+  // DICE_THROW is never issued into an unbound socket. (The zombie-bind case —
+  // socket stays OPEN but the server session is unbound — is covered by the
+  // `session_unbound` reset in handleMessage.)
+  useEffect(() => {
+    if (readyState !== WebSocket.OPEN) setSessionBound(false);
   }, [readyState]);
 
   // (2) Re-handshake on reconnect — keeps the original conservative gate.
