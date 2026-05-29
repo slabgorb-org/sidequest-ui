@@ -97,8 +97,7 @@ const originalWebSocket = globalThis.WebSocket;
 
 beforeEach(() => {
   MockWebSocket.instances = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  globalThis.WebSocket = MockWebSocket as any;
+  globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
   vi.useFakeTimers();
 });
 
@@ -150,6 +149,7 @@ describe("useWebSocket — 67-8 duplicate-socket elimination (AC2/AC3/AC6)", () 
     );
 
     act(() => result.current.connect());
+    expect(MockWebSocket.instances).toHaveLength(1);
     const firstSocket = MockWebSocket.instances[0]!;
     act(() => firstSocket.simulateOpen());
 
@@ -180,6 +180,7 @@ describe("useWebSocket — 67-8 duplicate-socket elimination (AC2/AC3/AC6)", () 
     );
 
     act(() => result.current.connect());
+    expect(MockWebSocket.instances).toHaveLength(1);
     const socket = MockWebSocket.instances[0]!;
     expect(socket.readyState).toBe(MockWebSocket.CONNECTING);
 
@@ -206,6 +207,7 @@ describe("useWebSocket — 67-8 duplicate-socket elimination (AC2/AC3/AC6)", () 
     );
 
     act(() => result.current.connect());
+    expect(MockWebSocket.instances).toHaveLength(1);
     const first = MockWebSocket.instances[0]!;
     act(() => first.simulateOpen());
     expect(liveSocketCount()).toBe(1);

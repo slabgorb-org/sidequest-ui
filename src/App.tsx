@@ -1442,7 +1442,15 @@ function AppInner() {
       const beat: BeatOption | undefined = confrontationData?.beats.find(
         (b) => b.id === beatId,
       );
-      if (!beat) return;
+      if (!beat) {
+        // Unreachable: the gate above already proved this beat exists. If we
+        // ever land here, the gate's invariant has broken — fail LOUDLY
+        // (No Silent Fallbacks) rather than silently swallowing the commit.
+        console.error(
+          `[beat-dispatch] INVARIANT VIOLATED: beat "${beatId}" absent after gate passed — dropping`,
+        );
+        return;
+      }
       // Build DiceRequest locally — no server round-trip needed.
       // The server will receive beat_id + face + seed in one DiceThrow message.
       const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
@@ -1498,6 +1506,23 @@ function AppInner() {
   const handleDiceThrow = useCallback(
     (params: DiceThrowParams, face: number[]) => {
       if (!diceRequest) return;
+      // Story 67-8 (Layer 3, post-review): the roll may have STARTED while the
+      // session was bound, but the session can unbind during the ~1-2s dice
+      // physics animation. Never flush a DICE_THROW into an OPEN-but-unbound
+      // socket — refuse and let the player re-roll. Not a buffer: the rolled
+      // result is discarded and the dice state reset (AC4 / No Silent
+      // Fallbacks). handleBeatSelect gates roll START; this gates roll SEND.
+      if (!sessionBound) {
+        console.warn(
+          "[dice-throw] suppressed — session not bound (AwaitingConnect) at throw time",
+        );
+        setTransientError("Server reconnecting — please retry your roll in a moment.");
+        pendingBeatIdRef.current = null;
+        pendingPlayerActionRef.current = "";
+        setDiceResult(null);
+        setDiceRequest(null);
+        return;
+      }
       const beatId = pendingBeatIdRef.current;
       pendingBeatIdRef.current = null;
       // Consume the latched player_action atomically with the beat id.
@@ -1527,7 +1552,7 @@ function AppInner() {
         localTurnInFlightRef.current = true;
       }
     },
-    [diceRequest, send],
+    [diceRequest, sessionBound, send],
   );
 
   // Yield action — player steps out of an active confrontation on their terms.

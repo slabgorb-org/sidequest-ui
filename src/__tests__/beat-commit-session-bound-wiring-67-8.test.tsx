@@ -54,4 +54,21 @@ describe("Wiring: 67-8 Layer 3 — handleBeatSelect gates on sessionBound", () =
       /code === "session_unbound"[\s\S]*?setSessionBound\(false\)/,
     );
   });
+
+  it("handleDiceThrow ALSO gates on sessionBound (post-review): refuse a throw if the session unbinds mid-physics", () => {
+    // handleBeatSelect gates roll START; the session can unbind during the
+    // 1-2s dice animation, so handleDiceThrow must re-check sessionBound at
+    // SEND time and refuse (reset dice state) rather than flush a DICE_THROW
+    // into an unbound socket. Without this, AC3 still costs one bounce in the
+    // mid-physics race.
+    const throwBody = appSrc.match(
+      /const handleDiceThrow\s*=\s*useCallback\([\s\S]*?\n\s*\[diceRequest[\s\S]*?\],\s*\n\s*\);/,
+    );
+    expect(throwBody).not.toBeNull();
+    const body = throwBody?.[0] ?? "";
+    // Guards on !sessionBound and bails (does not call send for that frame).
+    expect(body).toMatch(/if\s*\(\s*!sessionBound\s*\)\s*\{[\s\S]*?return;[\s\S]*?\}/);
+    // sessionBound is in the dependency array (no stale closure).
+    expect(body).toMatch(/\[diceRequest,\s*sessionBound,\s*send\]/);
+  });
 });
