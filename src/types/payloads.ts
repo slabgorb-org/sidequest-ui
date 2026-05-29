@@ -165,7 +165,9 @@ export interface PlayerActionPayload {
   action: string;
   aside?: boolean;
   /** Round (ADR-051) the action was submitted in. Anchors the peer-action
-   * transcript by exact round instead of arrival position (Story 71-10). */
+   * transcript by exact round instead of arrival position (Story 71-10).
+   * REQUIRED by the server's GameMessage schema (ge=0) — a missing round
+   * fails loud and tears down the socket; the UI threads it on every submit. */
   round: number;
 }
 

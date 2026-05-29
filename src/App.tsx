@@ -462,6 +462,16 @@ function AppInner() {
   const peerRevealsSnapshotRef = useRef<(() => void) | null>(null);
   const persistedPeerActionsResetRef = useRef<(() => void) | null>(null);
 
+  // sq-playtest 2026-05-28 #G3: the solo PLAYER_ACTION submit (handleSend)
+  // shipped with NO payload.round and an empty player_id, failing the server's
+  // GameMessage validation (PlayerActionPayload.round is required, ge=0) and
+  // tearing down the socket — no solo turn could ever resolve. handleSend is
+  // declared before currentPlayerId, so it reads the latest round + seated
+  // player id through these refs (assigned just after currentPlayerId is
+  // computed) rather than capturing stale closure values.
+  const currentRoundRef = useRef(0);
+  const currentPlayerIdRef = useRef<string | null>(null);
+
   // Dice overlay persists after result so the table can see "rolled N vs
   // target M → outcome" through the narrator's resolution. Cleared by:
   // (a) a new DiceRequest arriving (DICE_REQUEST handler below),
@@ -929,6 +939,8 @@ function AppInner() {
             class: (rawLocal.class as string) ?? "",
             class_reference_url: (rawLocal.class_reference_url as string | null | undefined) ?? null,
             race: (sheetFacet.race as string) || undefined,
+            calling_label: (sheetFacet.calling_label as string) || undefined,
+            origin_label: (sheetFacet.origin_label as string) || undefined,
             level: (rawLocal.level as number) ?? 1,
             hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
             hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
@@ -1283,8 +1295,8 @@ function AppInner() {
 
       const msg: GameMessage = {
         type: MessageType.PLAYER_ACTION,
-        payload: { action: text, aside, round: currentRound },
-        player_id: "",
+        payload: { action: text, aside, round: currentRoundRef.current },
+        player_id: currentPlayerIdRef.current ?? "",
       };
       setMessages((prev) => [...prev, msg]);
       send(msg);
@@ -1311,6 +1323,9 @@ function AppInner() {
     () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
     [partyMembers, connectedPlayerName],
   );
+  // Keep the handleSend refs (#G3) pointed at the latest round + seated player.
+  currentRoundRef.current = currentRound;
+  currentPlayerIdRef.current = currentPlayerId;
 
   const peerReveals = usePeerReveals({ selfPlayerId: currentPlayerId, round: currentRound });
   peerRevealsApplyRef.current = peerReveals.apply;
