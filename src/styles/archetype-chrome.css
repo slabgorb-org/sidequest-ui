@@ -505,13 +505,28 @@
   background: var(--accent);
   box-shadow: 0 0 8px var(--glow-accent);
 }
-/* Terminal player-action: prefix with `> ` and accent the line. */
+/* Terminal player-action: prefix with `> ` and accent the line.
+   Color MUST use --em-color, NOT --accent. --accent is a shadcn palette token
+   that `.dark` redeclares on the app-root (oklch(0.269...) ≈ near-black) — a
+   closer ancestor than :root[data-genre], so the genre's gold #E8A838 accent is
+   shadowed to near-black for this descendant and the player's own input echo
+   renders invisible on the dark bridge (the exact trap fixed for terminal `em`
+   ~line 150). --em-color (#FFD976, declared on [data-archetype="terminal"], never
+   in the shadcn palette) is immune to .dark and is the gold accent's bright
+   sibling. Per-data-peer split below preserves Story 71-4's own/peer contrast. */
 [data-archetype="terminal"] .player-action {
   font-style: normal;
   letter-spacing: 0.02em;
-  border-left-color: var(--accent);
-  color: var(--accent);
+  border-left-color: var(--em-color, #FFD976);
+  color: var(--em-color, #FFD976);
   text-shadow: 0 0 6px var(--glow-accent);
+}
+/* Peer actions stay lower-contrast (Story 71-4). --muted-foreground's .dark
+   value (oklch(0.708...)) is a readable mid-grey — correct here, unlike --accent. */
+[data-archetype="terminal"] .player-action[data-peer="true"] {
+  color: var(--muted-foreground);
+  border-left-color: var(--muted-foreground);
+  text-shadow: none;
 }
 [data-archetype="terminal"] .player-action::before {
   content: "> ";
