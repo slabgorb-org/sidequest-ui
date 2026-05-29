@@ -139,7 +139,21 @@ export function useWebSocket<T>({
     // the old socket's onclose handler could fire after it's been orphaned
     // and still call setReadyState / schedule a reconnect, leaking a ghost
     // connection.
-    detachHandlers(wsRef.current);
+    const prev = wsRef.current;
+    detachHandlers(prev);
+    // Story 67-8: detaching handlers alone leaves a still-LIVE socket OPEN on
+    // the server — a duplicate connection. The freshly-opened replacement sits
+    // in AwaitingConnect until its connect handshake completes, and a beat's
+    // DICE_THROW racing that window is rejected `session.message_rejected_unbound`
+    // (×4+), stranding the confrontation. So if the prior socket is still live,
+    // close it too. On the reconnect-timer path the prior socket is already
+    // CLOSED, so this is a no-op there (we never double-close).
+    if (
+      prev &&
+      (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING)
+    ) {
+      prev.close();
+    }
 
     const ws = new WebSocket(url);
     wsRef.current = ws;
@@ -187,6 +201,14 @@ export function useWebSocket<T>({
   }, [url, nextBackoff]);
 
   const connect = useCallback(() => {
+    // Honor the documented contract: no-op if already connected. Story 67-8 —
+    // a re-entrant connect() (StrictMode double-invoke of the slug-connect
+    // effect, or the slug-connect + reconnect effects both firing on one mount)
+    // must NOT tear down a live socket and open a second one. That duplicate is
+    // the churn that strands a confrontation in AwaitingConnect. A socket that
+    // is mid-handshake (CONNECTING) is handled by createSocket's close-prior
+    // guard, not here, so an in-flight connect can still be superseded.
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
     clearReconnectTimer();
     intentionalCloseRef.current = false;
     setIntentionalClose(false);
