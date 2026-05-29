@@ -31,6 +31,16 @@ export interface CharacterSheetData {
    *  previously the subtitle showed the genre slug, which is wrong (the genre
    *  is the rulebook, not part of character identity). */
   race?: string;
+  /** Display-only flavor label for Calling — the chargen phrase the player
+   *  chose ("Country Veterinary Surgeon") when it differs from the collapsed
+   *  mechanical class ("Doctor"). Server emits it on PARTY_STATUS as
+   *  `members[].sheet.calling_label`; the panel renders it OVER `class`.
+   *  Absent when the label is the archetype (UI falls back to `class`). */
+  calling_label?: string;
+  /** Display-only flavor label for Origin ("The Village Itself") shown OVER
+   *  `race`. Emitted as `members[].sheet.origin_label`; absent when the label
+   *  is the archetype (UI falls back to `race`). */
+  origin_label?: string;
   level: number;
   /** Current edge (composure). Sourced from PARTY_STATUS members[].current_hp.
    *  ADR-014 / ADR-078: HP was removed from CreatureCore in favor of EdgePool;
@@ -100,6 +110,10 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
               </span>
             ) : null}
           </h2>
+          {/* Prefer the chargen flavor label ("Country Veterinary Surgeon")
+              over the collapsed mechanical class ("Doctor"), but keep the link
+              to the mechanical class rules page — flavor text, mechanical
+              anchor. Falls back to the class slug when no label was emitted. */}
           <p className="text-sm text-muted-foreground">
             Level {data.level}{' '}
             {data.class_reference_url ? (
@@ -109,10 +123,10 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
                 rel="noopener noreferrer"
                 className="underline hover:no-underline"
               >
-                {toDisplayName(data.class)}
+                {data.calling_label || toDisplayName(data.class)}
               </a>
             ) : (
-              toDisplayName(data.class)
+              data.calling_label || toDisplayName(data.class)
             )}
           </p>
           {data.current_location && (

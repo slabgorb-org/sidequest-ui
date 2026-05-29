@@ -163,6 +163,33 @@ describe("CharacterPanel — 33-7: enriched header", () => {
     expect(subtitle.textContent).not.toMatch(/Mutant|Wasteland/);
   });
 
+  // #G2 live-panel extension (playtest 2026-05-28): a vet who picked "Country
+  // Veterinary Surgeon" saw the collapsed mechanical slug "Doctor · Servant".
+  // The panel must prefer the chargen FLAVOR labels over the slug.
+  it("subtitle prefers calling_label/origin_label over the mechanical slug", () => {
+    const flavored: CharacterSheetData = {
+      ...CHARACTER,
+      class: "Doctor",
+      race: "Servant",
+      calling_label: "Country Veterinary Surgeon",
+      origin_label: "The Village Itself",
+    };
+    render(<CharacterPanel character={flavored} />);
+    const subtitle = screen.getByTestId("character-subtitle");
+    expect(subtitle.textContent).toBe(
+      "Country Veterinary Surgeon · The Village Itself",
+    );
+    // The collapsed mechanical slug must NOT surface on the player sheet.
+    expect(subtitle.textContent).not.toContain("Doctor");
+    expect(subtitle.textContent).not.toContain("Servant");
+  });
+
+  it("subtitle falls back to class/race slug when no flavor label is present", () => {
+    // No calling_label/origin_label → byte-identical to the slug behavior.
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(screen.getByText(/Ranger · Wood Elf/)).toBeInTheDocument();
+  });
+
   it("portrait slot is 48px (w-12 h-12) for both img and placeholder", () => {
     const { rerender } = render(<CharacterPanel character={CHARACTER} />);
     const img = screen.getByRole("img");

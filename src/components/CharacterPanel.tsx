@@ -259,10 +259,14 @@ export function CharacterPanel({
             ) : null}
           </h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
-          {/* Subtitle is class · race ("Beastkin · Uplifted Animal"). Was
-              showing class · genre, which conflated the rulebook with the
-              character's identity (playtest 2026-04-23). Falls back to
-              class-only when race is absent — never to genre. */}
+          {/* Subtitle is calling · origin ("Country Veterinary Surgeon · The
+              Village Itself"). Prefers the chargen FLAVOR labels over the
+              collapsed mechanical slug (playtest 2026-05-28: a vet picked
+              "Country Veterinary Surgeon" but the panel showed "Doctor ·
+              Servant"). Falls back to the class/race slug when no label was
+              emitted, then to calling-only when origin is absent — never to
+              genre (playtest 2026-04-23). The flavor labels are already
+              proper phrases; toDisplayName only normalizes a bare slug. */}
           <p
             data-testid="character-subtitle"
             className="text-xs text-muted-foreground leading-tight"
@@ -272,8 +276,10 @@ export function CharacterPanel({
               color: FOLIO.inkSoft,
             }}
           >
-            {toDisplayName(character.class)}
-            {character.race ? ` · ${character.race}` : ""}
+            {character.calling_label || toDisplayName(character.class)}
+            {character.origin_label || character.race
+              ? ` · ${character.origin_label || character.race}`
+              : ""}
           </p>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">

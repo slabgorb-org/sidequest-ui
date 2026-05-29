@@ -164,6 +164,12 @@ export interface PartyStatusPayload {
 export interface PlayerActionPayload {
   action: string;
   aside?: boolean;
+  // ADR-051 round the action was submitted in. REQUIRED by the server's
+  // GameMessage schema (PlayerActionPayload.round, ge=0) — a missing round
+  // fails loud (No Silent Fallbacks) and tears down the socket. The server
+  // validates but does not read it; it stamps the authoritative
+  // turn_manager.round on outbound frames.
+  round: number;
 }
 
 export interface MapUpdatePayload {
