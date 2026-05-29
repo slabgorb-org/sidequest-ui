@@ -159,7 +159,22 @@ export function useGenreTheme(
 
     if (!last || !css) return clearFailTimer;
 
-    // Skip if we already injected this exact CSS
+    // ROOT CAUSE FIX (the recurring "genre text unreadable" bug): the genre's
+    // color tokens live in the injected `:root[data-genre] { --accent; --primary;
+    // --foreground; ... }` block, which ONLY matches while <html> carries the
+    // `data-genre` attribute. That attribute is what lets genre theming win the
+    // cascade over `.dark` (`:root[data-genre]` (0,2,0) > `.dark` (0,1,0) on the
+    // same element). This effect re-runs on EVERY `messages` change, and the
+    // cleanup below strips `data-genre`; the same-css early-return then skipped
+    // re-adding it — so the attribute was removed milliseconds after the first
+    // theme load and never restored. Result: `:root[data-genre]` stopped matching
+    // and every genre color silently collapsed to the `.dark` dark-mode value
+    // (--accent → oklch(0.269) ≈ near-black). Re-assert it on every run, BEFORE
+    // the early-return, so the attribute persists for the life of the theme.
+    const root = document.documentElement;
+    root.setAttribute("data-genre", "active");
+
+    // Skip if we already injected this exact CSS (data-genre re-asserted above).
     if (appliedRef.current === css) return clearFailTimer;
     appliedRef.current = css;
     everAppliedRef.current = true;
@@ -181,10 +196,6 @@ export function useGenreTheme(
       document.head.appendChild(styleEl);
     }
     styleEl.textContent = css;
-
-    // Set data-genre attribute for CSS specificity — :root[data-genre] beats .dark
-    const root = document.documentElement;
-    root.setAttribute("data-genre", "active");
 
     // Dynamic Google Font loading from genre CSS.
     // Extract font-family from the :root block or @font-face declarations.
