@@ -90,6 +90,35 @@ describe("useGenreTheme", () => {
     expect(document.documentElement.getAttribute("data-genre")).toBeNull();
   });
 
+  it("keeps data-genre set across re-renders after the same theme_css (regression: message churn must not strip it)", () => {
+    // Root-cause regression. The effect depends on `messages`, which changes on
+    // EVERY game message during play, so it re-runs constantly. The cleanup
+    // removes `data-genre`, and the same-css early-return skipped re-adding it —
+    // so the attribute was stripped milliseconds after the first theme load and
+    // never restored. With it gone, `:root[data-genre] { --accent; ... }` stops
+    // matching and every genre color silently collapses to the `.dark` dark-mode
+    // value (--accent → near-black). The attribute MUST persist for the life of
+    // the applied theme, across arbitrary re-renders.
+    const theme = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
+    const narration: GameMessage = {
+      type: MessageType.NARRATION,
+      payload: { text: "The console glows." },
+      player_id: "server",
+    };
+    const { rerender } = renderHook(
+      ({ msgs }: { msgs: GameMessage[] }) => useGenreTheme(msgs, true),
+      { initialProps: { msgs: [theme] as GameMessage[] } },
+    );
+    expect(document.documentElement.getAttribute("data-genre")).toBe("active");
+
+    // Simulate ongoing play: more messages arrive, the theme_css is unchanged.
+    rerender({ msgs: [theme, narration] });
+    expect(document.documentElement.getAttribute("data-genre")).toBe("active");
+
+    rerender({ msgs: [theme, narration, narration] });
+    expect(document.documentElement.getAttribute("data-genre")).toBe("active");
+  });
+
   it("updates CSS when a new theme_css event arrives", () => {
     const first = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
     const { rerender } = renderHook(
