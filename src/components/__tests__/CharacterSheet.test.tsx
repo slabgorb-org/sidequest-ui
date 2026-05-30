@@ -267,6 +267,16 @@ describe('CharacterSheet — Story 53-5: RigComposure + Edge + injury tags', () 
     expect(within(section).getByText(/^HP$/i)).toBeInTheDocument();
   });
 
+  it('Story 68-1: renders the genre survivability label instead of "HP" when set', () => {
+    // The survivability pool is genre-flavored (Composure/Standing/Poise on
+    // social packs). "Poise" avoids colliding with the section's "Composure"
+    // heading. Absent the label, the bar falls back to "HP" (test above).
+    render(<CharacterSheet data={{ ...RIG_DATA, survivability_pool_label: 'Poise' }} />);
+    const section = screen.getByTestId('rig-composure-section');
+    expect(within(section).getByText(/^Poise$/)).toBeInTheDocument();
+    expect(within(section).queryByText(/^HP$/i)).not.toBeInTheDocument();
+  });
+
   it('AC-3: renders RigComposure label distinct from HP', () => {
     render(<CharacterSheet data={RIG_DATA} />);
     const section = screen.getByTestId('rig-composure-section');
