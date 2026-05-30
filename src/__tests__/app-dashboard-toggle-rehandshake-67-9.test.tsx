@@ -37,14 +37,28 @@ import App from "../App";
 //   LobbyRoot (and StrictMode double-mount). So these tests exercise the
 //   `#/dashboard` toggle — the concrete, deterministic, in-spec trigger.
 //
-// FIX-AGNOSTIC OBSERVABLES (the client-side proxy for "no second
-// ws.connection_accepted cycle" — AC1/AC3): across a mid-session dashboard
-// toggle, the client must fire NO second handshake. We count two independent
-// signals, neither of which assumes a fix shape:
-//   1. GET /api/games/:slug  — step 1 of the handshake (App.tsx:1775)
-//   2. `new WebSocket(...)`  — connect() → createSocket() (useWebSocket.ts:158)
-// Pre-fix both become 2 after the toggle (RED). Post-fix (connection hoisted
-// above <Routes>, outside LobbyRoot's dashboard conditional) both stay 1.
+// FIX-AGNOSTIC, CONTAMINATION-IMMUNE OBSERVABLES (the client-side proxy for
+// "no second ws.connection_accepted cycle" — AC1/AC3): across a mid-session
+// dashboard toggle, the client must fire NO second handshake. We assert two
+// signals, neither of which assumes a fix shape AND neither of which is
+// polluted by other test files:
+//   1. GET /api/games/:slug count  — step 1 of the handshake (App.tsx:1775).
+//      Only App's slug-connect fetches this URL, so the count is immune to
+//      foreign sockets.
+//   2. The APP'S OWN socket lifecycle — the single OPEN socket to APP_WS_URL.
+//      We assert it survives the toggle (stays OPEN) and is never replaced.
+// A second app socket can only be opened via connect(), which is gated by the
+// slug-connect GET — so "GET stays 1" + "the app socket stays OPEN" together
+// prove no re-handshake and no second app socket, WITHOUT counting global
+// `new WebSocket()` constructions. (Round-trip 1 / review: the earlier global
+// `constructedSockets.length` assertion was FLAKY — the WebSocket-constructor
+// Proxy is installed on the *global* and captures sockets that OTHER test
+// files' lingering reconnect timers construct to the same `/ws` URL during this
+// file's run, inflating the count to 2. The app-socket-lifecycle observable is
+// immune to that cross-file bleed.)
+// Pre-fix: the toggle unmounts AppInner → useWebSocket cleanup closes the app
+// socket (readyState→CLOSED) and re-fires the handshake (2nd GET). Post-fix
+// (connection hoisted above <Routes>): GET stays 1, the app socket stays OPEN.
 //
 // AC3's server-side OTEL half (presence.multi_socket_attach never fires; no
 // second chargen_gate span) is a live-playtest acceptance check, mirroring the
@@ -58,6 +72,8 @@ import App from "../App";
 
 const LOBBY_STORAGE_KEY = "sidequest-connect";
 const SLUG = "2026-05-30-hoist-session";
+// The game socket URL App.tsx connects to (useGameSocket: `ws://<host>/ws`).
+const APP_WS_URL = `ws://${location.host}/ws`;
 
 const GAME_META = {
   genre_slug: "low_fantasy",
@@ -114,6 +130,8 @@ function installWebSocketCounter() {
   const Real = globalThis.WebSocket;
   const Counting = new Proxy(Real, {
     construct(target, args: [string, (string | string[])?]) {
+      // `target` is typed `object` inside a construct trap; the double-cast is
+      // the only way TS lets us `new` it. `target` IS the real WebSocket ctor.
       const sock = new (target as unknown as new (
         ...a: typeof args
       ) => WebSocket)(...args);
@@ -121,11 +139,22 @@ function installWebSocketCounter() {
       return sock;
     },
   });
+  // A construct-only Proxy forwards all other ops (static `OPEN` reads, etc.)
+  // to `Real` via default Reflect, so it is a faithful `typeof WebSocket`.
   globalThis.WebSocket = Counting as unknown as typeof WebSocket;
   return Real;
 }
 
-/** Toggle the #/dashboard hash and fire the hashchange LobbyRoot listens for. */
+/** The app's live (OPEN) game sockets — the contamination-immune observable.
+ *  Filters to APP_WS_URL + OPEN so a foreign test file's stray `/ws` socket
+ *  that never reaches OPEN (or a closed one) can't inflate the result. */
+function liveAppSockets(): WebSocket[] {
+  return constructedSockets.filter(
+    (s) => s.url === APP_WS_URL && s.readyState === WebSocket.OPEN,
+  );
+}
+
+/** Toggle the #/dashboard hash and fire the hashchange DashboardGate listens for. */
 function setDashboard(on: boolean) {
   act(() => {
     window.location.hash = on ? "#/dashboard" : "#/";
@@ -193,9 +222,9 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-archetype");
 });
 
-/** Mount real <App> at /solo/:slug and drive the first handshake to completion.
- *  Returns once SESSION_EVENT{connect} has been received by the server. */
-async function mountAndConnect() {
+/** Mount real <App> at /solo/:slug, drive the first handshake to completion,
+ *  and return the app's single live game socket. */
+async function mountAndConnect(): Promise<WebSocket> {
   render(
     <MemoryRouter initialEntries={[`/solo/${SLUG}`]}>
       <App />
@@ -213,20 +242,25 @@ async function mountAndConnect() {
   act(() => {
     server.send({ type: "SESSION_EVENT", payload: { event: "connected" } });
   });
+  // Exactly one live app socket exists now — the handshake's. Return it so
+  // tests can track THIS socket across the toggle (immune to foreign sockets).
+  const app = liveAppSockets();
+  expect(app).toHaveLength(1);
+  return app[0]!;
 }
 
 describe("App — 67-9: connection + slug-connect handshake hoisted above <Routes>", () => {
   it("AC5 (baseline/regression): a clean slug mount fires the connect handshake exactly once", async () => {
     // Guards the hoist against breaking the initial handshake: one GET, one
-    // socket, one SESSION_EVENT{connect}. Passes pre- and post-fix — its job
-    // is to prove the harness drives the real handshake and that 67-9 must not
-    // regress first-connect. (This same mount IS the wiring proof: the
+    // live app socket, one SESSION_EVENT{connect}. Passes pre- and post-fix —
+    // its job is to prove the harness drives the real handshake and that 67-9
+    // must not regress first-connect. (This same mount IS the wiring proof: the
     // production <App>/<AppRoutes>/<LobbyRoot> path reaches the handshake.)
     await mountAndConnect();
     await flush();
 
     expect(gameMetaGetCount).toBe(1);
-    expect(constructedSockets).toHaveLength(1);
+    expect(liveAppSockets()).toHaveLength(1);
   });
 
   it("AC1/AC3 (RED): a mid-session #/dashboard toggle fires NO second GET /api/games/:slug", async () => {
@@ -246,9 +280,8 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
     expect(gameMetaGetCount).toBe(1);
   });
 
-  it("AC1/AC3 (RED): a mid-session #/dashboard toggle opens NO second WebSocket", async () => {
-    await mountAndConnect();
-    expect(constructedSockets).toHaveLength(1);
+  it("AC1/AC3 (RED): a mid-session #/dashboard toggle opens NO second app WebSocket", async () => {
+    const appSocket = await mountAndConnect();
 
     setDashboard(true);
     await flush();
@@ -256,18 +289,22 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
     await flush();
 
     // INVARIANT (AC1/AC3 client half): no second `ws.connection_accepted`
-    // cycle. Pre-fix: AppInner unmount closes the socket (useWebSocket.ts:271)
-    // and the remount's re-fired connect() opens a second one →
-    // constructedSockets.length === 2. Post-fix the connection lives above
-    // <Routes> and survives the toggle → exactly one socket per page-session.
-    expect(constructedSockets).toHaveLength(1);
+    // cycle. The app opens a socket only via connect(), which is gated by the
+    // slug-connect GET — so "no 2nd GET" + "the app socket is still the single
+    // live app socket" proves no second app socket was opened. Pre-fix: the
+    // toggle unmounts AppInner → useWebSocket cleanup closes appSocket
+    // (useWebSocket.ts:271) and the remount's re-fired connect() opens a new one
+    // → gameMetaGetCount === 2 and appSocket is no longer OPEN. (We assert the
+    // app socket's lifecycle, NOT a global construction count — the latter is
+    // polluted by other test files' sockets to the same /ws URL.)
+    expect(gameMetaGetCount).toBe(1);
+    expect(appSocket.readyState).toBe(WebSocket.OPEN);
+    expect(liveAppSockets()).toEqual([appSocket]);
   });
 
   it("AC2 (RED): the connection persists across the dashboard toggle — the original socket stays OPEN, never torn down", async () => {
-    await mountAndConnect();
-    expect(constructedSockets).toHaveLength(1);
-    const firstSocket = constructedSockets[0]!;
-    expect(firstSocket.readyState).toBe(WebSocket.OPEN);
+    const appSocket = await mountAndConnect();
+    expect(appSocket.readyState).toBe(WebSocket.OPEN);
 
     setDashboard(true);
     await flush();
@@ -276,12 +313,12 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
 
     // AC2: the slug-connect handshake fires once per page-session, owned above
     // the per-route dashboard toggle — so the original connection is never
-    // closed by the toggle and no replacement socket is stood up. Pre-fix:
-    // AppInner's unmount runs useWebSocket's cleanup (ws.close(),
-    // useWebSocket.ts:271) → firstSocket transitions to CLOSED, and the
-    // remount opens a second socket (RED on BOTH assertions).
-    expect(firstSocket.readyState).toBe(WebSocket.OPEN);
-    expect(constructedSockets).toHaveLength(1);
+    // closed by the toggle and no replacement is stood up. Pre-fix: AppInner's
+    // unmount runs useWebSocket's cleanup (ws.close(), useWebSocket.ts:271) →
+    // appSocket transitions to CLOSED (RED). The `liveAppSockets() === [appSocket]`
+    // check confirms it's still THE single live app connection — not replaced.
+    expect(appSocket.readyState).toBe(WebSocket.OPEN);
+    expect(liveAppSockets()).toEqual([appSocket]);
   });
 
   it("AC4 (regression guardrail): the initial handshake still sends a well-formed SESSION_EVENT{connect}", async () => {
@@ -298,6 +335,7 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
       type: string;
       payload: Record<string, unknown>;
     };
+    expect(connectMsg.type).toBe("SESSION_EVENT");
     expect(connectMsg.payload.event).toBe("connect");
     expect(connectMsg.payload.game_slug).toBe(SLUG);
     expect(connectMsg.payload.player_name).toBe("Keith");
