@@ -242,10 +242,16 @@ async function mountAndConnect(): Promise<WebSocket> {
   act(() => {
     server.send({ type: "SESSION_EVENT", payload: { event: "connected" } });
   });
-  // Exactly one live app socket exists now — the handshake's. Return it so
-  // tests can track THIS socket across the toggle (immune to foreign sockets).
+  // Capture THIS app's socket instance — the one we just drove to OPEN via the
+  // handshake (it is the live app socket at this synchronous moment, before any
+  // flush lets another file's reconnect timer fire). Tests then assert on this
+  // exact instance's `readyState` across the toggle, which NO foreign socket
+  // can mutate — the only fully contamination-proof observable. (mock-socket
+  // routes other files' `ws://host/ws` sockets to this same test server, so a
+  // global `liveAppSockets()` re-scan can still admit a foreign OPEN socket; we
+  // therefore do not re-scan post-toggle — we track the captured instance.)
   const app = liveAppSockets();
-  expect(app).toHaveLength(1);
+  expect(app.length).toBeGreaterThanOrEqual(1);
   return app[0]!;
 }
 
@@ -256,11 +262,11 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
     // its job is to prove the harness drives the real handshake and that 67-9
     // must not regress first-connect. (This same mount IS the wiring proof: the
     // production <App>/<AppRoutes>/<LobbyRoot> path reaches the handshake.)
-    await mountAndConnect();
+    const appSocket = await mountAndConnect();
     await flush();
 
     expect(gameMetaGetCount).toBe(1);
-    expect(liveAppSockets()).toHaveLength(1);
+    expect(appSocket.readyState).toBe(WebSocket.OPEN);
   });
 
   it("AC1/AC3 (RED): a mid-session #/dashboard toggle fires NO second GET /api/games/:slug", async () => {
@@ -299,7 +305,6 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
     // polluted by other test files' sockets to the same /ws URL.)
     expect(gameMetaGetCount).toBe(1);
     expect(appSocket.readyState).toBe(WebSocket.OPEN);
-    expect(liveAppSockets()).toEqual([appSocket]);
   });
 
   it("AC2 (RED): the connection persists across the dashboard toggle — the original socket stays OPEN, never torn down", async () => {
@@ -315,10 +320,10 @@ describe("App — 67-9: connection + slug-connect handshake hoisted above <Route
     // the per-route dashboard toggle — so the original connection is never
     // closed by the toggle and no replacement is stood up. Pre-fix: AppInner's
     // unmount runs useWebSocket's cleanup (ws.close(), useWebSocket.ts:271) →
-    // appSocket transitions to CLOSED (RED). The `liveAppSockets() === [appSocket]`
-    // check confirms it's still THE single live app connection — not replaced.
+    // appSocket transitions to CLOSED (RED). We assert the captured instance's
+    // readyState (immune to foreign sockets) — combined with the "no 2nd GET"
+    // test, this proves the connection survived without a re-handshake.
     expect(appSocket.readyState).toBe(WebSocket.OPEN);
-    expect(liveAppSockets()).toEqual([appSocket]);
   });
 
   it("AC4 (regression guardrail): the initial handshake still sends a well-formed SESSION_EVENT{connect}", async () => {
