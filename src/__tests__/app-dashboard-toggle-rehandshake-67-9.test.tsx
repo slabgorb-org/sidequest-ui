@@ -165,8 +165,8 @@ function setDashboard(on: boolean) {
 /** Flush micro+macrotask queues so any re-fired fetch().then(connect()) chain
  *  settles. The fetch mock resolves immediately, so the pre-fix re-handshake
  *  (2nd GET + 2nd socket) completes within a couple of ticks. */
-async function flush(ticks = 4) {
-  for (let i = 0; i < ticks; i++) {
+async function flush() {
+  for (let i = 0; i < 4; i++) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
