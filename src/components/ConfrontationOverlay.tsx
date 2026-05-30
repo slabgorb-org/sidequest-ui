@@ -297,6 +297,17 @@ function BeatTile({
   onSelect?: (id: string) => void;
 }) {
   const base = beat.base ?? 1;
+  // The roll the player makes is d20 + their stat modifier vs this DC. `base`
+  // is the dial-IMPACT magnitude (how far the dial moves on a success) and it
+  // ALSO scales the DC — it is NOT a roll bonus. Showing "+{base}" next to the
+  // stat name read as "Cunning +3" while the actual roll modifier was the
+  // ability mod (+1) — a self-contradicting player-facing number (playtest
+  // 59-8, Sebastien/Jade lane). Show the DC instead: it matches what the dice
+  // panel displays on commit ("need 16 on d20") and is the honest difficulty
+  // signal. Formula mirrors the server NativeRulesetModule.compute_dc /
+  // _opposed_dc (10 + 2*|base|, clamped 10..30) and App.tsx's dice-request
+  // builder, so all three agree on the same number.
+  const dc = Math.min(30, Math.max(10, 10 + Math.abs(base) * 2));
   const color = riskColor(base);
   const finisher = !!beat.resolution;
   const tooltip = beat.risk
@@ -371,7 +382,7 @@ function BeatTile({
           {beat.kind && <span className="opacity-50"> · </span>}
           {beat.stat_check}
           <span className="opacity-50"> · </span>
-          <span className="text-foreground/70 tracking-normal normal-case">+{base}</span>
+          <span className="text-foreground/70 tracking-normal normal-case">DC {dc}</span>
         </span>
         {beat.risk && (
           <span
