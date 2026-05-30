@@ -907,6 +907,11 @@ function AppInner() {
         character_name: (m.character_name as string) ?? (m.name as string) ?? "",
         hp: (m.current_hp as number) ?? 0,
         hp_max: (m.max_hp as number) ?? 0,
+        // Story 68-1: genre survivability label (undefined ⇒ surfaces show "HP").
+        survivability_pool_label:
+          typeof m.survivability_pool_label === "string"
+            ? (m.survivability_pool_label as string)
+            : undefined,
         status_effects: (m.statuses as string[]) ?? [],
         class: (m.class as string) ?? "",
         level: (m.level as number) ?? 1,
@@ -956,6 +961,11 @@ function AppInner() {
             level: (rawLocal.level as number) ?? 1,
             hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
             hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
+            // Story 68-1: genre survivability label for the sheet's HP badge.
+            survivability_pool_label:
+              typeof rawLocal.survivability_pool_label === "string"
+                ? (rawLocal.survivability_pool_label as string)
+                : undefined,
             stats: (sheetFacet.stats as Record<string, number>) ?? {},
             abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
             class_moves: (sheetFacet.class_moves as ClassMove[]) ?? [],

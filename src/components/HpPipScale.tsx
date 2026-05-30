@@ -22,26 +22,47 @@ export interface HpPipScaleProps {
   characters: CharacterSummary[];
   /** The local player's id; resolves which character's HP sits at the input. */
   currentPlayerId?: string;
+  /**
+   * Story 68-1: per-genre survivability-pool label (Composure / Standing /
+   * Poise on social packs). Defaults to "HP" so mechanical packs are
+   * unchanged. Genre-level — the same word labels the whole table's pools.
+   */
+  survivabilityLabel?: string;
 }
 
-export function HpPipScale({ characters, currentPlayerId }: HpPipScaleProps) {
+export function HpPipScale({
+  characters,
+  currentPlayerId,
+  survivabilityLabel,
+}: HpPipScaleProps) {
   // The scale co-located with the input shows the LOCAL player's own pool
   // (context-story-69-2 Assumptions: single active PC at the opening board).
   // Fall back to the first character when no id matches.
   const local =
     characters.find((c) => c.player_id === currentPlayerId) ?? characters[0];
 
+  // Story 68-1: an explicit prop wins (override / tests); otherwise read the
+  // genre label off the resolved character (the server stamps it on every
+  // PARTY_STATUS member), then default to "HP" for mechanical packs.
+  const label = survivabilityLabel ?? local?.survivability_pool_label ?? "HP";
+
   return (
     <div
       data-testid="input-hp-scale"
       className="flex items-center gap-2 px-1 py-1"
     >
-      {local && <HpPipGroup character={local} />}
+      {local && <HpPipGroup character={local} label={label} />}
     </div>
   );
 }
 
-function HpPipGroup({ character }: { character: CharacterSummary }) {
+function HpPipGroup({
+  character,
+  label,
+}: {
+  character: CharacterSummary;
+  label: string;
+}) {
   const { player_id, hp, hp_max } = character;
   // Guard division: an unknown/zero max is treated as full (not danger), and
   // 0 current HP is a real value (danger), never conflated with "missing".
@@ -52,15 +73,15 @@ function HpPipGroup({ character }: { character: CharacterSummary }) {
   return (
     <div
       data-testid={`hp-pip-group-${player_id}`}
-      aria-label={`HP ${hp} of ${hp_max}`}
-      title="HP / Vitality"
+      aria-label={`${label} ${hp} of ${hp_max}`}
+      title={label === "HP" ? "HP / Vitality" : label}
       className={cn(
         "flex items-center gap-1.5 font-mono text-xs tabular-nums",
         danger ? "text-destructive" : "text-[var(--primary)]",
       )}
     >
       <span className="whitespace-nowrap font-semibold">
-        HP {hp}/{hp_max}
+        {label} {hp}/{hp_max}
       </span>
       <span className="flex gap-0.5" aria-hidden="true">
         {Array.from({ length: cap }).map((_, i) => {
