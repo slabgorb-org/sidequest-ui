@@ -307,7 +307,11 @@ export function CharacterPanel({
               App.tsx fans them into hp/hp_max on CharacterSheetData. Hidden
               when both are absent so we never render a fake "0/0". */}
           {hasEdge && (
-            <EdgeBadge current={character.hp!} max={character.hp_max!} />
+            <EdgeBadge
+              current={character.hp!}
+              max={character.hp_max!}
+              label={character.survivability_pool_label ?? "HP"}
+            />
           )}
         </div>
       </div>
@@ -316,7 +320,11 @@ export function CharacterPanel({
           composure under the header. Hidden on edge-less genres so we
           don't paint a row of empty diamonds. */}
       {hasEdge && (
-        <FolioEdgeTicks current={character.hp!} max={character.hp_max!} />
+        <FolioEdgeTicks
+          current={character.hp!}
+          max={character.hp_max!}
+          label={character.survivability_pool_label ?? "HP"}
+        />
       )}
 
       {/* Tabs — Pirata One label with a small gold glyph in front of each.
@@ -566,7 +574,7 @@ export function CharacterPanel({
                             fontVariantNumeric: "tabular-nums",
                           }}
                         >
-                          HP {c.hp}/{c.hp_max}
+                          {c.survivability_pool_label ?? "HP"} {c.hp}/{c.hp_max}
                         </span>
                       </>
                     )}
@@ -697,7 +705,16 @@ export function CharacterPanel({
  * so a glance is enough to know "I'm one push from a yield". Same threshold
  * rule as the inline party-row edge for consistency.
  */
-function EdgeBadge({ current, max }: { current: number; max: number }) {
+function EdgeBadge({
+  current,
+  max,
+  label = "HP",
+}: {
+  current: number;
+  max: number;
+  // Story 68-1: per-genre survivability label (Composure / Standing / Poise).
+  label?: string;
+}) {
   const ratio = max > 0 ? current / max : 1;
   const danger = ratio <= 0.25;
   const tone = danger
@@ -707,8 +724,8 @@ function EdgeBadge({ current, max }: { current: number; max: number }) {
     <div
       data-testid="character-edge-badge"
       className={`px-2 py-0.5 rounded-md text-xs border font-mono ${tone}`}
-      aria-label={`HP ${current} of ${max}`}
-      title="HP / Vitality"
+      aria-label={`${label} ${current} of ${max}`}
+      title={label === "HP" ? "HP / Vitality" : label}
       style={{
         borderColor: danger ? FOLIO.crimson : FOLIO.gold,
         color: danger ? FOLIO.crimson : FOLIO.ink,
@@ -718,7 +735,7 @@ function EdgeBadge({ current, max }: { current: number; max: number }) {
         borderRadius: 2,
       }}
     >
-      HP {current}/{max}
+      {label} {current}/{max}
     </div>
   );
 }
@@ -727,7 +744,16 @@ function EdgeBadge({ current, max }: { current: number; max: number }) {
  *  while above the danger threshold and crimson once the ratio crosses 25%.
  *  Gives a tabletop-flavored at-a-glance pool reading without competing with
  *  the textual badge in the header corner. */
-function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
+function FolioEdgeTicks({
+  current,
+  max,
+  label = "HP",
+}: {
+  current: number;
+  max: number;
+  // Story 68-1: per-genre survivability label (Composure / Standing / Poise).
+  label?: string;
+}) {
   const danger = max > 0 && current / max <= 0.25;
   const fill = danger ? FOLIO.crimson : FOLIO.gold;
   const cap = Math.max(0, max);
@@ -744,7 +770,7 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
       }}
     >
       <span
-        title="HP / Vitality"
+        title={label === "HP" ? "HP / Vitality" : label}
         style={{
           fontFamily: FONT_LABEL,
           fontSize: 14,
@@ -754,7 +780,7 @@ function FolioEdgeTicks({ current, max }: { current: number; max: number }) {
           fontVariantNumeric: "tabular-nums",
         }}
       >
-        HP {current}/{cap}
+        {label} {current}/{cap}
       </span>
       <div
         style={{

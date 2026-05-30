@@ -5,6 +5,12 @@ export interface CharacterSummary {
   portrait_url?: string;
   hp: number;
   hp_max: number;
+  /**
+   * Story 68-1: per-genre label for the survivability pool (Composure /
+   * Standing / Poise on social packs). Undefined ⇒ surfaces render the
+   * default "HP". Genre-level — uniform across the party.
+   */
+  survivability_pool_label?: string;
   status_effects: string[];
   class: string;
   level: number;

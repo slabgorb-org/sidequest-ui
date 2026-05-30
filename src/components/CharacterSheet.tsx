@@ -52,6 +52,11 @@ export interface CharacterSheetData {
   /** Maximum edge (composure ceiling). Sourced from PARTY_STATUS
    *  members[].max_hp. See `hp` field doc for the legacy-name caveat. */
   hp_max?: number;
+  /** Story 68-1: per-genre label for the survivability (HP) pool — Composure /
+   *  Standing / Poise on social packs. Sourced from PARTY_STATUS
+   *  members[].survivability_pool_label. Absent ⇒ the badge renders "HP"
+   *  (mechanical packs unchanged). */
+  survivability_pool_label?: string;
   stats: Record<string, number>;
   abilities: AbilityDefinition[];
   /** Resolved confrontation-beat choices for the Abilities panel. Each carries
