@@ -2341,26 +2341,6 @@ function AppInner() {
 }
 
 function LobbyRoot() {
-  const [isDashboard, setIsDashboard] = useState(
-    () => window.location.hash === "#/dashboard",
-  );
-
-  useEffect(() => {
-    const onHashChange = () => {
-      setIsDashboard(window.location.hash === "#/dashboard");
-    };
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  if (isDashboard) {
-    return (
-      <Suspense fallback={<div style={{ color: "#e0e0e0", background: "#1a1a2e", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>}>
-        <LazyDashboard />
-      </Suspense>
-    );
-  }
-
   return (
     <div data-testid="lobby-root">
       <GameStateProvider>
@@ -2380,7 +2360,51 @@ function AppRoutes() {
   );
 }
 
+// Story 67-9 (67-8 Layer 2): the GM dashboard is a global overlay, hoisted
+// ABOVE <Routes> so toggling #/dashboard never unmounts the session-owning
+// tree (LobbyRoot → AppInner → the WebSocket connection + slug-connect
+// handshake). Pre-67-9 the dashboard lived inside the per-route LobbyRoot and
+// *replaced* AppInner, so opening/closing it tore the socket down and re-ran
+// the connect handshake on the way back (a second ws.connection_accepted /
+// chargen_gate cycle). Rendering it as a stable sibling above the router keeps
+// the single connection alive for the whole page-session; the live session
+// view simply sits underneath the opaque full-screen overlay.
+function DashboardGate() {
+  const [isDashboard, setIsDashboard] = useState(
+    () => window.location.hash === "#/dashboard",
+  );
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setIsDashboard(window.location.hash === "#/dashboard");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (!isDashboard) return null;
+
+  return (
+    <div
+      data-testid="dashboard-overlay"
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#1a1a2e" }}
+    >
+      <Suspense fallback={<div style={{ color: "#e0e0e0", background: "#1a1a2e", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>}>
+        <LazyDashboard />
+      </Suspense>
+    </div>
+  );
+}
+
 export default function App() {
   // In tests we wrap with MemoryRouter; in production the entry point (main.tsx) provides BrowserRouter.
-  return <AppRoutes />;
+  // <DashboardGate> is a hash-driven overlay rendered ABOVE <Routes> (story
+  // 67-9) — a sibling, never a conditional replacement, so it cannot unmount
+  // the connection-owning session tree.
+  return (
+    <>
+      <AppRoutes />
+      <DashboardGate />
+    </>
+  );
 }
