@@ -243,20 +243,27 @@ export function CharacterPanel({
                 Story 67-4: also suppress when player_id == name — a player
                 whose identity equals their character name would render a
                 doubled "Kael — Kael" header. Mirrors CharacterSheet.tsx's
-                `player_id !== data.name` guard so the two surfaces agree. */}
-            {character.player_id && character.player_id !== character.name && characters && characters.length > 1 ? (
-              <span
-                data-testid="character-panel-player-name"
-                className="ml-2 text-xs font-normal"
-                style={{
-                  fontFamily: FONT_BODY,
-                  color: FOLIO.inkSoft,
-                  letterSpacing: 0,
-                }}
-              >
-                — {character.player_id}
-              </span>
-            ) : null}
+                `player_id !== data.name` guard so the two surfaces agree.
+                Story 67-6: prefer player_identity (authenticated email / dev
+                host) over player_id (display-name handle). Undefined
+                player_identity means disconnected peer — no fabricated suffix. */}
+            {(() => {
+              const suffix = character.player_identity || character.player_id;
+              const show = suffix && suffix !== character.name && characters && characters.length > 1;
+              return show ? (
+                <span
+                  data-testid="character-panel-player-name"
+                  className="ml-2 text-xs font-normal"
+                  style={{
+                    fontFamily: FONT_BODY,
+                    color: FOLIO.inkSoft,
+                    letterSpacing: 0,
+                  }}
+                >
+                  — {suffix}
+                </span>
+              ) : null;
+            })()}
           </h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
           {/* Subtitle is calling · origin ("Country Veterinary Surgeon · The

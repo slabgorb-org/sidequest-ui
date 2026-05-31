@@ -1,5 +1,9 @@
 export interface CharacterSummary {
   player_id: string;
+  /** Authenticated player identity (email / dev host) distinct from the
+   *  display-name handle (`player_id`). Undefined for disconnected peers
+   *  or when the server has not resolved identity. Story 67-6. */
+  player_identity?: string;
   name: string;
   character_name: string;
   portrait_url?: string;
