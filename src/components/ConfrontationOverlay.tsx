@@ -321,6 +321,15 @@ function BeatTile({
   const normalHover = "oklch(0.24 0.008 80)";
   const finisherBg = "color-mix(in oklab, var(--accent-finisher) 7%, var(--card))";
   const finisherHover = "color-mix(in oklab, var(--accent-finisher) 11%, var(--card))";
+  // Text color must match the SURFACE, not the theme. Non-finisher tiles use a
+  // hard-coded dark surface (normalBg) that does NOT flip with the genre theme,
+  // so their text must be a fixed light tone — otherwise a light theme (e.g.
+  // Tea & Murder / Glenross, whose --foreground is dark) inherits dark-on-dark
+  // and the label/kind/stat/DC vanish (playtest 67-10). The finisher tile's
+  // surface IS theme-derived (--card), so its text correctly tracks
+  // --card-foreground and stays legible in both light and dark themes.
+  const tileText = finisher ? "var(--card-foreground)" : "oklch(0.92 0.012 80)";
+  const tileTextMuted = finisher ? "var(--muted-foreground)" : "oklch(0.72 0.01 80)";
   return (
     <button
       type="button"
@@ -334,6 +343,7 @@ function BeatTile({
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
         background: finisher ? finisherBg : normalBg,
         borderColor: finisher ? "var(--accent-finisher)" : "var(--border)",
+        color: tileText,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = finisher ? finisherHover : normalHover;
@@ -377,12 +387,15 @@ function BeatTile({
       {/* Row 2 — mechanical signal kept legible for the crunch players:
           kind · stat · +base on the left, risk dot on the right. */}
       <div className="flex items-center justify-between gap-1.5 min-w-0">
-        <span className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground font-semibold truncate min-w-0">
+        <span
+          className="text-[9.5px] uppercase tracking-[0.14em] font-semibold truncate min-w-0"
+          style={{ color: tileTextMuted }}
+        >
           {KIND_LABEL[beat.kind ?? ""] ?? beat.kind ?? ""}
           {beat.kind && <span className="opacity-50"> · </span>}
           {beat.stat_check}
           <span className="opacity-50"> · </span>
-          <span className="text-foreground/70 tracking-normal normal-case">DC {dc}</span>
+          <span className="tracking-normal normal-case" style={{ color: tileText }}>DC {dc}</span>
         </span>
         {beat.risk && (
           <span
