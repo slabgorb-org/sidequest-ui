@@ -269,6 +269,72 @@ describe('AC2: Dual-dial metric display', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// hp_depletion HP track (playtest 67-10 / 59-26): SWN combat carries
+// inert 1e6 placeholder dials; the overlay must render the real HP the
+// server already emits (player_hp/opponent_hp) instead of "0/1000000".
+// ═══════════════════════════════════════════════════════════
+
+describe('hp_depletion HP track', () => {
+  const HP_COMBAT_DATA: ConfrontationData = {
+    ...COMBAT_DATA,
+    win_condition: 'hp_depletion',
+    // The dials are the inert 1e6 placeholders the server synthesizes.
+    player_metric: { name: 'hp', current: 0, starting: 0, threshold: 1000000 },
+    opponent_metric: { name: 'hp', current: 0, starting: 0, threshold: 1000000 },
+    player_hp: { current: 7, max: 10 },
+    opponent_hp: { current: 3, max: 8 },
+  };
+
+  it('renders HP bars (not dial metric bars) under hp_depletion', () => {
+    render(<ConfrontationOverlay data={HP_COMBAT_DATA} />);
+    expect(screen.getAllByTestId('hp-bar')).toHaveLength(2);
+    expect(screen.queryByTestId('metric-bar')).not.toBeInTheDocument();
+  });
+
+  it('shows the real current/max HP, never the 1e6 placeholder', () => {
+    render(<ConfrontationOverlay data={HP_COMBAT_DATA} />);
+    expect(screen.getByText('7/10')).toBeInTheDocument();
+    expect(screen.getByText('3/8')).toBeInTheDocument();
+    expect(screen.queryByText(/1000000/)).not.toBeInTheDocument();
+  });
+
+  it('tags the bar container with the resolution model', () => {
+    render(<ConfrontationOverlay data={HP_COMBAT_DATA} />);
+    expect(screen.getByTestId('dual-dial-bars')).toHaveAttribute(
+      'data-resolution-model',
+      'hp_depletion',
+    );
+  });
+
+  it('flags a downed side (0 HP) for visual emphasis', () => {
+    const downed: ConfrontationData = {
+      ...HP_COMBAT_DATA,
+      opponent_hp: { current: 0, max: 8 },
+    };
+    render(<ConfrontationOverlay data={downed} />);
+    const bars = screen.getAllByTestId('hp-bar');
+    const opp = bars.find((b) => b.getAttribute('data-hp-side') === 'opponent');
+    expect(opp).toHaveAttribute('data-hp-downed', 'true');
+  });
+
+  it('falls back to dial EdgeBars for non-hp_depletion confrontations', () => {
+    render(<ConfrontationOverlay data={COMBAT_DATA} />);
+    expect(screen.getAllByTestId('metric-bar')).toHaveLength(2);
+    expect(screen.queryByTestId('hp-bar')).not.toBeInTheDocument();
+  });
+
+  it('falls back per-side to a dial EdgeBar when a side HP is absent', () => {
+    const partial: ConfrontationData = {
+      ...HP_COMBAT_DATA,
+      opponent_hp: undefined,
+    };
+    render(<ConfrontationOverlay data={partial} />);
+    expect(screen.getAllByTestId('hp-bar')).toHaveLength(1);
+    expect(screen.getAllByTestId('metric-bar')).toHaveLength(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
 // AC3: Available beats render as action buttons
 // ═══════════════════════════════════════════════════════════
 

@@ -75,6 +75,23 @@ export interface ConfrontationData {
   player_metric: EncounterMetric;
   /** Opponent edge — advances on opponent_metric deltas; resolution at threshold. */
   opponent_metric: EncounterMetric;
+  /**
+   * Resolution model. `"hp_depletion"` (SWN combat — win on a side reaching
+   * 0 HP) or `"dial_threshold"` (native dial packs). Under hp_depletion the
+   * dial metrics are inert 1e6 placeholders, so the overlay renders the HP
+   * track below instead of the meaningless dial. Absent on legacy/dial
+   * payloads — treated as dial_threshold.
+   */
+  win_condition?: string;
+  /**
+   * Primary combatants' HP under hp_depletion, `{current, max}`. The server
+   * already emits these (sidequest-server confrontation.py:244-262, threaded
+   * with the live find_creature_core resolver); this overlay is the UI mirror
+   * the server NOTE flagged as deferred. Absent for dial packs / when no
+   * backing CreatureCore resolves.
+   */
+  player_hp?: StatValue;
+  opponent_hp?: StatValue;
   beats: BeatOption[];
   secondary_stats: SecondaryStats | null;
   genre_slug: string;
@@ -252,7 +269,55 @@ function EdgeBar({
   );
 }
 
+// HP track for hp_depletion (SWN) combat. Unlike EdgeBar (an edge that fills
+// UP toward a resolution threshold), HP DEPLETES: the bar starts full at max
+// and drains toward 0, which is the loss condition. Reuses the per-side
+// blue/amber palette so the player can read "my HP" vs "their HP" at a glance
+// (Sebastien/Jade player-facing-math goal). Renders the literal current/max so
+// the math is legible.
+function HpBar({ hp, side }: { hp: StatValue; side: MetricSide }) {
+  const max = hp.max > 0 ? hp.max : 1;
+  const fillPct = Math.max(0, Math.min(100, (hp.current / max) * 100));
+  const downed = hp.current <= 0;
+  return (
+    <div
+      data-testid="hp-bar"
+      data-hp-side={side}
+      data-hp-downed={downed ? "true" : undefined}
+      className="flex-1 flex items-center gap-1.5 min-w-0"
+    >
+      <span
+        className="text-[9px] uppercase tracking-wider font-semibold flex-shrink-0"
+        style={{ color: SIDE_COLOR_VAR[side] }}
+        aria-label={`${side === "player" ? "Player" : "Opponent"} HP`}
+      >
+        {SIDE_LABEL[side]}
+      </span>
+      <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden min-w-[24px]">
+        <div
+          data-testid="hp-bar-fill"
+          className={`h-full transition-all duration-300 ${downed ? "animate-pulse" : ""}`}
+          style={{
+            width: `${fillPct}%`,
+            background: SIDE_COLOR_VAR[side],
+            boxShadow: downed ? `0 0 8px ${SIDE_COLOR_VAR[side]}` : undefined,
+          }}
+        />
+      </div>
+      <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
+        {hp.current}/{hp.max}
+        <span className="sr-only"> HP</span>
+      </span>
+    </div>
+  );
+}
+
 function StatusLine({ data }: { data: ConfrontationData }) {
+  // hp_depletion combat carries inert 1e6 placeholder dials; render the real
+  // HP track instead so the bars don't read "0/1000000". Fall back to the dial
+  // EdgeBar per-side when a side's HP is absent (no backing CreatureCore) or
+  // for any non-hp_depletion (dial) confrontation — keeps dial packs unchanged.
+  const isHpDepletion = data.win_condition === "hp_depletion";
   return (
     <div
       className="flex items-center gap-3 px-3 py-1.5 rounded-md mb-2 border"
@@ -276,10 +341,19 @@ function StatusLine({ data }: { data: ConfrontationData }) {
       </span>
       <div
         data-testid="dual-dial-bars"
+        data-resolution-model={isHpDepletion ? "hp_depletion" : "dial_threshold"}
         className="flex-1 flex items-center gap-3 min-w-0"
       >
-        <EdgeBar metric={data.player_metric} side="player" />
-        <EdgeBar metric={data.opponent_metric} side="opponent" />
+        {isHpDepletion && data.player_hp ? (
+          <HpBar hp={data.player_hp} side="player" />
+        ) : (
+          <EdgeBar metric={data.player_metric} side="player" />
+        )}
+        {isHpDepletion && data.opponent_hp ? (
+          <HpBar hp={data.opponent_hp} side="opponent" />
+        ) : (
+          <EdgeBar metric={data.opponent_metric} side="opponent" />
+        )}
       </div>
     </div>
   );
@@ -321,6 +395,15 @@ function BeatTile({
   const normalHover = "oklch(0.24 0.008 80)";
   const finisherBg = "color-mix(in oklab, var(--accent-finisher) 7%, var(--card))";
   const finisherHover = "color-mix(in oklab, var(--accent-finisher) 11%, var(--card))";
+  // Text color must match the SURFACE, not the theme. Non-finisher tiles use a
+  // hard-coded dark surface (normalBg) that does NOT flip with the genre theme,
+  // so their text must be a fixed light tone — otherwise a light theme (e.g.
+  // Tea & Murder / Glenross, whose --foreground is dark) inherits dark-on-dark
+  // and the label/kind/stat/DC vanish (playtest 67-10). The finisher tile's
+  // surface IS theme-derived (--card), so its text correctly tracks
+  // --card-foreground and stays legible in both light and dark themes.
+  const tileText = finisher ? "var(--card-foreground)" : "oklch(0.92 0.012 80)";
+  const tileTextMuted = finisher ? "var(--muted-foreground)" : "oklch(0.72 0.01 80)";
   return (
     <button
       type="button"
@@ -334,6 +417,7 @@ function BeatTile({
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
         background: finisher ? finisherBg : normalBg,
         borderColor: finisher ? "var(--accent-finisher)" : "var(--border)",
+        color: tileText,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = finisher ? finisherHover : normalHover;
@@ -377,12 +461,15 @@ function BeatTile({
       {/* Row 2 — mechanical signal kept legible for the crunch players:
           kind · stat · +base on the left, risk dot on the right. */}
       <div className="flex items-center justify-between gap-1.5 min-w-0">
-        <span className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground font-semibold truncate min-w-0">
+        <span
+          className="text-[9.5px] uppercase tracking-[0.14em] font-semibold truncate min-w-0"
+          style={{ color: tileTextMuted }}
+        >
           {KIND_LABEL[beat.kind ?? ""] ?? beat.kind ?? ""}
           {beat.kind && <span className="opacity-50"> · </span>}
           {beat.stat_check}
           <span className="opacity-50"> · </span>
-          <span className="text-foreground/70 tracking-normal normal-case">DC {dc}</span>
+          <span className="tracking-normal normal-case" style={{ color: tileText }}>DC {dc}</span>
         </span>
         {beat.risk && (
           <span
