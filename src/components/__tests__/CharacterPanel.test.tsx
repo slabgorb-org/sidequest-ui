@@ -1192,3 +1192,110 @@ describe("CharacterPanel — Story 67-4: no doubled player==character header (MP
     expect(screen.queryByTestId("character-panel-player-name")).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 67-6: player_identity field — suffix sourced from authenticated
+// identity, not player_id (which is display-name / handle).
+//
+// The server now sends a nullable `player_identity` field on each PARTY_STATUS
+// member. The suffix must prefer `player_identity` when present, fall back to
+// `player_id`, and render only when it differs from the character name and
+// there is more than one character. A disconnected peer (player_identity ==
+// undefined) must produce NO fabricated suffix.
+// ---------------------------------------------------------------------------
+describe("CharacterPanel — Story 67-6: player_identity suffix (prefers identity over player_id)", () => {
+  it("renders suffix from player_identity when set, differs from character name, MP (2+ chars)", () => {
+    // player_identity = authenticated email; differs from name "Kael"
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Kael",        // handle == name → would suppress under 67-4
+      player_identity: "keith@example.com",  // identity != name → must render
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Kael",
+            name: "Kael",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Kael"
+      />,
+    );
+    const suffix = screen.getByTestId("character-panel-player-name");
+    expect(suffix).toBeInTheDocument();
+    expect(suffix.textContent ?? "").toMatch(/keith@example\.com/);
+  });
+
+  it("does not render suffix when player_identity is undefined and player_id equals character name (disconnected peer)", () => {
+    // Disconnected peer: player_identity undefined, player_id == name
+    const character: CharacterSheetData = {
+      ...CHARACTER,
+      player_id: "Kael",
+      // player_identity intentionally absent (undefined)
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Kael",
+            name: "Kael",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Kael"
+      />,
+    );
+    // player_identity undefined, player_id == name → no suffix
+    expect(screen.queryByTestId("character-panel-player-name")).not.toBeInTheDocument();
+  });
+
+  it("falls back to player_id when player_identity is absent but player_id differs from character name", () => {
+    // No player_identity, but player_id differs from character name → classic 56-1 case still works
+    const character: CharacterSheetData = {
+      ...CHARACTER,  // name: "Kael"
+      player_id: "Sebastien",
+      // player_identity intentionally absent
+    };
+    render(
+      <CharacterPanel
+        character={character}
+        characters={[
+          {
+            player_id: "Sebastien",
+            name: "Sebastien",
+            character_name: "Kael",
+            hp: 30,
+            hp_max: 30,
+            status_effects: [],
+            class: CHARACTER.class,
+            level: CHARACTER.level,
+            current_location: "The Rusty Cantina",
+          },
+          SECOND_PC_SUMMARY,
+        ]}
+        currentPlayerId="Sebastien"
+      />,
+    );
+    const suffix = screen.getByTestId("character-panel-player-name");
+    expect(suffix).toBeInTheDocument();
+    expect(suffix.textContent ?? "").toMatch(/Sebastien/);
+  });
+});

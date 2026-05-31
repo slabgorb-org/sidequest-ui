@@ -51,6 +51,11 @@ export interface StateDelta {
 export interface PartyMemberPayload {
   player_id: string;
   name: string;
+  /** Authenticated player identity (email / dev host) distinct from the
+   *  display-name handle. Server emits this on PARTY_STATUS members when
+   *  an authenticated session is active. Undefined for disconnected peers
+   *  or when the server has not yet resolved identity. Story 67-6. */
+  player_identity?: string;
   character_name?: string;
   current_hp: number;
   max_hp: number;

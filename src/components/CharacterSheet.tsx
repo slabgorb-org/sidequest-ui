@@ -73,6 +73,12 @@ export interface CharacterSheetData {
    *  leaves this undefined in single-player so the header renders the
    *  character name only. Story 56-1. */
   player_id?: string;
+  /** Authenticated player identity (email / dev host) from PARTY_STATUS
+   *  `member.player_identity`. Distinct from `player_id` (display-name
+   *  handle). The suffix prefers this field when present, falling back to
+   *  `player_id`. Undefined when server has not resolved identity or peer
+   *  is disconnected — must never produce a fabricated suffix. Story 67-6. */
+  player_identity?: string;
   /** Current rig composure. Absent/undefined when character has no rig. */
   rig_composure_current?: number;
   /** Maximum rig composure. Absent/undefined when character has no rig. */
