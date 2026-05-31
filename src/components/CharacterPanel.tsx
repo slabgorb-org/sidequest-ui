@@ -149,6 +149,18 @@ export function CharacterPanel({
 
   const hasResources = resources != null && Object.keys(resources).length > 0;
 
+  // Story 56-1 / 67-4 / 67-6: controlling-player suffix in the header.
+  // Prefer player_identity (authenticated email / dev host) over player_id
+  // (display-name handle); render only when it differs from the character
+  // name (no doubled "Kael — Kael", story 67-4) and the roster has >1 PC
+  // (the conservative MP signal App.tsx uses). Undefined player_identity ⇒
+  // disconnected peer ⇒ no fabricated suffix.
+  const playerSuffix = character.player_identity || character.player_id;
+  const showPlayerSuffix =
+    !!playerSuffix &&
+    playerSuffix !== character.name &&
+    characters.length > 1;
+
   // Backstory removed: lives in the top-level Lore panel now. Character
   // tab is the mechanical sheet (stats / abilities / status), not lore.
   const tabs: { id: TabId; label: string; glyph: string }[] = [
@@ -247,23 +259,19 @@ export function CharacterPanel({
                 Story 67-6: prefer player_identity (authenticated email / dev
                 host) over player_id (display-name handle). Undefined
                 player_identity means disconnected peer — no fabricated suffix. */}
-            {(() => {
-              const suffix = character.player_identity || character.player_id;
-              const show = suffix && suffix !== character.name && characters && characters.length > 1;
-              return show ? (
-                <span
-                  data-testid="character-panel-player-name"
-                  className="ml-2 text-xs font-normal"
-                  style={{
-                    fontFamily: FONT_BODY,
-                    color: FOLIO.inkSoft,
-                    letterSpacing: 0,
-                  }}
-                >
-                  — {suffix}
-                </span>
-              ) : null;
-            })()}
+            {showPlayerSuffix ? (
+              <span
+                data-testid="character-panel-player-name"
+                className="ml-2 text-xs font-normal"
+                style={{
+                  fontFamily: FONT_BODY,
+                  color: FOLIO.inkSoft,
+                  letterSpacing: 0,
+                }}
+              >
+                — {playerSuffix}
+              </span>
+            ) : null}
           </h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
           {/* Subtitle is calling · origin ("Country Veterinary Surgeon · The

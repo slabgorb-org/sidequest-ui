@@ -19,11 +19,12 @@ import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
 import { beatDispatchBlockReason } from "@/lib/beatDispatch";
+import { toCharacterSummary, toCharacterSheetData } from "@/lib/partyStatusMapping";
 import {
   computeSubmittedPlayerIds,
   mergePeerRevealsWithSubmittedStatus,
 } from "@/lib/turnStatusDerivation";
-import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
+import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
@@ -901,23 +902,7 @@ function AppInner() {
     // local player's slice into characterSheet / inventoryData here.
     if (msg.type === MessageType.PARTY_STATUS) {
       const members = (msg.payload.members as Array<Record<string, unknown>>) ?? [];
-      const mapped = members.map((m) => ({
-        player_id: (m.player_id as string) ?? "",
-        name: (m.name as string) ?? "",
-        character_name: (m.character_name as string) ?? (m.name as string) ?? "",
-        hp: (m.current_hp as number) ?? 0,
-        hp_max: (m.max_hp as number) ?? 0,
-        // Story 68-1: genre survivability label (undefined ⇒ surfaces show "HP").
-        survivability_pool_label:
-          typeof m.survivability_pool_label === "string"
-            ? (m.survivability_pool_label as string)
-            : undefined,
-        status_effects: (m.statuses as string[]) ?? [],
-        class: (m.class as string) ?? "",
-        level: (m.level as number) ?? 1,
-        portrait_url: (m.portrait_url as string) || undefined,
-        current_location: (m.current_location as string) ?? "",
-      }));
+      const mapped = members.map(toCharacterSummary);
       // Deduplicate by player_id (HMR/reconnect can re-register players)
       const seen = new Set<string>();
       const deduped = mapped.filter((m) => {
@@ -951,34 +936,7 @@ function AppInner() {
           // second PC's PARTY_STATUS arrives later) is appropriate for the
           // load-bearing AC-4: single-player must not regress.
           const isMultiplayer = deduped.length > 1;
-          const built: CharacterSheetData = {
-            name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
-            class: (rawLocal.class as string) ?? "",
-            class_reference_url: (rawLocal.class_reference_url as string | null | undefined) ?? null,
-            race: (sheetFacet.race as string) || undefined,
-            calling_label: (sheetFacet.calling_label as string) || undefined,
-            origin_label: (sheetFacet.origin_label as string) || undefined,
-            level: (rawLocal.level as number) ?? 1,
-            hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
-            hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
-            // Story 68-1: genre survivability label for the sheet's HP badge.
-            survivability_pool_label:
-              typeof rawLocal.survivability_pool_label === "string"
-                ? (rawLocal.survivability_pool_label as string)
-                : undefined,
-            stats: (sheetFacet.stats as Record<string, number>) ?? {},
-            abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
-            class_moves: (sheetFacet.class_moves as ClassMove[]) ?? [],
-            backstory: (sheetFacet.backstory as string) ?? "",
-            portrait_url: (rawLocal.portrait_url as string) || undefined,
-            current_location: (rawLocal.current_location as string) ?? "",
-            player_id: isMultiplayer
-              ? ((rawLocal.player_id as string) || undefined)
-              : undefined,
-            rig_composure_current: typeof rawLocal.rig_composure_current === "number" ? rawLocal.rig_composure_current as number : undefined,
-            rig_composure_max: typeof rawLocal.rig_composure_max === "number" ? rawLocal.rig_composure_max as number : undefined,
-            injury_tags: Array.isArray(rawLocal.injury_tags) ? rawLocal.injury_tags as string[] : undefined,
-          };
+          const built = toCharacterSheetData(rawLocal, sheetFacet, isMultiplayer);
           setCharacterSheet(built);
         }
         const invFacet = rawLocal.inventory as Record<string, unknown> | undefined;
