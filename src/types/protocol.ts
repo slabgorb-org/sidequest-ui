@@ -81,6 +81,10 @@ export const MessageType = {
   // state changes. Fires when an encounter with a non-None
   // location_overlay activates or deactivates. UI consumer in 54-9.
   LOCATION_OVERLAY_CHANGED: "LOCATION_OVERLAY_CHANGED",
+  // ADR-136: snapshot channel for the NPC relationship roster (per-NPC
+  // disposition band/trend, beats, personality read, claims). Server emits
+  // on demand for the relationship panel.
+  RELATIONSHIPS: "RELATIONSHIPS",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
