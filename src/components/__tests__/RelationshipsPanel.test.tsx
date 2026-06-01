@@ -47,4 +47,19 @@ describe("RelationshipsPanel (ADR-136 Task 14)", () => {
     render(<RelationshipsPanel data={null} />);
     expect(screen.getByText(/no one yet/i)).toBeInTheDocument();
   });
+
+  it("shows personality read on expand and numeric OCEAN on further expand", () => {
+    const withOcean: RelationshipEntryPayload = {
+      ...entry,
+      personality_read: "Outgoing and warm; disciplined and reliable.",
+      ocean: { openness: 5, conscientiousness: 7, extraversion: 9, agreeableness: 5, neuroticism: 4 },
+    };
+    render(<RelationshipsPanel data={[withOcean]} />);
+    fireEvent.click(screen.getByRole("button", { name: /tabitha/i }));
+    expect(screen.getByText(/outgoing and warm/i)).toBeInTheDocument();
+    // numeric profile hidden until further expand
+    expect(screen.queryByText(/extraversion/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /personality|show traits|ocean/i }));
+    expect(screen.getByText(/extraversion/i)).toBeInTheDocument();
+  });
 });

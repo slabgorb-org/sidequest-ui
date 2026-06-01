@@ -32,6 +32,7 @@ export interface RelationshipsPanelProps {
 
 export function RelationshipsPanel({ data }: RelationshipsPanelProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [oceanOpen, setOceanOpen] = useState<Set<string>>(new Set());
 
   if (!data || data.length === 0) {
     return (
@@ -54,6 +55,17 @@ export function RelationshipsPanel({ data }: RelationshipsPanelProps) {
 
   const toggle = (name: string) =>
     setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+
+  const toggleOcean = (name: string) =>
+    setOceanOpen((prev) => {
       const next = new Set(prev);
       if (next.has(name)) {
         next.delete(name);
@@ -128,7 +140,44 @@ export function RelationshipsPanel({ data }: RelationshipsPanelProps) {
                     </ul>
                   </div>
                 ) : null}
-                {/* Phase B inserts personality_read here; Phase C inserts claims here. */}
+                {e.personality_read && (
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+                      Personality
+                    </div>
+                    <div>{e.personality_read}</div>
+                    {e.ocean && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleOcean(e.name)}
+                          aria-expanded={oceanOpen.has(e.name)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: FOLIO.inkSoft,
+                            fontFamily: FONT_BODY,
+                            padding: "0.25rem 0",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          {oceanOpen.has(e.name) ? "Hide traits" : "Show traits"}
+                        </button>
+                        {oceanOpen.has(e.name) && (
+                          <ul style={{ margin: 0, paddingLeft: "1rem" }}>
+                            {Object.entries(e.ocean).map(([dim, val]) => (
+                              <li key={dim}>
+                                {dim}: {val.toFixed(1)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+                {/* Phase C inserts claims here. */}
               </div>
             )}
           </div>
