@@ -62,4 +62,15 @@ describe("RelationshipsPanel (ADR-136 Task 14)", () => {
     fireEvent.click(screen.getByRole("button", { name: /personality|show traits|ocean/i }));
     expect(screen.getByText(/extraversion/i)).toBeInTheDocument();
   });
+
+  it("shows claims with credibility hints on expand", () => {
+    const withClaims: RelationshipEntryPayload = {
+      ...entry,
+      claims: [{ text: "I was in the garden all evening", credibility_hint: "credible" }],
+    };
+    render(<RelationshipsPanel data={[withClaims]} />);
+    fireEvent.click(screen.getByRole("button", { name: /tabitha/i }));
+    expect(screen.getByText(/i was in the garden all evening/i)).toBeInTheDocument();
+    expect(screen.getByText(/credible/i)).toBeInTheDocument();
+  });
 });

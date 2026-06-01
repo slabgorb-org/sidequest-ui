@@ -22,8 +22,10 @@ const FONT_BODY = "'EB Garamond', serif";
 
 // ADR-136 hybrid disclosure: the band ("Warm") is the default, player-facing
 // read; the raw disposition integer + per-turn beat history are mechanics-first
-// detail (Sebastien/Jade) revealed only on expand. Phase B will insert
-// personality_read and Phase C the claims roster inside the expanded body.
+// detail (Sebastien/Jade) revealed only on expand. The expanded body also
+// renders the personality_read prose, the numeric OCEAN profile (behind a
+// further "Show traits" toggle), and the claims-to-party roster with
+// credibility hints.
 const TREND_ARROW: Record<string, string> = { up: "↗", flat: "→", down: "↘" };
 
 export interface RelationshipsPanelProps {
@@ -177,7 +179,23 @@ export function RelationshipsPanel({ data }: RelationshipsPanelProps) {
                     )}
                   </div>
                 )}
-                {/* Phase C inserts claims here. */}
+                {e.claims.length > 0 && (
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+                      Told the party
+                    </div>
+                    <ul style={{ margin: "0.25rem 0", paddingLeft: "1rem" }}>
+                      {e.claims.map((c, i) => (
+                        <li key={i}>
+                          “{c.text}”{" "}
+                          <span style={{ color: FOLIO.inkSoft, fontStyle: "italic" }}>
+                            ({c.credibility_hint})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
