@@ -10,6 +10,7 @@ import type {
   LocationDescriptionPayload,
   NarrationDelta,
   NarrationMessage,
+  RelationshipEntryPayload,
 } from '@/types/payloads';
 
 export interface CharacterState {
@@ -77,6 +78,8 @@ export interface ClientGameState {
    * pre-54 worlds remain valid in this shape.
    */
   currentLocation?: LocationDescriptionPayload | null;
+  /** ADR-136: player-facing NPC relationship roster (full replace per message). */
+  relationships?: RelationshipEntryPayload[] | null;
 }
 
 export interface GameStateContextValue {
@@ -106,6 +109,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   quests: {},
   knowledge: [],
   currentLocation: null,
+  relationships: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

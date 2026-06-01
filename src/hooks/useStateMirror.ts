@@ -7,6 +7,7 @@ import type {
   LocationDescriptionPayload,
   LocationOverlayChangedPayload,
   NarrationMessage,
+  RelationshipsPayload,
 } from '../types/payloads';
 import { reduceStreamingNarration, initialStreamingState } from '../providers/streamingNarration';
 import type { MagicState } from '../types/magic';
@@ -79,6 +80,10 @@ export function useStateMirror(messages: GameMessage[]): void {
     // the current baseline is dropped (room change is the truth source).
     let currentLocation: LocationDescriptionPayload | null = null;
     let pendingOverlays: LocationOverlayChangedPayload | null = null;
+    // ADR-136: player-facing NPC relationship roster. RELATIONSHIPS is a
+    // snapshot — every message is a full replace (same idempotent-replay
+    // contract as currentLocation). Null until the first roster arrives.
+    let relationships: RelationshipsPayload['entries'] | null = null;
 
     for (const msg of messages) {
       // narration.delta arrives with `kind` (not `type`) and is NOT a GameMessage
@@ -218,6 +223,14 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // ADR-136: full replace of the relationship roster. RELATIONSHIPS is a
+      // snapshot — the latest message wins, mirroring LOCATION_DESCRIPTION.
+      if (msg.type === MessageType.RELATIONSHIPS) {
+        const payload = msg.payload as unknown as RelationshipsPayload;
+        relationships = payload.entries;
+        continue;
+      }
+
       // Story 54-9: per-encounter overlay delta. When a baseline exists
       // for the same region_id, replace its overlays slice. When the
       // baseline is for a DIFFERENT region the delta is stale (room change
@@ -339,6 +352,12 @@ export function useStateMirror(messages: GameMessage[]): void {
     // default in EMPTY_GAME_STATE is null so the panel's dataGated tab
     // stays hidden during chargen and on pre-54 worlds.
     current = { ...current, currentLocation };
+
+    // ADR-136: relationship roster slice. Always mirrored — null when no
+    // RELATIONSHIPS message has arrived, the latest snapshot's entries
+    // otherwise. Same always-replace shape as currentLocation above so the
+    // panel's data-gated surface stays hidden until the server sends a roster.
+    current = { ...current, relationships };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;
