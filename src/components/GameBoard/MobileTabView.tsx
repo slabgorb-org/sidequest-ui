@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BookOpen, User, Map, MapPin, Package, BookMarked, Image } from "lucide-react";
+import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart } from "lucide-react";
 import type { WidgetId } from "./widgetRegistry";
 
 interface MobileTab {
@@ -11,6 +11,11 @@ interface MobileTab {
 const TABS: MobileTab[] = [
   { id: "narrative", label: "Story", icon: <BookOpen size={18} /> },
   { id: "character", label: "Character", icon: <User size={18} /> },
+  // ADR-136: data-gated like every non-narrative tab — only renders when
+  // `relationships` is in availableWidgets (a RELATIONSHIPS snapshot has met
+  // NPCs). Kept in sync with the desktop dockview rightGroupOrder (after
+  // character) so the Relationships tab has mobile/desktop layout parity.
+  { id: "relationships", label: "Relationships", icon: <Heart size={18} /> },
   { id: "map", label: "Map", icon: <Map size={18} /> },
   // Capability-gated like every non-narrative tab: only renders when
   // `location` is in availableWidgets (region / room_graph worlds). Kept in

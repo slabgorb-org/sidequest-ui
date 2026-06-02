@@ -49,6 +49,7 @@ import type {
   DiceResultPayload,
   DiceThrowParams,
   LocationDescriptionPayload,
+  RelationshipEntryPayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -70,6 +71,7 @@ import { InventoryWidget } from "./widgets/InventoryWidget";
 // JournalView and the journal data pipeline are intentionally retained.
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
+import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 // ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
 // dedicated panel between the dockview workspace and the InputBar (D2 mock).
 import { AudioWidget } from "./widgets/AudioWidget";
@@ -165,6 +167,13 @@ export interface GameBoardProps {
   // tab. The JournalEntry type and gameState.journal pipeline are kept in
   // the provider so the feature can be revived without re-plumbing data.
   knowledgeEntries?: KnowledgeEntry[];
+  /**
+   * ADR-136: NPC relationship roster, mirrored from state.relationships.
+   * Null/empty until a RELATIONSHIPS snapshot arrives; the Relationships tab
+   * is gated on data presence in availableWidgets below (no one met yet → no
+   * tab clutter), mirroring the knowledge data-gate.
+   */
+  relationshipsData?: RelationshipEntryPayload[] | null;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -246,6 +255,7 @@ export function GameBoard({
   audio,
   nowPlaying = null,
   knowledgeEntries,
+  relationshipsData = null,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -326,8 +336,16 @@ export function GameBoard({
     if (navMode === "region" || navMode === "room_graph") {
       available.add("location");
     }
+    // ADR-136: the Relationships tab is data-gated — it appears only once a
+    // RELATIONSHIPS snapshot carries at least one met NPC. No stable
+    // world-capability signal exists for relationships (every world can have
+    // NPCs), so gating on the payload keeps an empty roster from cluttering
+    // the dock before anyone has been met.
+    if (relationshipsData != null && relationshipsData.length > 0) {
+      available.add("relationships");
+    }
     return available;
-  }, [worldSlug, navMode]);
+  }, [worldSlug, navMode, relationshipsData]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -472,6 +490,8 @@ export function GameBoard({
         ) : null;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
+      case "relationships":
+        return relationshipsData ? <RelationshipsWidget data={relationshipsData} /> : null;
       case "location":
         return <LocationWidget data={currentLocation ?? null} />;
       case "audio":
@@ -490,7 +510,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      currentLocation, knowledgeEntries, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, relationshipsData, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
@@ -636,6 +656,7 @@ export function GameBoard({
     // initial layout is stable regardless of when data arrives.
     const rightGroupOrder: WidgetId[] = [
       "character",
+      "relationships",
       "inventory",
       "map",
       "location",

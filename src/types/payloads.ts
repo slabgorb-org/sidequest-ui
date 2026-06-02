@@ -531,6 +531,11 @@ export interface ScrapbookEntryMessage extends BaseMessage {
   payload: ScrapbookEntryPayload;
 }
 
+export interface RelationshipsMessage extends BaseMessage {
+  type: typeof MessageType.RELATIONSHIPS;
+  payload: RelationshipsPayload;
+}
+
 /**
  * Streaming narration delta — intentionally outside TypedGameMessage union.
  *
@@ -568,7 +573,8 @@ export type TypedGameMessage =
   | DiceRequestMessage
   | DiceThrowMessage
   | DiceResultMessage
-  | ScrapbookEntryMessage;
+  | ScrapbookEntryMessage
+  | RelationshipsMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -775,6 +781,39 @@ export interface LocationDescriptionPayload {
   /** Story 63-6: deep-link from the region header into the /reference/lore
    * wiki; null/absent when the region has no lore-page anchor. */
   reference_url?: string | null;
+}
+
+// ADR-136: NPC relationship roster snapshot. Field names mirror the server
+// pydantic models (DispositionBeatPayload / RelationshipClaimPayload /
+// RelationshipEntry / RelationshipsPayload) on the snake_case wire.
+export interface DispositionBeatPayload {
+  turn: number;
+  delta: number;
+  reason: string;
+  location: string | null;
+}
+
+export interface RelationshipClaimPayload {
+  text: string;
+  credibility_hint: string;
+}
+
+export interface RelationshipEntryPayload {
+  name: string;
+  portrait_url: string | null;
+  band: string;
+  disposition: number;
+  trend: string;
+  last_seen_turn: number;
+  last_seen_location: string | null;
+  beats: DispositionBeatPayload[];
+  personality_read: string | null;
+  ocean: Record<string, number> | null;
+  claims: RelationshipClaimPayload[];
+}
+
+export interface RelationshipsPayload {
+  entries: RelationshipEntryPayload[];
 }
 
 // Story 54-7 / ADR-109: delta-channel payload for encounter location

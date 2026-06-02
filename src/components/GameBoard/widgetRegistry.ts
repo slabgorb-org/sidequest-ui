@@ -21,6 +21,7 @@ export type WidgetId =
   | "location"
   | "ship"
   | "knowledge"
+  | "relationships"
   | "gallery"
   | "audio";
 
@@ -114,6 +115,19 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     minH: 3,
     defaultW: 4,
     defaultH: 4,
+    closable: true,
+    dataGated: true,
+  },
+  // ADR-136 Task 14: NPC relationship roster. dataGated so the tab is hidden
+  // until a RELATIONSHIPS snapshot arrives (no one met yet → no tab clutter).
+  relationships: {
+    id: "relationships",
+    label: "Relationships",
+    hotkey: "r",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
     closable: true,
     dataGated: true,
   },
