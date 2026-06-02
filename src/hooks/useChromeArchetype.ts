@@ -6,6 +6,9 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
   tea_and_murder: "parchment",
   elemental_harmony: "parchment",
+  // wry_whimsy — golden-age literary portal fairytale (Denslow 1900 storybook).
+  // Bookish serif chrome, same family as the other literary parchment packs.
+  wry_whimsy: "parchment",
   neon_dystopia: "terminal",
   space_opera: "terminal",
   road_warrior: "rugged",
