@@ -48,7 +48,7 @@ describe("LocationPanel (Story 54-9)", () => {
     ).toContain("gathering your bearings");
   });
 
-  it("renders the region_id as a header", () => {
+  it("falls back to the region_id slug in the header when no display name is present", () => {
     render(<LocationPanel data={payload()} />);
     expect(screen.getByTestId("location-header")).toBeTruthy();
     expect(screen.getByTestId("location-header").textContent).toContain(
@@ -69,6 +69,43 @@ describe("LocationPanel (Story 54-9)", () => {
     expect(header.style.fontFamily).toContain("--font-display");
     const panel = screen.getByTestId("location-panel");
     expect(panel.style.fontFamily).toContain("--font-body");
+  });
+
+  // BUG-LOW (2026-06-02 playtest): the header was rendering the raw
+  // snake_case slug ("munchkin_country"). When the server supplies the
+  // authored display name it must be shown instead.
+  it("renders the authored region_name in the header, not the slug", () => {
+    render(
+      <LocationPanel
+        data={payload({
+          region_id: "munchkin_country",
+          region_name: "The Munchkin Country",
+        })}
+      />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Munchkin Country");
+    expect(header.textContent).not.toContain("munchkin_country");
+  });
+
+  // The slug stays the deep-link target even when the display name is shown:
+  // the lore anchor is keyed on the snake_case region_id, not the prose name.
+  it("keeps the lore deep-link keyed on the slug while displaying the name", () => {
+    render(
+      <LocationPanel
+        data={payload({
+          region_id: "munchkin_country",
+          region_name: "The Munchkin Country",
+          reference_url:
+            "/reference/lore/wry_whimsy/oz#location-munchkin-country",
+        })}
+      />,
+    );
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe(
+      "/reference/lore/wry_whimsy/oz#location-munchkin-country",
+    );
+    expect(link.textContent).toBe("The Munchkin Country");
   });
 
   it("renders the base prose paragraphs", () => {

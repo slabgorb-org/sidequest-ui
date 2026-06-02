@@ -100,10 +100,10 @@ export function LocationPanel({ data }: LocationPanelProps) {
             rel="noopener noreferrer"
             style={{ color: FOLIO.ink, textDecoration: "underline" }}
           >
-            {prettifyRegionId(data.region_id)}
+            {regionDisplayName(data)}
           </a>
         ) : (
-          <span>{prettifyRegionId(data.region_id)}</span>
+          <span>{regionDisplayName(data)}</span>
         )}
         {data.terrain ? (
           <span data-testid="location-terrain-badge" style={badgeStyle()}>
@@ -168,12 +168,16 @@ function splitParagraphs(prose: string): string[] {
     .filter((p) => p.length > 0);
 }
 
-// Region ids are snake_case. The Location header shows them verbatim for
-// now so the player + Keith always know exactly which room key the panel
-// is rendering; a server-supplied display_name field would be a future
-// seam (54 out of scope per spec §2).
-function prettifyRegionId(id: string): string {
-  return id;
+// The header shows the authored, human-readable region/room name supplied
+// by the server (LocationDescriptionPayload.region_name — e.g. "The Munchkin
+// Country"). The snake_case region_id is NOT shown to the player; it stays
+// the key for the lore deep-link (data.reference_url). When no authored name
+// is available (old snapshots / nameless sources) we fall back to the slug
+// rather than inventing one — an honest, if ugly, label beats a wrong guess.
+function regionDisplayName(data: LocationDescriptionPayload): string {
+  return data.region_name && data.region_name.length > 0
+    ? data.region_name
+    : data.region_id;
 }
 
 function badgeStyle(): CSSProperties {
