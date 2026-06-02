@@ -774,6 +774,11 @@ export interface LocationDescriptionOverlaySummary {
 
 export interface LocationDescriptionPayload {
   region_id: string;
+  /** Authored human-readable region/room name for the header (e.g. "The
+   * Munchkin Country"). null/absent on old snapshots or sources with no
+   * authored name — the panel then falls back to rendering region_id.
+   * region_id stays the snake_case key used for the lore deep-link. */
+  region_name?: string | null;
   prose: string;
   terrain: string | null;
   entities: LocationEntity[];
