@@ -18,8 +18,18 @@ const FOLIO = {
   rule: "var(--border)",
 } as const;
 
-const FONT_DISPLAY = "'Pirata One', serif";
-const FONT_BODY = "'EB Garamond', serif";
+// ADR-079: track the genre's chrome archetype instead of hard-coding one
+// face. useChromeArchetype sets --font-display / --font-body per archetype
+// (parchment → Cinzel / EB Garamond, terminal → Orbitron / Share Tech Mono,
+// rugged → Pirata One / Source Sans 3). The old hard-coded 'Pirata One'
+// header rendered blackletter on the wry_whimsy parchment theme (off-theme;
+// 2026-06-02 playtest). All three archetype display faces are loaded
+// (index.html), so var() resolution is safe; the literal fallback only
+// applies pre-archetype. NB: --font-ui is deliberately NOT used here — its
+// rugged value ('Oswald') is unloaded and degrades to Impact (see
+// CharacterPanel's No-Silent-Fallback note).
+const FONT_DISPLAY = "var(--font-display, 'Pirata One', serif)";
+const FONT_BODY = "var(--font-body, 'EB Garamond', serif)";
 
 // Story 54-9 / ADR-109: this component intentionally renders prose ONLY.
 // The LocationEntity manifest arrives in `data.entities` and is mirrored
