@@ -56,6 +56,21 @@ describe("LocationPanel (Story 54-9)", () => {
     );
   });
 
+  // BUG-LOW (2026-06-02 playtest): the panel hard-coded 'Pirata One' /
+  // 'EB Garamond' and rendered blackletter on the wry_whimsy parchment
+  // theme. It must read the genre archetype font vars (ADR-079) so it
+  // tracks the per-genre face like the Narrative column.
+  it("pulls header + body fonts from the genre theme vars, not a hard-coded face", () => {
+    render(<LocationPanel data={payload()} />);
+    // jsdom stores the inline style string verbatim (it does not resolve
+    // CSS custom properties), so asserting on the var() reference proves
+    // the panel is wired to the theme rather than a literal font.
+    const header = screen.getByTestId("location-header");
+    expect(header.style.fontFamily).toContain("--font-display");
+    const panel = screen.getByTestId("location-panel");
+    expect(panel.style.fontFamily).toContain("--font-body");
+  });
+
   it("renders the base prose paragraphs", () => {
     render(
       <LocationPanel
