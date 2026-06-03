@@ -1,0 +1,55 @@
+/* SideQuest lobby — local token sheet (dark parchment shell + Folio palette).
+   Lifted from the design system's colors_and_type.css, trimmed to what the
+   lobby needs, with self-hosted fonts + Google display/genre faces. */
+
+@font-face { font-family:"EB Garamond"; src:url("./fonts/EBGaramond.ttf") format("truetype"); font-display:swap; }
+@font-face { font-family:"Oswald";      src:url("./fonts/Oswald.ttf")      format("truetype"); font-display:swap; }
+@font-face { font-family:"Orbitron";    src:url("./fonts/Orbitron.ttf")    format("truetype"); font-display:swap; }
+
+@import url("https://fonts.googleapis.com/css2?family=Pirata+One&family=Lora:ital@0;1&family=Cormorant+Garamond:ital@0;1&family=Rajdhani:wght@400;500;600&family=Special+Elite&family=IM+Fell+English:ital@0;1&display=swap");
+
+:root {
+  /* Dark shell (base-nova, dark mode) */
+  --background:   oklch(0.145 0.01 80);
+  --foreground:   oklch(0.985 0.005 80);
+  --muted-fg:     oklch(0.708 0.005 80);
+  --destructive:  oklch(0.704 0.191 22.216);
+
+  /* Dark Folio — the manuscript interior. The lobby lives on this. */
+  --folio-paper:    #1a140d;
+  --folio-paper2:   #221a10;
+  --folio-paper3:   #2b2012;
+  --folio-ink:      #ecdba8;
+  --folio-ink-soft: #b09a6a;
+  --folio-crimson:  #d6735e;
+  --folio-gold:     #d4a945;
+  --folio-rule:     rgba(212,169,69,0.22);
+  --folio-rule-soft:rgba(236,219,168,0.10);
+
+  --font-body:    "EB Garamond", Georgia, serif;
+  --font-display: "Pirata One", "EB Garamond", serif;
+
+  /* Genre accent — overridden per selection for the "subtle accent shift".
+     Defaults to the house gold so an unselected lobby reads neutral. */
+  --accent:      var(--folio-gold);
+  --accent-deep: var(--folio-crimson);
+}
+
+* { box-sizing: border-box; }
+
+/* Per-genre accent values, set on a [data-genre] ancestor. Only the accent
+   colour travels — type + structure stay the manuscript house style. */
+[data-genre="low_fantasy"]        { --accent:#b88a4e; --accent-deep:#6B4423; }
+[data-genre="tea_and_murder"]     { --accent:#cdb06b; --accent-deep:#5C7A4F; }
+[data-genre="neon_dystopia"]      { --accent:#39d8d8; --accent-deep:#c264c2; }
+[data-genre="space_opera"]        { --accent:#6fa8e0; --accent-deep:#E8A838; }
+[data-genre="mutant_wasteland"]   { --accent:#9bc46a; --accent-deep:#ff6600; }
+[data-genre="caverns_and_claudes"]{ --accent:#D4A843; --accent-deep:#b5472b; }
+[data-genre="elemental_harmony"]  { --accent:#c98a4a; --accent-deep:#9E3520; }
+[data-genre="pulp_noir"]          { --accent:#C4A35A; --accent-deep:#D4A017; }
+[data-genre="road_warrior"]       { --accent:#d08a3e; --accent-deep:#7a3b1a; }
+[data-genre="spaghetti_western"]  { --accent:#cca24f; --accent-deep:#9a5a24; }
+[data-genre="heavy_metal"]        { --accent:#c25460; --accent-deep:#6a1119; }
+
+::-webkit-scrollbar { width:0; height:0; }
+* { scrollbar-width: none; }

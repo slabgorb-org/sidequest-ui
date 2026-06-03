@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SideQuest Lobby · The Standing Folio</title>
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  html, body { margin:0; height:100%; }
+  body {
+    background: var(--folio-paper);
+    color: var(--folio-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Aged-vellum canvas + vignette (parchment archetype) */
+  body::before {
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(214,169,69,0.035) 28px, rgba(214,169,69,0.035) 29px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(214,169,69,0.025) 40px, rgba(214,169,69,0.025) 41px),
+      radial-gradient(ellipse at 30% 12%, rgba(214,169,69,0.05), transparent 55%),
+      radial-gradient(ellipse at center, transparent 48%, rgba(0,0,0,0.45) 100%);
+  }
+  #root { position:relative; z-index:1; }
+
+  .stage { min-height:100vh; display:flex; flex-direction:column; align-items:center;
+           padding:40px 28px 72px; }
+  .wrap { width:100%; max-width:1140px; }
+
+  /* ── Masthead ── */
+  .mast { text-align:center; margin-bottom:30px; }
+  .orn { color:var(--folio-rule); letter-spacing:.7em; font-size:13px; user-select:none; }
+  .wordmark {
+    font-family:var(--font-display); color:var(--folio-ink);
+    font-size:62px; line-height:.9; letter-spacing:1px; margin:16px 0 4px;
+    text-shadow:0 0 30px rgba(214,169,69,0.10);
+  }
+  .tagline { font-style:italic; color:var(--folio-ink-soft); font-size:16px; letter-spacing:.2px; }
+
+  .nameblock { text-align:center; margin:26px auto 0; max-width:24rem; }
+  .nameblock label { display:block; font-style:italic; color:var(--folio-ink-soft); font-size:16px; margin-bottom:10px; }
+  .nameblock input {
+    width:100%; background:transparent; border:0; border-bottom:1px solid var(--folio-rule);
+    text-align:center; font-family:var(--font-body); font-size:20px; color:var(--folio-ink);
+    padding:6px 4px 9px; outline:none; transition:border-color .18s ease;
+  }
+  .nameblock input::placeholder { color:rgba(236,219,168,0.32); }
+  .nameblock input:focus { border-bottom-color:var(--accent); }
+
+  /* ── Folio card (two-pane) ── */
+  .folio {
+    margin-top:34px; display:grid; grid-template-columns:296px 1fr;
+    background:linear-gradient(180deg, rgba(34,26,16,0.7), rgba(26,20,13,0.7));
+    border:1px solid var(--folio-rule);
+    box-shadow:0 26px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(236,219,168,0.05);
+  }
+
+  /* World index — genre accordion. 11 genres collapse to single rows; the
+     active genre expands its worlds inline, so 20 worlds fit with no scroll. */
+  .index { border-right:1px solid var(--folio-rule); padding:16px 0 10px; min-width:0; display:flex; flex-direction:column; }
+  .index .eyebrow {
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:"Oswald",sans-serif; text-transform:uppercase; letter-spacing:.22em;
+    font-size:11px; color:var(--folio-ink-soft); padding:0 20px 10px;
+  }
+  .index .eyebrow b { color:var(--folio-ink); font-weight:600; }
+  .index .eyebrow .n { font-weight:400; opacity:.6; }
+  .acc { display:flex; flex-direction:column; overflow-y:auto; }
+  .ghead {
+    width:100%; display:flex; align-items:center; gap:9px; text-align:left;
+    background:transparent; border:0; border-left:3px solid transparent;
+    padding:8px 18px; cursor:pointer; transition:background .14s, border-color .14s;
+    font-family:var(--font-body);
+  }
+  .ghead:hover { background:rgba(236,219,168,0.035); }
+  .ghead .chev { width:9px; color:var(--folio-ink-soft); font-size:10px; transition:transform .18s ease; flex-shrink:0; }
+  .ghead.open .chev { transform:rotate(90deg); color:var(--accent); }
+  .ghead .gname { flex:1; font-size:15.5px; color:rgba(236,219,168,0.82); letter-spacing:.2px; }
+  .ghead.open .gname { color:var(--folio-ink); }
+  .ghead .gd { font-size:13px; color:var(--accent); opacity:.8; }
+  .ghead .gn { font-family:"Oswald",sans-serif; font-size:10px; letter-spacing:.1em; color:var(--folio-ink-soft); opacity:.7; }
+  .gworlds { display:flex; flex-direction:column; padding:2px 0 8px; }
+  .row {
+    width:100%; display:flex; align-items:baseline; gap:8px; justify-content:space-between;
+    text-align:left; background:transparent; border:0; border-left:3px solid transparent;
+    padding:6px 18px 6px 36px; cursor:pointer; transition:background .14s ease, border-color .14s ease;
+    font-family:var(--font-body);
+  }
+  .row:hover { background:rgba(236,219,168,0.04); }
+  .row .nm { font-size:16px; color:rgba(236,219,168,0.66); letter-spacing:.2px; transition:color .14s; }
+  .row .here { font-family:"Oswald",sans-serif; font-size:10px; letter-spacing:.12em; color:var(--accent); white-space:nowrap; }
+  .row.sel { background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 80%); border-left-color:var(--accent); }
+  .row.sel .nm { color:var(--folio-ink); font-weight:600; }
+
+  /* Preview pane */
+  .preview { padding:0; min-width:0; display:flex; flex-direction:column; }
+  .hero {
+    position:relative; aspect-ratio:16/7; overflow:hidden;
+    border-bottom:1px solid var(--folio-rule);
+  }
+  .hero .art { position:absolute; inset:0; transition:opacity .5s ease; }
+  .hero .motif {
+    position:absolute; right:18px; bottom:6px; font-size:108px; line-height:1;
+    color:rgba(0,0,0,0.22); pointer-events:none; user-select:none;
+  }
+  .hero .scrim { position:absolute; inset:0; background:linear-gradient(180deg, transparent 38%, rgba(26,20,13,0.55) 78%, var(--folio-paper) 100%); }
+  .hero .placard { position:absolute; left:26px; bottom:18px; right:26px; }
+  .hero .glabel { font-family:"Oswald",sans-serif; text-transform:uppercase; letter-spacing:.32em; font-size:11px; color:var(--accent); margin-bottom:6px; }
+  .hero h2 { font-family:var(--font-display); font-size:42px; line-height:.95; margin:0; color:#fff; text-shadow:0 2px 18px rgba(0,0,0,0.6); }
+
+  .pbody { padding:18px 26px 22px; display:flex; flex-direction:column; gap:14px; }
+  .era { font-style:italic; color:var(--folio-ink-soft); font-size:14px; margin-top:-2px; }
+  .chips { display:flex; flex-wrap:wrap; gap:7px; }
+  .chip {
+    font-size:12px; font-style:italic; color:rgba(236,219,168,0.78);
+    border:1px solid var(--folio-rule); border-radius:999px; padding:2px 11px;
+  }
+  .chip .g { font-style:normal; margin-right:5px; color:var(--accent); }
+  .blurb { font-size:16px; line-height:1.62; color:rgba(236,219,168,0.86); margin:0; max-width:62ch; }
+  .insp { font-size:13px; color:var(--folio-ink-soft); }
+  .insp .lab { font-family:"Oswald",sans-serif; text-transform:uppercase; letter-spacing:.2em; font-size:10px; opacity:.7; margin-right:8px; }
+  .insp em { font-style:italic; color:rgba(236,219,168,0.7); }
+  .insp em:not(:last-child)::after { content:" · "; color:var(--folio-rule); font-style:normal; }
+
+  /* Commit row — mode + start */
+  .commit {
+    margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    padding:16px 26px 20px; border-top:1px solid var(--folio-rule);
+    background:linear-gradient(180deg, transparent, rgba(0,0,0,0.18));
+  }
+  .modeseg { display:flex; border:1px solid var(--folio-rule); }
+  .modeseg button {
+    background:transparent; border:0; cursor:pointer; font-family:var(--font-body);
+    color:var(--folio-ink-soft); font-size:13.5px; padding:8px 16px; letter-spacing:.3px;
+    display:flex; flex-direction:column; align-items:flex-start; line-height:1.15; gap:1px;
+    transition:background .14s, color .14s;
+  }
+  .modeseg button + button { border-left:1px solid var(--folio-rule); }
+  .modeseg button small { font-style:italic; font-size:10.5px; opacity:.65; }
+  .modeseg button:hover { color:var(--folio-ink); }
+  .modeseg button.on { background:color-mix(in srgb, var(--accent) 18%, transparent); color:var(--folio-ink); }
+
+  .start {
+    font-family:"Oswald",sans-serif; text-transform:uppercase; letter-spacing:.22em; white-space:nowrap;
+    font-size:15px; font-weight:600; color:var(--folio-paper);
+    background:var(--accent); border:0; cursor:pointer; padding:13px 28px;
+    box-shadow:0 0 22px color-mix(in srgb, var(--accent) 30%, transparent);
+    transition:transform .1s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .start:hover { box-shadow:0 0 34px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .start:active { transform:translateY(1px); }
+  .start:disabled { background:rgba(236,219,168,0.14); color:rgba(236,219,168,0.4); cursor:default; box-shadow:none; }
+
+  /* Keyboard focus — visible accent ring across interactive chrome */
+  .ghead:focus-visible, .row:focus-visible, .modeseg button:focus-visible,
+  .jrow:focus-visible, .scene:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--accent); }
+  .start:focus-visible { outline:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .nameblock input:focus-visible { outline:none; }
+
+  .links { display:flex; gap:14px; }
+  .links a { color:var(--folio-ink-soft); font-size:12.5px; text-decoration:underline; text-underline-offset:3px; }
+  .links a:hover { color:var(--folio-ink); }
+
+  /* ── Below the fold ── */
+  .below { margin-top:34px; display:grid; grid-template-columns:1fr 1fr; gap:30px 44px; }
+  .sec h3 { font-family:"Oswald",sans-serif; text-transform:uppercase; letter-spacing:.24em; font-size:11px; color:var(--folio-ink-soft); margin:0 0 12px; }
+  .sessrow, .jrow { padding:8px 0 8px 12px; border-left:2px solid var(--folio-rule); }
+  .sessrow + .sessrow, .jrow + .jrow { margin-top:6px; }
+  .sessrow .who { color:var(--folio-ink); font-weight:600; font-size:14px; }
+  .sessrow .meta, .jrow .meta { color:var(--folio-ink-soft); font-size:13px; }
+  .jrow { display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; transition:border-color .14s, background .14s; border-left-color:transparent; }
+  .jrow:hover { border-left-color:var(--accent); background:rgba(236,219,168,0.03); }
+  .jrow .left { font-size:14px; }
+  .jrow .mode { color:var(--accent); margin-right:7px; }
+  .jrow .nm { color:var(--folio-ink); }
+  .jrow .wd { font-style:italic; color:var(--folio-ink-soft); }
+  .jrow .when { font-style:italic; color:var(--folio-ink-soft); font-size:12px; }
+  .empty { color:var(--folio-ink-soft); font-style:italic; font-size:13.5px; opacity:.7; }
+  .scenes { grid-column:1 / -1; }
+  .scenegrid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .scene { text-align:left; background:transparent; border:1px solid var(--folio-rule); padding:11px 13px; cursor:pointer; transition:border-color .14s, background .14s; }
+  .scene:hover { border-color:var(--accent); background:rgba(236,219,168,0.03); }
+  .scene .top { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .scene .nm { font-family:var(--font-body); font-size:14px; color:var(--folio-ink); }
+  .scene .tag { font-family:"Oswald",sans-serif; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--folio-ink-soft); border:1px solid var(--folio-rule); padding:1px 6px; }
+  .scene .d { font-size:12.5px; font-style:italic; color:var(--folio-ink-soft); line-height:1.4; }
+
+  .footorn { text-align:center; margin-top:42px; }
+
+  @media (max-width:880px) {
+    .folio { grid-template-columns:1fr; }
+    .index { border-right:0; border-bottom:1px solid var(--folio-rule); }
+    .index .ixlist { display:grid; grid-template-columns:1fr 1fr; }
+    .acc { max-height:none; }
+    .below { grid-template-columns:1fr; }
+    .wordmark { font-size:48px; }
+    .hero { aspect-ratio:16/8; }
+  }
+  @media (max-width:560px) {
+    .index .ixlist { grid-template-columns:1fr; }
+    .scenegrid { grid-template-columns:1fr; }
+    .commit { flex-direction:column; align-items:stretch; }
+    .start { width:100%; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .fade-key { animation:fade .45s ease backwards; }
+    @keyframes fade { from { transform:translateY(6px) scale(1.02); } to { transform:none; } }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="worlds.js"></script>
+<script type="text/babel">
+const { useState } = React;
+const WORLDS = window.SQ_WORLDS, TG = window.SQ_TONE_GLYPH, GENRES = window.SQ_GENRES;
+const BY_GENRE = GENRES.map(g => ({ ...g, worlds: WORLDS.filter(w => w.genre === g.slug) }));
+
+function Lobby() {
+  const [name, setName] = useState("");
+  const [sel, setSel] = useState("tea_and_murder/curfew");
+  const [mode, setMode] = useState("solo");
+  const w = WORLDS.find(x => x.slug === sel);
+  const [open, setOpen] = useState(w ? w.genre : GENRES[0].slug);
+  const sessions = (window.SQ_SESSIONS[sel] || []);
+  const pickGenre = (g) => setOpen(o => o === g ? null : g);
+
+  return (
+    <div className="stage" data-genre={w ? w.genre : undefined}>
+      <div className="wrap">
+        {/* Masthead */}
+        <div className="mast">
+          <div className="orn">── ◇ ──</div>
+          <h1 className="wordmark">SideQuest</h1>
+          <div className="tagline">An evening's adventure, told by lamplight.</div>
+          <div className="nameblock">
+            <label htmlFor="nm">What name shall be yours?</label>
+            <input id="nm" value={name} onChange={e=>setName(e.target.value)} placeholder="Enter your name…" autoFocus />
+          </div>
+        </div>
+
+        {/* Folio card */}
+        <div className="folio">
+          <div className="index">
+            <div className="eyebrow"><span><b>Worlds</b></span><span className="n">{WORLDS.length} across {GENRES.length} genres</span></div>
+            <div className="acc">
+              {BY_GENRE.map(g => {
+                const isOpen = open === g.slug;
+                const here = g.worlds.reduce((n,x)=>n+x.here,0);
+                return (
+                  <div key={g.slug} data-genre={g.slug}>
+                    <button className={"ghead"+(isOpen?" open":"")} onClick={()=>pickGenre(g.slug)}
+                            aria-expanded={isOpen} title={here>0 ? `${here} adventurer${here>1?"s":""} here now` : undefined}>
+                      <span className="chev" aria-hidden="true">▶</span>
+                      <span className="gname">{g.label}</span>
+                      {here>0 && <span className="gd" aria-hidden="true">●</span>}
+                      <span className="gn">{g.worlds.length}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="gworlds" role="radiogroup" aria-label={g.label+" worlds"}>
+                        {g.worlds.map(x => (
+                          <button key={x.slug} role="radio" aria-checked={x.slug===sel} className={"row"+(x.slug===sel?" sel":"")} onClick={()=>setSel(x.slug)}>
+                            <span className="nm">{x.world}</span>
+                            {x.here>0 && <span className="here">{x.here} here</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="preview">
+            <div className="hero">
+              <div className="art fade-key" key={w.slug} style={{background:w.art}}></div>
+              <div className="motif">{w.dinkus}</div>
+              <div className="scrim"></div>
+              <div className="placard">
+                <div className="glabel">{window.SQ_GENRE_LABEL[w.genre]}</div>
+                <h2>{w.world}</h2>
+              </div>
+            </div>
+            <div className="pbody">
+              <div className="era">{w.era}</div>
+              <div className="chips">
+                {w.tone.map(([b,l]) => <span className="chip" key={l}><span className="g">{TG[b]}</span>{l}</span>)}
+              </div>
+              <p className="blurb">{w.blurb}</p>
+              <div className="insp">
+                <span className="lab">Inspired by</span>
+                {w.inspirations.map(i => <em key={i}>{i}</em>)}
+              </div>
+            </div>
+            <div className="commit">
+              <div className="modeseg" role="radiogroup" aria-label="Mode">
+                <button className={mode==="solo"?"on":""} onClick={()=>setMode("solo")}>Solo<small>just you & the narrator</small></button>
+                <button className={mode==="multiplayer"?"on":""} onClick={()=>setMode("multiplayer")}>Multiplayer<small>share the table</small></button>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:18}}>
+                <div className="links">
+                  <a href="#" onClick={e=>e.preventDefault()}>Rules</a>
+                  <a href="#" onClick={e=>e.preventDefault()}>Lore</a>
+                </div>
+                <button className="start" disabled={!w}>
+                  {mode==="multiplayer" ? "Start or Join" : "Start Adventure"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Below the fold */}
+        <div className="below">
+          <div className="sec">
+            <h3>Currently in this world</h3>
+            {sessions.length ? sessions.map((s,i)=>(
+              <div className="sessrow" key={i}>
+                <span className="who">{s.players}</span>
+                <span className="meta"> — turn {s.turn} · <em>{s.location}</em>{s.mode?` · ${s.mode}`:""}</span>
+              </div>
+            )) : <div className="empty">No lanterns lit here tonight.</div>}
+          </div>
+          <div className="sec">
+            <h3>Past journeys</h3>
+            {window.SQ_HISTORY.map((h,i)=>(
+              <div className="jrow" key={i} onClick={()=>setSel(h.slug)}>
+                <span className="left">
+                  <span className="mode">{h.mode==="multiplayer"?"❖":"◆"}</span>
+                  <span className="nm">{h.name}</span> <span className="wd">· {h.genreLabel} / {h.world}</span>
+                </span>
+                <span className="when">{h.when}</span>
+              </div>
+            ))}
+          </div>
+          <div className="sec scenes">
+            <h3>Scene library</h3>
+            <div className="scenegrid">
+              {window.SQ_SCENES.map((s,i)=>(
+                <button className="scene" key={i}>
+                  <div className="top"><span className="nm">{s.name}</span><span className="tag">{s.genre}</span></div>
+                  <div className="d">{s.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="footorn orn">── ◇ ──</div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Lobby/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+/* Standing Folio lobby — scoped presentation (story 83-1).
+ *
+ * The per-genre accent shift (AC7) is driven by an inline `--accent` CSS var
+ * set on the stage / accordion items / preview card from genreArt.ts, so the
+ * accent travels with the selected world while type + structure stay the
+ * manuscript house style. This sheet holds only the bits Tailwind utilities
+ * can't express cleanly. Scoped under `.lobby-folio` so nothing here leaks to
+ * the rest of the app.
+ *
+ * NOTE: the design's display face is Pirata One (a Google webfont). The app
+ * deliberately self-hosts its chrome fonts and dropped the Google Fonts links
+ * (see index.css, 2026-06-03), and the handoff bundle does not ship a Pirata
+ * One .ttf — so the wordmark falls back to the house heading serif until the
+ * face is self-hosted. Tracked as a Delivery Finding.
+ */
+
+.lobby-folio .lobby-wordmark {
+  font-family: var(--font-heading, "Baskerville", Georgia, serif);
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent, #d4a945) 14%, transparent);
+}
+
+/* Aged-vellum vignette behind the folio — subtle, pointer-transparent. */
+.lobby-folio::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 30% 12%, color-mix(in srgb, var(--accent, #d4a945) 5%, transparent), transparent 55%),
+    radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 0.35) 100%);
+}
+.lobby-folio > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The world index fits the fold via the accordion (the redesign's core goal:
+ * kill the scrollbar). Should the accordion ever overflow on a very short
+ * viewport, hide the scrollbar chrome rather than reintroduce the old bar. */
+.lobby-folio [role="radiogroup"]::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.lobby-folio [role="radiogroup"] {
+  scrollbar-width: none;
+}

@@ -1,15 +1,19 @@
 /**
  * ConnectScreen reference surface integration tests.
  *
- * After the lobby redesign (story 80-1) the two reference links no longer sit
- * in one orphaned block: **Rules** (pack-scoped) lives on each genre header in
- * the grouped world picker, and **Lore** (world-scoped) lives in the
- * WorldPreview card header. The standalone `ReferenceLinks` block is gone from
- * the lobby (the component itself is retained for the in-game NarrativeWidget).
- * These tests verify the relocated links are wired into ConnectScreen.
+ * Story 83-1 (Standing Folio) relocates the reference links. In the prior
+ * grouped-list lobby (story 80-1) **Rules** sat on every genre header
+ * (pack-scoped, reachable without selecting a world). The Standing Folio
+ * accordion has no room on a collapsed genre header, so Rules + Lore now
+ * live in the preview / commit row, contextual to the SELECTED world:
+ *   - **Rules** is pack-scoped → `/reference/rules/{genre}`
+ *   - **Lore** is world-scoped → `/reference/lore/{genre}/{world}`
+ * Both appear once a world is selected. Neither is a dead `href="#"` stub
+ * (No Stubbing / No Silent Fallbacks).
  *
- * The harness mirrors ConnectScreen.test.tsx exactly — same GENRES fixture,
- * same fetch mock, same MemoryRouter wrapper.
+ * DEVIATION from story 80-1: Rules is no longer reachable before a world is
+ * picked. Logged in the session file; flagged as a Delivery Finding for the
+ * Reviewer to weigh against ADR-135 (reference pages as a public table tool).
  */
 
 import { render, screen } from "@testing-library/react";
@@ -95,47 +99,59 @@ describe("ConnectScreen reference surface", () => {
     }) as unknown as typeof fetch;
   });
 
-  it("renders a pack-scoped Rules link on each genre header (no world selection needed)", () => {
+  it("shows no world-scoped Lore link until a world is selected", () => {
     renderConnect({ genres: GENRES });
-
-    // Rules is pack-scoped — present on every genre header regardless of
-    // whether a world is selected yet.
-    const rules = screen.getAllByRole("link", { name: /rules$/i });
-    expect(rules.length).toBeGreaterThan(0);
-    expect(rules[0]).toHaveAttribute("href", expect.stringMatching(/^\/reference\/rules\//));
-
     // The orphaned standalone link block is gone.
     expect(screen.queryByTestId("reference-links")).toBeNull();
-
-    // Lore is world-scoped — absent until a world is picked (empty-state card).
+    // Lore is world-scoped — absent on the empty-state preview.
     expect(screen.queryByRole("link", { name: /lore$/i })).toBeNull();
   });
 
-  it("Rules sits on the matching genre header with the pack href", () => {
-    renderConnect({ genres: GENRES });
-    const lowFantasyRules = screen.getByRole("link", { name: "Low Fantasy rules" });
-    expect(lowFantasyRules).toHaveAttribute("href", "/reference/rules/low_fantasy");
-    const roadWarriorRules = screen.getByRole("link", { name: "Road Warrior rules" });
-    expect(roadWarriorRules).toHaveAttribute("href", "/reference/rules/road_warrior");
-  });
-
-  it("surfaces the world-scoped Lore link in the preview card once a world is selected", async () => {
+  it("surfaces pack-scoped Rules + world-scoped Lore once a world is selected", async () => {
     const user = userEvent.setup();
     renderConnect({ genres: GENRES });
 
+    // low_fantasy is the default-open genre, so greyhawk is reachable directly.
     await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
 
-    // Rules still on the header (pack-scoped); Lore now appears in the card.
-    expect(screen.getByRole("link", { name: "Low Fantasy rules" })).toHaveAttribute(
-      "href",
-      "/reference/rules/low_fantasy",
-    );
-    const lore = screen.getByRole("link", { name: "Greyhawk lore" });
+    const rules = screen.getByRole("link", { name: /rules$/i });
+    expect(rules).toHaveAttribute("href", "/reference/rules/low_fantasy");
+
+    const lore = screen.getByRole("link", { name: /greyhawk lore/i });
     expect(lore).toHaveAttribute("href", "/reference/lore/low_fantasy/greyhawk");
   });
 
-  it("clicking a reference link does not dispatch a websocket message", async () => {
-    // Pre-select a world so both links are enabled.
+  it("retargets Rules + Lore to the newly-selected world's pack", async () => {
+    const user = userEvent.setup();
+    renderConnect({ genres: GENRES });
+
+    // Switch to a world in a different genre.
+    const roadWarrior = screen.getByRole("button", { name: /road warrior/i });
+    await user.click(roadWarrior);
+    await user.click(screen.getByRole("radio", { name: /wasteland/i }));
+
+    expect(screen.getByRole("link", { name: /rules$/i })).toHaveAttribute(
+      "href",
+      "/reference/rules/road_warrior",
+    );
+    expect(screen.getByRole("link", { name: /wasteland lore/i })).toHaveAttribute(
+      "href",
+      "/reference/lore/road_warrior/wasteland",
+    );
+  });
+
+  it("ships no dead href='#' reference link stubs", async () => {
+    const user = userEvent.setup();
+    const { container } = renderConnect({ genres: GENRES });
+
+    await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+
+    // The design prototype used placeholder href="#" links; the real lobby
+    // must wire real reference routes (No Stubbing / No Silent Fallbacks).
+    expect(container.querySelectorAll('a[href="#"]')).toHaveLength(0);
+  });
+
+  it("clicking a reference link does not dispatch a fetch / websocket message", async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -148,22 +164,14 @@ describe("ConnectScreen reference surface", () => {
     const user = userEvent.setup();
     renderConnect({ genres: GENRES });
 
-    // Grouped picker renders one Rules link per genre header, so target a
-    // specific one rather than a fuzzy /rules/i match (which now multi-matches).
-    const rules = screen.getByRole("link", { name: "Low Fantasy rules" });
+    const rules = screen.getByRole("link", { name: /rules$/i });
     expect(rules).toBeInTheDocument();
 
-    // ConnectScreen does not hold a WebSocket connection — it uses fetch
-    // only. Verify that fetch is NOT called with a WebSocket-style endpoint
-    // (no /ws path) when the user interacts with the reference link. The
-    // link itself opens a new tab (target="_blank"); in jsdom that is a
-    // no-op, but we can assert no new fetch calls were made.
     const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
     const callsBefore = fetchMock.mock.calls.length;
 
     await user.click(rules);
 
-    // No additional fetch calls were triggered by clicking the link.
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
   });
 });

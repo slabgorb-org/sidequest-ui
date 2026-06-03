@@ -4,6 +4,7 @@
 @import "@fontsource-variable/geist";
 @import "./styles/fonts.css"; /* self-hosted chrome fonts from R2 — replaces the index.html Google Fonts links (2026-06-03) */
 @import "./styles/archetype-chrome.css"; /* reprocess-bump 2026-05-27: force Vite to re-inline archetype partial (terminal em legibility) */
+@import "./styles/lobby-folio.css"; /* Standing Folio lobby presentation (story 83-1) */
 
 @custom-variant dark (&:is(.dark *));
 
