@@ -16,7 +16,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { CharacterPanel } from "@/components/CharacterPanel";
 import type { CharacterSummary } from "@/types/party";
-import type { CharacterSheetData, AbilityDefinition } from "@/components/CharacterSheet";
+import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
 
 // Mirror the App.tsx PARTY_STATUS handler shape (App.tsx:673-694) so that
 // when this test wakes someone up two months from now, they can grep the
@@ -54,7 +54,7 @@ function partyStatusToSheet(m: Record<string, unknown>): CharacterSheetData {
       typeof m.max_hp === "number" ? (m.max_hp as number) : undefined,
     stats: (sheet.stats as Record<string, number>) ?? {},
     abilities: (sheet.abilities as AbilityDefinition[]) ?? [],
-    class_moves: (sheet.class_moves as string[]) ?? [],
+    class_moves: (sheet.class_moves as ClassMove[]) ?? [],
     backstory: (sheet.backstory as string) ?? "",
     portrait_url: (m.portrait_url as string) || undefined,
     current_location: (m.current_location as string) ?? "",

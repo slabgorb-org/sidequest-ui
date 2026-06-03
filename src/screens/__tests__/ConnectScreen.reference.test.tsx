@@ -38,6 +38,7 @@ const GENRES: GenresResponse = {
         inspirations: [],
         axis_snapshot: {},
         hero_image: null,
+        navigation_mode: null,
       },
       {
         slug: "forgotten_realms",
@@ -48,6 +49,7 @@ const GENRES: GenresResponse = {
         inspirations: [],
         axis_snapshot: {},
         hero_image: null,
+        navigation_mode: null,
       },
     ],
   },
@@ -64,6 +66,7 @@ const GENRES: GenresResponse = {
         inspirations: [],
         axis_snapshot: {},
         hero_image: null,
+        navigation_mode: null,
       },
     ],
   },

@@ -13,6 +13,7 @@ function makeWorld(overrides: Partial<WorldMeta> = {}): WorldMeta {
     axis_snapshot: {},
     inspirations: [],
     hero_image: "/genre/space_opera/worlds/coyote_star/assets/poi/mendes_post.png",
+    navigation_mode: null,
     ...overrides,
   };
 }
