@@ -4,7 +4,9 @@ import {
   type ChromeArchetype,
   getArchetypeForGenre,
   ARCHETYPE_PROPERTIES,
+  applyArchetypeToElement,
   useChromeArchetype,
+  useScopedChromeArchetype,
 } from "@/hooks/useChromeArchetype";
 
 // ---------------------------------------------------------------------------
@@ -70,12 +72,19 @@ describe("getArchetypeForGenre", () => {
 // ---------------------------------------------------------------------------
 
 describe("ARCHETYPE_PROPERTIES", () => {
-  const archetypes: ChromeArchetype[] = ["parchment", "terminal", "rugged"];
+  const archetypes: ChromeArchetype[] = ["parchment", "terminal", "rugged", "house"];
 
-  it("defines properties for all three archetypes", () => {
+  it("defines properties for all four archetypes", () => {
     for (const arch of archetypes) {
       expect(ARCHETYPE_PROPERTIES[arch]).toBeDefined();
     }
+  });
+
+  it("house uses a serif body distinct from parchment", () => {
+    expect(ARCHETYPE_PROPERTIES["house"]["--font-body"]).toMatch(/serif/i);
+    expect(ARCHETYPE_PROPERTIES["house"]["--font-body"]).not.toEqual(
+      ARCHETYPE_PROPERTIES["parchment"]["--font-body"],
+    );
   });
 
   it("each archetype has a font-body CSS property", () => {
@@ -110,7 +119,7 @@ describe("ARCHETYPE_PROPERTIES", () => {
 
   it("archetypes have distinct border-radius values", () => {
     const radii = new Set(archetypes.map((a) => ARCHETYPE_PROPERTIES[a]["--border-radius"]));
-    expect(radii.size).toBe(3);
+    expect(radii.size).toBe(4);
   });
 });
 
@@ -118,104 +127,137 @@ describe("ARCHETYPE_PROPERTIES", () => {
 // Hook: useChromeArchetype
 // ---------------------------------------------------------------------------
 
-describe("useChromeArchetype", () => {
+// The hooks are now ARCHETYPE-driven, not genre-driven. Callers resolve a
+// genre slug to an archetype via `getArchetypeForGenre` BEFORE calling, so the
+// hook can also apply the non-genre `house` chrome. Inputs below are archetypes.
+
+describe("applyArchetypeToElement (pure helper)", () => {
+  it("sets the attribute + CSS vars and returns the keys it set", () => {
+    const el = document.createElement("div");
+    const keys = applyArchetypeToElement(el, "terminal", []);
+    expect(el.getAttribute("data-archetype")).toBe("terminal");
+    expect(el.style.getPropertyValue("--font-body")).toMatch(/mono/i);
+    // Keys returned must match what was set, so the caller can clean up exactly.
+    expect(keys).toEqual(Object.keys(ARCHETYPE_PROPERTIES["terminal"]));
+  });
+
+  it("removes the previously-set keys before applying the next archetype (no leak)", () => {
+    const el = document.createElement("div");
+    const firstKeys = applyArchetypeToElement(el, "terminal", []);
+    const secondKeys = applyArchetypeToElement(el, "parchment", firstKeys);
+    expect(el.getAttribute("data-archetype")).toBe("parchment");
+    expect(el.style.getPropertyValue("--font-body")).toMatch(/serif/i);
+    expect(el.style.getPropertyValue("--font-body")).not.toMatch(/mono/i);
+    expect(secondKeys).toEqual(Object.keys(ARCHETYPE_PROPERTIES["parchment"]));
+  });
+
+  it("clears the attribute and prior keys and returns [] when given null", () => {
+    const el = document.createElement("div");
+    const keys = applyArchetypeToElement(el, "rugged", []);
+    const cleared = applyArchetypeToElement(el, null, keys);
+    expect(el.getAttribute("data-archetype")).toBeNull();
+    expect(el.style.getPropertyValue("--font-body")).toBe("");
+    expect(cleared).toEqual([]);
+  });
+});
+
+describe("useChromeArchetype (root)", () => {
   beforeEach(() => {
     document.documentElement.style.cssText = "";
     document.documentElement.removeAttribute("data-archetype");
   });
 
-  it("sets data-archetype attribute on document element", () => {
-    renderHook(() => useChromeArchetype("low_fantasy"));
+  it("sets data-archetype on the document element", () => {
+    renderHook(() => useChromeArchetype("parchment"));
     expect(document.documentElement.getAttribute("data-archetype")).toBe("parchment");
   });
 
   it("injects archetype CSS custom properties onto :root", () => {
-    renderHook(() => useChromeArchetype("neon_dystopia"));
+    renderHook(() => useChromeArchetype("terminal"));
     const style = document.documentElement.style;
     expect(style.getPropertyValue("--font-body")).toMatch(/mono/i);
     expect(style.getPropertyValue("--font-ui")).toBeTruthy();
     expect(style.getPropertyValue("--border-radius")).toBeDefined();
   });
 
-  it("updates archetype when genre slug changes", () => {
+  it("updates archetype when the input changes", () => {
     const { rerender } = renderHook(
-      ({ genre }: { genre: string }) => useChromeArchetype(genre),
-      { initialProps: { genre: "low_fantasy" } },
+      ({ a }: { a: ChromeArchetype }) => useChromeArchetype(a),
+      { initialProps: { a: "parchment" as ChromeArchetype } },
     );
-
     expect(document.documentElement.getAttribute("data-archetype")).toBe("parchment");
-
-    rerender({ genre: "neon_dystopia" });
+    rerender({ a: "terminal" });
     expect(document.documentElement.getAttribute("data-archetype")).toBe("terminal");
   });
 
-  it("cleans up previous archetype CSS properties when switching", () => {
+  it("cleans up previous CSS properties when switching", () => {
     const { rerender } = renderHook(
-      ({ genre }: { genre: string }) => useChromeArchetype(genre),
-      { initialProps: { genre: "neon_dystopia" } },
+      ({ a }: { a: ChromeArchetype }) => useChromeArchetype(a),
+      { initialProps: { a: "terminal" as ChromeArchetype } },
     );
-
-    // Terminal archetype has monospace font
     expect(document.documentElement.style.getPropertyValue("--font-body")).toMatch(/mono/i);
-
-    rerender({ genre: "low_fantasy" });
-
-    // After switch to parchment, font should be serif, not monospace
+    rerender({ a: "parchment" });
     expect(document.documentElement.style.getPropertyValue("--font-body")).toMatch(/serif/i);
     expect(document.documentElement.style.getPropertyValue("--font-body")).not.toMatch(/mono/i);
   });
 
-  it("returns the current archetype value", () => {
-    const { result } = renderHook(() => useChromeArchetype("road_warrior"));
-    expect(result.current).toBe("rugged");
+  it("applies the non-genre house archetype on the root", () => {
+    renderHook(() => useChromeArchetype("house"));
+    expect(document.documentElement.getAttribute("data-archetype")).toBe("house");
+    expect(document.documentElement.style.getPropertyValue("--font-body")).toMatch(/serif/i);
   });
 
-  it("returns updated archetype after genre change", () => {
-    const { result, rerender } = renderHook(
-      ({ genre }: { genre: string }) => useChromeArchetype(genre),
-      { initialProps: { genre: "road_warrior" } },
+  it("removes data-archetype when given null", () => {
+    const { rerender } = renderHook(
+      ({ a }: { a: ChromeArchetype | null }) => useChromeArchetype(a),
+      { initialProps: { a: "rugged" as ChromeArchetype | null } },
     );
+    expect(document.documentElement.getAttribute("data-archetype")).toBe("rugged");
+    rerender({ a: null });
+    expect(document.documentElement.getAttribute("data-archetype")).toBeNull();
+  });
 
-    expect(result.current).toBe("rugged");
-
-    rerender({ genre: "space_opera" });
-    expect(result.current).toBe("terminal");
+  it("does not clobber genre color variables", () => {
+    document.documentElement.style.setProperty("--primary", "#C4650A");
+    renderHook(() => useChromeArchetype("rugged"));
+    expect(document.documentElement.style.getPropertyValue("--primary")).toBe("#C4650A");
+    expect(document.documentElement.style.getPropertyValue("--font-body")).toBeTruthy();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Wiring: archetype integrates with existing theme system
-// ---------------------------------------------------------------------------
-
-describe("useChromeArchetype wiring", () => {
+describe("useScopedChromeArchetype", () => {
   beforeEach(() => {
     document.documentElement.style.cssText = "";
     document.documentElement.removeAttribute("data-archetype");
   });
 
-  it("archetype properties do not clobber genre color variables", () => {
-    // Simulate genre colors already set (as useGenreTheme would do)
-    document.documentElement.style.setProperty("--primary", "#C4650A");
-    document.documentElement.style.setProperty("--background", "#1a1208");
-
-    renderHook(() => useChromeArchetype("road_warrior"));
-
-    // Genre colors should survive — archetype only sets structural properties
-    expect(document.documentElement.style.getPropertyValue("--primary")).toBe("#C4650A");
-    expect(document.documentElement.style.getPropertyValue("--background")).toBe("#1a1208");
-
-    // Archetype structural properties should be set
-    expect(document.documentElement.style.getPropertyValue("--font-body")).toBeTruthy();
-    expect(document.documentElement.style.getPropertyValue("--border-radius")).toBeDefined();
+  it("applies the archetype to the ref element, NOT the document root", () => {
+    const el = document.createElement("div");
+    const ref = { current: el };
+    renderHook(() => useScopedChromeArchetype(ref, "terminal"));
+    expect(el.getAttribute("data-archetype")).toBe("terminal");
+    expect(el.style.getPropertyValue("--font-body")).toMatch(/mono/i);
+    // Root must be untouched by the scoped applier — this is the whole point:
+    // genre flavor stays confined to the card subtree, never the lobby shell.
+    expect(document.documentElement.getAttribute("data-archetype")).toBeNull();
   });
 
-  it("data-archetype attribute enables CSS selector targeting", () => {
-    renderHook(() => useChromeArchetype("neon_dystopia"));
+  it("cleans up stale CSS vars on the scoped element when the archetype changes", () => {
+    const el = document.createElement("div");
+    const ref = { current: el };
+    const { rerender } = renderHook(
+      ({ a }: { a: ChromeArchetype }) => useScopedChromeArchetype(ref, a),
+      { initialProps: { a: "terminal" as ChromeArchetype } },
+    );
+    expect(el.style.getPropertyValue("--font-body")).toMatch(/mono/i);
+    rerender({ a: "parchment" });
+    expect(el.style.getPropertyValue("--font-body")).toMatch(/serif/i);
+    expect(el.style.getPropertyValue("--font-body")).not.toMatch(/mono/i);
+  });
 
-    // The data-archetype attribute should allow CSS selectors like
-    // [data-archetype="terminal"] .panel { ... }
-    const attr = document.documentElement.getAttribute("data-archetype");
-    expect(attr).toBe("terminal");
-    expect(["parchment", "terminal", "rugged"]).toContain(attr);
+  it("is a no-op when the ref is empty", () => {
+    const ref = { current: null as HTMLElement | null };
+    expect(() => renderHook(() => useScopedChromeArchetype(ref, "house"))).not.toThrow();
+    expect(document.documentElement.getAttribute("data-archetype")).toBeNull();
   });
 });
