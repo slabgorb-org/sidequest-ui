@@ -190,10 +190,10 @@ export function ConnectScreen({
     openGenre === undefined ? (genreSlug ?? firstGenreSlug) : openGenre;
 
   const handleToggleGenre = (slug: string) => {
-    setOpenGenre((prev) => {
-      const eff = prev === undefined ? (genreSlug ?? firstGenreSlug) : prev;
-      return eff === slug ? null : slug;
-    });
+    // Reuse the already-derived effective-open value rather than recomputing
+    // the default-open fallback chain. Event handlers see the current render's
+    // state, so effectiveOpenGenre is up to date here.
+    setOpenGenre(effectiveOpenGenre === slug ? null : slug);
   };
 
   const handleSelectWorld = useCallback((composite: string) => {
