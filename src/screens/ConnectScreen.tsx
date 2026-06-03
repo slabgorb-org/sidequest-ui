@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioEngine } from "@/audio/AudioEngine";
 import type { GenresResponse, GenreMeta, WorldMeta } from "@/types/genres";
-import { OptionList, type OptionItem, type OptionGroup } from "./lobby/OptionList";
+import {
+  GenreAccordion,
+  type AccordionGenre,
+  type AccordionWorld,
+} from "./lobby/GenreAccordion";
 import { WorldPreview } from "./lobby/WorldPreview";
 import { CurrentSessions } from "./lobby/CurrentSessions";
 import { useSessions } from "./lobby/useSessions";
@@ -16,6 +20,7 @@ import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { getArchetypeForGenre } from "@/hooks/useChromeArchetype";
+import { getGenreArt } from "./lobby/genreArt";
 
 export interface ConnectScreenProps {
   /**
@@ -80,6 +85,11 @@ export function ConnectScreen({
   const [worldSlug, setWorldSlug] = useState<string | null>(
     saved.world ?? null,
   );
+  // `undefined` = follow the default-open rule (selected world's genre, else
+  // the first genre); a string pins one genre open; `null` collapses all.
+  const [openGenre, setOpenGenre] = useState<string | null | undefined>(
+    undefined,
+  );
   const [mode, setMode] = useState<GameMode>("solo");
   const { start } = useStartGame();
   const { setName: setDisplayName } = useDisplayName();
@@ -108,16 +118,14 @@ export function ConnectScreen({
     return () => { cancelled = true; };
   }, []);
 
-  // Live multiplayer presence — drives both the per-world "X here"
-  // annotations on the world list and the CurrentSessions panel below
-  // the preview. Polls /api/sessions every 15s while the lobby is open.
-  // No genre filter: the flat world picker shows presence across every
-  // genre at once.
+  // Live multiplayer presence — drives both the per-genre presence dots and
+  // the CurrentSessions panel below the preview. Polls /api/sessions every 15s
+  // while the lobby is open. No genre filter: presence spans every genre.
   const { sessions: activeSessions } = useSessions({ pollMs: 15000 });
 
-  // Pre-compute "N here" annotations keyed by composite "genre/world"
-  // slug so the flat world list can show at-a-glance presence without
-  // collapsing same-named worlds across genres.
+  // Pre-compute "N here" annotations keyed by composite "genre/world" slug so
+  // the accordion can show at-a-glance presence without collapsing same-named
+  // worlds across genres.
   const worldPresence: Record<string, number> = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const session of activeSessions) {
@@ -127,50 +135,66 @@ export function ConnectScreen({
     return counts;
   }, [activeSessions]);
 
-  // Worlds grouped by genre. Genre renders as a sticky section header (with a
-  // pack-scoped Rules link) rather than an inline hint. Composite "genre/world"
-  // slug keeps rows unique across genres that ship same-slug worlds. Groups are
-  // sorted by genre label; worlds sorted by world label within each group.
-  const worldGroups: OptionGroup[] = useMemo(() => {
-    const groups: OptionGroup[] = [];
+  // Worlds grouped by genre for the accordion. Genres render in the order the
+  // server emits them (insertion order) — NOT alphabetised — so the first
+  // genre is a deterministic default-open target and packs keep their authored
+  // ordering. Composite "genre/world" slug keeps rows unique across genres
+  // that ship same-slug worlds.
+  const accordionGenres: AccordionGenre[] = useMemo(() => {
+    const out: AccordionGenre[] = [];
     for (const [gSlug, gMeta] of Object.entries(genres)) {
-      const genreLabel = gMeta.name || prettify(gSlug);
-      const items: OptionItem[] = [];
+      const worlds: AccordionWorld[] = [];
+      let here = 0;
       for (const w of gMeta.worlds) {
         const composite = `${gSlug}/${w.slug}`;
         const count = worldPresence[composite] ?? 0;
-        items.push({
+        here += count;
+        worlds.push({
           slug: composite,
           label: w.name || prettify(w.slug),
-          annotation: count > 0 ? `· ${count} here` : undefined,
+          annotation: count > 0 ? `${count} here` : undefined,
         });
       }
-      if (items.length === 0) continue;
-      items.sort((a, b) => a.label.localeCompare(b.label));
-      groups.push({
+      if (worlds.length === 0) continue;
+      out.push({
         slug: gSlug,
-        label: genreLabel,
-        rulesHref: `/reference/rules/${gSlug}`,
-        items,
+        label: gMeta.name || prettify(gSlug),
+        worlds,
+        here,
       });
     }
-    groups.sort((a, b) => a.label.localeCompare(b.label));
-    return groups;
+    return out;
   }, [genres, worldPresence]);
 
   const worldCount = useMemo(
-    () => worldGroups.reduce((n, g) => n + g.items.length, 0),
-    [worldGroups],
+    () => accordionGenres.reduce((n, g) => n + g.worlds.length, 0),
+    [accordionGenres],
   );
+  const genreCount = accordionGenres.length;
 
   const allWorldItems = useMemo(
-    () => worldGroups.flatMap((g) => g.items),
-    [worldGroups],
+    () => accordionGenres.flatMap((g) => g.worlds),
+    [accordionGenres],
   );
 
-  // Composite slug used by the OptionList to track the active row.
+  const firstGenreSlug = accordionGenres[0]?.slug ?? null;
+
+  // Composite slug used by the accordion to track the active row.
   const selectedComposite =
     genreSlug && worldSlug ? `${genreSlug}/${worldSlug}` : null;
+
+  // Effective open genre: the explicit pin, else the selected world's genre,
+  // else the first genre. Derived (not stored) so it self-corrects when the
+  // catalogue arrives asynchronously.
+  const effectiveOpenGenre =
+    openGenre === undefined ? (genreSlug ?? firstGenreSlug) : openGenre;
+
+  const handleToggleGenre = (slug: string) => {
+    setOpenGenre((prev) => {
+      const eff = prev === undefined ? (genreSlug ?? firstGenreSlug) : prev;
+      return eff === slug ? null : slug;
+    });
+  };
 
   const handleSelectWorld = useCallback((composite: string) => {
     const slash = composite.indexOf("/");
@@ -345,10 +369,12 @@ export function ConnectScreen({
         navigate(`${prefix}/${entry.game_slug}`);
         return;
       }
-      // Legacy fallback: prefill only.
+      // Legacy fallback: prefill only. Reset the open-genre pin to undefined
+      // so the accordion opens the prefilled genre by the default rule.
       setPlayerName(entry.player_name);
       setGenreSlug(entry.genre);
       setWorldSlug(entry.world);
+      setOpenGenre(undefined);
     },
     [navigate, setDisplayName],
   );
@@ -372,49 +398,54 @@ export function ConnectScreen({
   const showGenreError = genreError || Object.keys(genres).length === 0;
 
   return (
-    <div className="flex flex-col items-center min-h-screen px-6 py-12">
-      {/* Opening ornament */}
-      <span
-        aria-hidden="true"
-        className="text-muted-foreground/30 text-sm tracking-[0.5em] mb-10"
-      >
-        ── ◇ ──
-      </span>
-
-      <form
-        onSubmit={(e) => { e.preventDefault(); void handleStart(); }}
-        className="flex flex-col items-center gap-8 w-full max-w-4xl"
-      >
-        {/* Name prompt */}
-        <div className="text-center w-full max-w-sm">
-          <label
-            htmlFor="player-name"
-            className="block text-base italic text-muted-foreground/60 mb-3"
+    <div
+      className="lobby-folio flex flex-col items-center min-h-screen px-6 py-10"
+      data-genre={genreSlug ?? undefined}
+      style={{ "--accent": getGenreArt(genreSlug).accent } as CSSProperties}
+    >
+      <div className="w-full max-w-5xl">
+        {/* ── Masthead — the opening ritual ── */}
+        <div className="text-center mb-8">
+          <span
+            aria-hidden="true"
+            className="text-muted-foreground/30 text-sm tracking-[0.5em] select-none"
           >
-            What name shall be yours?
-          </label>
-          <input
-            id="player-name"
-            type="text"
-            aria-label="Player name"
-            autoFocus
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            className="w-full bg-transparent border-0 border-b border-muted-foreground/40
-                       text-center text-lg text-foreground/90
-                       focus:outline-none focus:border-muted-foreground
-                       placeholder:text-muted-foreground/60"
-            placeholder="Enter your name…"
-            disabled={isConnecting}
-          />
+            ── ◇ ──
+          </span>
+          <h1 className="lobby-wordmark mt-4 mb-1 text-5xl md:text-6xl leading-none tracking-wide text-foreground/95">
+            SideQuest
+          </h1>
+          <p className="italic text-muted-foreground/70 text-base">
+            An evening's adventure, told by lamplight.
+          </p>
+
+          {/* Name ritual */}
+          <div className="mt-6 mx-auto max-w-sm text-center">
+            <label
+              htmlFor="player-name"
+              className="block text-base italic text-muted-foreground/60 mb-2"
+            >
+              What name shall be yours?
+            </label>
+            <input
+              id="player-name"
+              type="text"
+              aria-label="Player name"
+              autoFocus
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full bg-transparent border-0 border-b border-muted-foreground/40
+                         text-center text-lg text-foreground/90
+                         focus:outline-none focus:border-[var(--accent)]
+                         placeholder:text-muted-foreground/40"
+              placeholder="Enter your name…"
+              disabled={isConnecting}
+            />
+          </div>
         </div>
 
-        {/* World + Preview — two-column on md+, single-column below. The
-            lobby flattened genre→world into a single world list (2026-05-05);
-            genre name renders as a hint on each row so the rules pack is
-            still visible without a second pick step. */}
         {showGenreError ? (
-          <div className="text-center w-full max-w-sm">
+          <div className="text-center w-full max-w-sm mx-auto">
             <p id="genre-load-error" className="text-sm italic text-destructive/70 mb-2">
               Could not load worlds. Is the server running?
             </p>
@@ -431,71 +462,112 @@ export function ConnectScreen({
             )}
           </div>
         ) : (
-          <div className="flex flex-col md:flex-row gap-8 w-full">
-            {/* Left column — genre-grouped world radio list. Rules links live
-                on each genre header (pack-scoped); the orphaned standalone link
-                block is gone — Lore moved into the WorldPreview card (right). */}
-            <div className="flex flex-col gap-6 md:w-64 shrink-0">
-              <section className="flex flex-col min-h-0">
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
-                  World
-                  <span className="not-italic text-muted-foreground/40 ml-1">
-                    ({worldCount})
+          <>
+            {/* ── Folio card — two-pane: genre accordion index + preview ── */}
+            <div
+              data-testid="lobby-folio"
+              className="grid md:grid-cols-[296px_1fr] border border-[var(--accent)]/25
+                         bg-[linear-gradient(180deg,rgba(34,26,16,0.5),rgba(26,20,13,0.5))]
+                         shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
+            >
+              {/* World index */}
+              <div className="md:border-r border-b md:border-b-0 border-[var(--accent)]/20 py-4 flex flex-col min-w-0">
+                <div className="flex items-baseline justify-between px-5 pb-2 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/60">
+                  <span className="text-foreground/90 font-semibold">Worlds</span>
+                  <span
+                    data-testid="lobby-world-count"
+                    className="opacity-70 normal-case tracking-normal"
+                  >
+                    {worldCount} {worldCount === 1 ? "world" : "worlds"} across{" "}
+                    {genreCount} {genreCount === 1 ? "genre" : "genres"}
                   </span>
-                </h2>
-                {/* Real vertical height so the top row never clips above the
-                    fold; sticky genre headers + auto-scroll-to-selected do the
-                    orientation work as the list scrolls inside its frame. */}
-                <div className="max-h-[70vh] flex flex-col min-h-0">
-                  <OptionList
-                    ariaLabel="World"
-                    groups={worldGroups}
-                    selected={selectedComposite}
-                    onSelect={handleSelectWorld}
-                    disabled={isConnecting}
-                  />
                 </div>
-              </section>
+                <GenreAccordion
+                  genres={accordionGenres}
+                  selected={selectedComposite}
+                  openGenre={effectiveOpenGenre}
+                  onToggleGenre={handleToggleGenre}
+                  onSelectWorld={handleSelectWorld}
+                  disabled={isConnecting}
+                />
+              </div>
+
+              {/* Preview + commit row */}
+              <div className="flex flex-col min-w-0">
+                <WorldPreview
+                  pack={currentPack}
+                  world={currentWorld}
+                  archetype={genreSlug ? getArchetypeForGenre(genreSlug) : null}
+                  genreSlug={genreSlug}
+                  loreHref={
+                    genreSlug && worldSlug
+                      ? `/reference/lore/${genreSlug}/${worldSlug}`
+                      : null
+                  }
+                />
+
+                {/* Commit row — mode + reference links + start. Always present
+                    so Start is reachable (disabled) before a world is chosen. */}
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-t border-[var(--accent)]/20">
+                  <div className="min-w-[12rem]">
+                    <ModePicker value={mode} onChange={setMode} />
+                  </div>
+                  <div className="flex items-center gap-5">
+                    {genreSlug && (
+                      <a
+                        href={`/reference/rules/${genreSlug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm underline underline-offset-4 text-muted-foreground/70 hover:text-foreground"
+                      >
+                        Rules
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      data-testid="lobby-start-button"
+                      onClick={handleStart}
+                      disabled={!canStart || isConnecting || isStarting}
+                      title={!canStart ? "Choose a world to begin" : undefined}
+                      className="font-semibold uppercase tracking-[0.22em] whitespace-nowrap
+                                 text-[var(--primary-foreground)] bg-[var(--accent)]
+                                 hover:shadow-[0_0_28px_color-mix(in_srgb,var(--accent)_45%,transparent)]
+                                 disabled:bg-muted/40 disabled:text-muted-foreground/40
+                                 disabled:cursor-default disabled:shadow-none
+                                 transition-all border-0
+                                 focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60
+                                 focus-visible:outline-none
+                                 px-7 py-3 cursor-pointer
+                                 shadow-[0_0_18px_color-mix(in_srgb,var(--accent)_28%,transparent)]"
+                    >
+                      {isStarting
+                        ? "Starting..."
+                        : mode === "multiplayer"
+                          ? "Start or Join Adventure"
+                          : "Start Adventure"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Right column — mode picker + world preview. Mode sits above
-                the preview so it doesn't feel like a footnote buried beneath
-                the world description — Sebastien-tier readers need mode to
-                read as a real decision. */}
-            <div className="flex-1 flex flex-col gap-4">
-              {worldSlug && (
-                <div className="px-6">
-                  <ModePicker value={mode} onChange={setMode} />
-                </div>
-              )}
-              <WorldPreview
-                pack={currentPack}
-                world={currentWorld}
-                archetype={genreSlug ? getArchetypeForGenre(genreSlug) : null}
-                loreHref={
-                  genreSlug && worldSlug
-                    ? `/reference/lore/${genreSlug}/${worldSlug}`
-                    : null
-                }
+            {/* ── Below the fold ── */}
+            <div className="mt-8 grid md:grid-cols-2 gap-x-10 gap-y-8">
+              {/* Live presence panel — who else is in the selected world. */}
+              <CurrentSessions sessions={sessionsForWorld} />
+
+              {/* Past journeys — localStorage-backed resume convenience. */}
+              <JourneyHistory
+                onSelect={handleSelectHistory}
+                prettyGenre={prettyGenreName}
+                prettyWorld={prettyWorldName}
               />
             </div>
-          </div>
-        )}
-
-        {/* Live presence panel — shows who else is in the selected world. */}
-        {!showGenreError && <CurrentSessions sessions={sessionsForWorld} />}
-
-        {/* Past journeys — localStorage-backed prefill convenience. */}
-        {!showGenreError && (
-          <JourneyHistory
-            onSelect={handleSelectHistory}
-            prettyGenre={prettyGenreName}
-            prettyWorld={prettyWorldName}
-          />
+          </>
         )}
 
         {/* Scene Library — fixture picker for quick scene loading. */}
-        <section className="w-full max-w-4xl">
+        <section className="w-full mt-8">
           <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-3">
             Scene Library
           </h2>
@@ -507,7 +579,7 @@ export function ConnectScreen({
                   type="button"
                   onClick={() => navigate(`/?scene=${scene.name}`)}
                   className="text-left p-3 rounded-md border border-muted-foreground/20
-                             hover:border-muted-foreground/40 hover:bg-muted/20
+                             hover:border-[var(--accent)]/50 hover:bg-muted/20
                              transition-colors cursor-pointer bg-transparent"
                 >
                   <div className="flex items-center gap-2 mb-1">
@@ -533,7 +605,7 @@ export function ConnectScreen({
         {/* Error — covers both the prop-passed connection error and start() failures.
             Both sources are joined so neither silently masks the other. */}
         {[error, startError].filter(Boolean).join(" — ") && (
-          <p role="alert" className="text-sm italic text-destructive/70">
+          <p role="alert" className="mt-6 text-center text-sm italic text-destructive/70">
             {[error, startError].filter(Boolean).join(" — ")}
           </p>
         )}
@@ -542,49 +614,22 @@ export function ConnectScreen({
         {isConnecting && (
           <p
             role="status"
-            className="text-sm italic text-muted-foreground/50 animate-pulse"
+            className="mt-6 text-center text-sm italic text-muted-foreground/50 animate-pulse"
           >
             The pages are turning…
           </p>
         )}
 
-        {/* Closing ornament + submit */}
-        <div className="flex flex-col items-center gap-4 mt-4">
+        {/* Closing ornament */}
+        <div className="text-center mt-10">
           <span
             aria-hidden="true"
             className="text-muted-foreground/30 text-sm tracking-[0.5em]"
           >
             ── ◇ ──
           </span>
-          <button
-            type="button"
-            data-testid="lobby-start-button"
-            onClick={handleStart}
-            disabled={!canStart || isConnecting || isStarting}
-            title={
-              !canStart
-                ? "Choose a world to begin"
-                : undefined
-            }
-            className="text-lg font-semibold uppercase tracking-[0.25em]
-                       text-[var(--primary-foreground)] bg-[var(--primary)]
-                       hover:bg-[var(--primary)]/90 hover:shadow-[0_0_24px_rgba(255,255,255,0.08)]
-                       disabled:bg-muted/40 disabled:text-muted-foreground/40
-                       disabled:cursor-default disabled:shadow-none
-                       transition-all border-0
-                       focus-visible:ring-2 focus-visible:ring-[var(--primary)]/60
-                       focus-visible:outline-none
-                       rounded-md px-10 py-3.5 cursor-pointer
-                       shadow-[0_0_16px_rgba(0,0,0,0.3)]"
-          >
-            {isStarting
-              ? "Starting..."
-              : mode === "multiplayer"
-                ? "Start or Join Adventure"
-                : "Start Adventure"}
-          </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

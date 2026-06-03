@@ -129,21 +129,27 @@ async function connectPlayer(
     vi.advanceTimersByTime(100);
   });
 
-  // Click the genre radio.
-  const genreRadio = document.querySelector<HTMLButtonElement>(
-    `[role="radio"][data-slug="${genre}"]`,
-  );
-  if (genreRadio) {
-    await user.click(genreRadio);
+  // Expand the genre's accordion section (Standing Folio lobby, story 83-1).
+  // Genres are collapsible header buttons (one open by default); each section
+  // is scoped by a [data-genre] wrapper. Selecting a WORLD radio inside it is
+  // what sets the (genre, world) selection — clicking the header only expands.
+  const genreHeader = document
+    .querySelector(`[data-genre="${genre}"]`)
+    ?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+  if (genreHeader && genreHeader.getAttribute("aria-expanded") !== "true") {
+    await user.click(genreHeader);
   }
 
-  // Let the world list render after genre selection.
+  // Let the world list render after the genre expands.
   await act(async () => {
     vi.advanceTimersByTime(100);
   });
 
-  // If a world radiogroup exists and none is selected yet, click the first one.
-  const worldGroup = document.querySelector('[role="radiogroup"][aria-label="World"]');
+  // Click the first world radio inside the expanded genre's radiogroup, unless
+  // one is already selected (e.g. an auto-selected single world).
+  const worldGroup = document
+    .querySelector(`[data-genre="${genre}"]`)
+    ?.querySelector('[role="radiogroup"]');
   if (worldGroup) {
     const selectedWorld = worldGroup.querySelector<HTMLButtonElement>(
       '[role="radio"][aria-checked="true"]',

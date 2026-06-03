@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import type { GenreMeta, WorldMeta } from "@/types/genres";
 import { getToneChips } from "./toneAxes";
+import { getGenreArt } from "./genreArt";
 import { useScopedChromeArchetype, type ChromeArchetype } from "@/hooks/useChromeArchetype";
 
 export interface WorldPreviewProps {
@@ -12,6 +13,12 @@ export interface WorldPreviewProps {
   archetype?: ChromeArchetype | null;
   /** World-scoped lore reference href, or null when unavailable. */
   loreHref?: string | null;
+  /**
+   * Selected world's genre slug. Drives the per-genre `[data-genre]` accent
+   * scope and the cinematic hero's gradient placeholder (story 83-1). Null
+   * when no world is selected.
+   */
+  genreSlug?: string | null;
 }
 
 /**
@@ -28,6 +35,7 @@ export function WorldPreview({
   world,
   archetype = null,
   loreHref = null,
+  genreSlug = null,
 }: WorldPreviewProps) {
   // Confine the selected world's genre archetype to THIS card's subtree — the
   // lobby shell stays neutral `house` while the card shows a taste of the genre.
@@ -61,6 +69,7 @@ export function WorldPreview({
 
   const toneChips = getToneChips(world.axis_snapshot);
   const hasImage = Boolean(world.hero_image);
+  const genreArt = getGenreArt(genreSlug);
 
   // Pick the placeholder copy for the *non-loaded* states. Three explicit
   // copies so a player (and Sebastien with a debugger open) can tell at a
@@ -76,14 +85,20 @@ export function WorldPreview({
     <div
       ref={cardRef}
       data-testid="world-preview-card"
+      data-genre={genreSlug ?? undefined}
+      style={{ "--accent": genreArt.accent } as CSSProperties}
       className="flex-1 flex flex-col gap-4 px-6"
     >
+      {/* Cinematic hero (story 83-1). Carries the genre-label placard and, when
+          the world has no runtime AI render, a per-genre gradient placeholder. */}
+      <div data-testid="lobby-hero" className="relative">
       {/* Hero image frame — 4:3 to match the POI render aspect (1024×768)
           so the whole plate shows uncropped. Fixed ratio still prevents
           layout jump (every hero is the same shape). */}
       <div
         data-testid="world-hero-frame"
         data-image-status={imageStatus}
+        style={hasImage ? undefined : { backgroundImage: genreArt.art }}
         className={`relative w-full aspect-[4/3] overflow-hidden rounded border border-muted-foreground/20 bg-muted/10 ${
           imageStatus === "loading" ? "animate-pulse" : ""
         }`}
@@ -140,6 +155,13 @@ export function WorldPreview({
             </p>
           </div>
         )}
+        </div>
+        {/* Genre placard — bottom-left plate label over the hero, per design. */}
+        <div className="absolute left-3 bottom-2 right-3 pointer-events-none">
+          <div className="text-[11px] uppercase tracking-[0.32em] text-[var(--accent)] [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
+            {pack.name}
+          </div>
+        </div>
       </div>
 
       {/* Title + era subtitle, with the world-scoped Lore reference. */}

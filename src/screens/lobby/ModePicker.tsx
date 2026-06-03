@@ -12,11 +12,10 @@ const MODES: { value: GameMode; label: string; subtitle: string }[] = [
 /**
  * Two-state segmented control for picking solo vs multiplayer mode.
  *
- * Visual parity with OptionList (genre/world picker): selected option uses
- * the genre `--primary` accent stripe and tinted background; unselected is
- * muted with a hover affordance. WAI-ARIA radiogroup role for keyboard
- * users; native arrow-key roving works because each option is a button
- * with the radio role.
+ * Visual parity with the lobby world accordion: selected option uses the
+ * genre accent stripe and tinted background; unselected is muted with a hover
+ * affordance. WAI-ARIA radiogroup role for keyboard users; native arrow-key
+ * roving works because each option is a button with the radio role.
  */
 export function ModePicker({
   value,
