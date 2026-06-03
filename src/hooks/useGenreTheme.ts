@@ -197,21 +197,14 @@ export function useGenreTheme(
     }
     styleEl.textContent = css;
 
-    // Dynamic Google Font loading from genre CSS.
-    // Extract font-family from the :root block or @font-face declarations.
+    // Apply the genre's primary font-family as the document base font. The
+    // face itself is delivered by the genre CSS's own @font-face rules, which
+    // the server has already rewritten to R2 (cdn.slabgorb.com) via the
+    // asset_urls seam — there is NO external font CDN and no runtime <link>
+    // injection. (Killing the Google-Fonts brain: ADR follow-up 2026-06-03.)
     const fontMatch = css.match(/font-family:\s*'([^']+)'/);
     if (fontMatch) {
       const fontName = fontMatch[1];
-      const fontId = fontName.replace(/\s+/g, "+");
-      const linkId = "genre-google-font";
-      let linkEl = document.getElementById(linkId) as HTMLLinkElement | null;
-      if (!linkEl) {
-        linkEl = document.createElement("link");
-        linkEl.id = linkId;
-        linkEl.rel = "stylesheet";
-        document.head.appendChild(linkEl);
-      }
-      linkEl.href = `https://fonts.googleapis.com/css2?family=${fontId}:wght@400;700&display=swap`;
       root.style.setProperty("font-family", `'${fontName}', var(--font-sans)`);
     }
 
