@@ -143,10 +143,30 @@ describe("ConnectScreen", () => {
     renderConnect({ genres: GENRES });
     const lowFantasy = screen.getByRole("button", { name: /low fantasy/i });
     const roadWarrior = screen.getByRole("button", { name: /road warrior/i });
-    expect(lowFantasy).toHaveAttribute("aria-expanded");
-    expect(roadWarrior).toHaveAttribute("aria-expanded");
+    // Assert the INITIAL expanded state, not just attribute presence: the
+    // default-open genre is expanded, the rest collapsed.
+    expect(lowFantasy).toHaveAttribute("aria-expanded", "true");
+    expect(roadWarrior).toHaveAttribute("aria-expanded", "false");
     // The old single flat "World" radiogroup spanning every genre is gone.
     expect(screen.queryByRole("radiogroup", { name: /^world$/i })).toBeNull();
+  });
+
+  it("collapses the open genre when its header is clicked again (no genre left open)", async () => {
+    const user = userEvent.setup();
+    renderConnect({ genres: GENRES });
+
+    const lowFantasy = screen.getByRole("button", { name: /low fantasy/i });
+    expect(lowFantasy).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
+
+    // Clicking the open genre's header collapses it — a reachable state
+    // (every genre closed) that must hide its worlds and toggle aria-expanded.
+    await user.click(lowFantasy);
+
+    expect(
+      screen.getByRole("button", { name: /low fantasy/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("radio", { name: /greyhawk/i })).toBeNull();
   });
 
   it("hides a genre's worlds until its header is expanded", async () => {
@@ -162,7 +182,8 @@ describe("ConnectScreen", () => {
 
   it("opens the first genre by default so its worlds are immediately reachable", () => {
     renderConnect({ genres: GENRES });
-    // low_fantasy sorts first → open on mount → its worlds present.
+    // low_fantasy is first in the fixture's insertion order → open on mount
+    // (the lobby does not alphabetise) → its worlds present.
     expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: /forgotten realms/i }),
