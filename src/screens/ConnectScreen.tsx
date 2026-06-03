@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioEngine } from "@/audio/AudioEngine";
 import type { GenresResponse, GenreMeta, WorldMeta } from "@/types/genres";
-import { OptionList, type OptionItem } from "./lobby/OptionList";
+import { OptionList, type OptionItem, type OptionGroup } from "./lobby/OptionList";
 import { WorldPreview } from "./lobby/WorldPreview";
 import { CurrentSessions } from "./lobby/CurrentSessions";
 import { useSessions } from "./lobby/useSessions";
@@ -15,7 +15,7 @@ import {
 import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
-import { ReferenceLinks } from "@/components/ReferenceLinks";
+import { getArchetypeForGenre } from "@/hooks/useChromeArchetype";
 
 export interface ConnectScreenProps {
   /**
@@ -127,28 +127,46 @@ export function ConnectScreen({
     return counts;
   }, [activeSessions]);
 
-  // Flat list of every world across every genre, sorted by world label.
-  // Composite "genre/world" slug keeps OptionList rows unique even when
-  // two genres ship a world with the same slug. Genre name renders as a
-  // hint so Sebastien-tier players can see which rule pack a world rides.
-  const worldItems: OptionItem[] = useMemo(() => {
-    const items: OptionItem[] = [];
+  // Worlds grouped by genre. Genre renders as a sticky section header (with a
+  // pack-scoped Rules link) rather than an inline hint. Composite "genre/world"
+  // slug keeps rows unique across genres that ship same-slug worlds. Groups are
+  // sorted by genre label; worlds sorted by world label within each group.
+  const worldGroups: OptionGroup[] = useMemo(() => {
+    const groups: OptionGroup[] = [];
     for (const [gSlug, gMeta] of Object.entries(genres)) {
       const genreLabel = gMeta.name || prettify(gSlug);
+      const items: OptionItem[] = [];
       for (const w of gMeta.worlds) {
         const composite = `${gSlug}/${w.slug}`;
         const count = worldPresence[composite] ?? 0;
         items.push({
           slug: composite,
           label: w.name || prettify(w.slug),
-          hint: genreLabel,
           annotation: count > 0 ? `· ${count} here` : undefined,
         });
       }
+      if (items.length === 0) continue;
+      items.sort((a, b) => a.label.localeCompare(b.label));
+      groups.push({
+        slug: gSlug,
+        label: genreLabel,
+        rulesHref: `/reference/rules/${gSlug}`,
+        items,
+      });
     }
-    items.sort((a, b) => a.label.localeCompare(b.label));
-    return items;
+    groups.sort((a, b) => a.label.localeCompare(b.label));
+    return groups;
   }, [genres, worldPresence]);
+
+  const worldCount = useMemo(
+    () => worldGroups.reduce((n, g) => n + g.items.length, 0),
+    [worldGroups],
+  );
+
+  const allWorldItems = useMemo(
+    () => worldGroups.flatMap((g) => g.items),
+    [worldGroups],
+  );
 
   // Composite slug used by the OptionList to track the active row.
   const selectedComposite =
@@ -180,11 +198,11 @@ export function ConnectScreen({
   // Auto-select if the entire catalog has exactly one world (and the user
   // has not already chosen one — e.g. from saved state).
   useEffect(() => {
-    if (worldItems.length === 1 && selectedComposite === null) {
-      handleSelectWorld(worldItems[0].slug);
+    if (allWorldItems.length === 1 && selectedComposite === null) {
+      handleSelectWorld(allWorldItems[0].slug);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [worldItems.length]);
+  }, [allWorldItems.length]);
 
   // If saved state references a world that no longer exists in the
   // catalog (pack removed since last visit), clear the stale selection
@@ -192,14 +210,14 @@ export function ConnectScreen({
   useEffect(() => {
     if (
       selectedComposite &&
-      worldItems.length > 0 &&
-      !worldItems.some((item) => item.slug === selectedComposite)
+      allWorldItems.length > 0 &&
+      !allWorldItems.some((item) => item.slug === selectedComposite)
     ) {
       setGenreSlug(null);
       setWorldSlug(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [worldItems]);
+  }, [allWorldItems]);
 
   // Start requires only a world selection — player name is collected by
   // AppInner's NamePrompt when mounting at the slug route (if not already
@@ -414,33 +432,30 @@ export function ConnectScreen({
           </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-8 w-full">
-            {/* Left column — flat world radio list */}
+            {/* Left column — genre-grouped world radio list. Rules links live
+                on each genre header (pack-scoped); the orphaned standalone link
+                block is gone — Lore moved into the WorldPreview card (right). */}
             <div className="flex flex-col gap-6 md:w-64 shrink-0">
               <section className="flex flex-col min-h-0">
                 <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
                   World
                   <span className="not-italic text-muted-foreground/40 ml-1">
-                    ({worldItems.length})
+                    ({worldCount})
                   </span>
                 </h2>
-                {/* Cap height so the list scrolls inside its frame instead
-                    of pushing the page below the fold; ensures Sebastien-
-                    type players see all packs without needing to discover
-                    that the page itself scrolls. */}
-                <div className="max-h-[60vh] flex flex-col min-h-0">
+                {/* Real vertical height so the top row never clips above the
+                    fold; sticky genre headers + auto-scroll-to-selected do the
+                    orientation work as the list scrolls inside its frame. */}
+                <div className="max-h-[70vh] flex flex-col min-h-0">
                   <OptionList
                     ariaLabel="World"
-                    items={worldItems}
+                    groups={worldGroups}
                     selected={selectedComposite}
                     onSelect={handleSelectWorld}
                     disabled={isConnecting}
                   />
                 </div>
               </section>
-              {/* Reference surface — always visible; disabled until a world
-                  is selected (which sets both genreSlug and worldSlug
-                  simultaneously via handleSelectWorld). */}
-              <ReferenceLinks pack={genreSlug} world={worldSlug} />
             </div>
 
             {/* Right column — mode picker + world preview. Mode sits above
@@ -453,7 +468,16 @@ export function ConnectScreen({
                   <ModePicker value={mode} onChange={setMode} />
                 </div>
               )}
-              <WorldPreview pack={currentPack} world={currentWorld} />
+              <WorldPreview
+                pack={currentPack}
+                world={currentWorld}
+                archetype={genreSlug ? getArchetypeForGenre(genreSlug) : null}
+                loreHref={
+                  genreSlug && worldSlug
+                    ? `/reference/lore/${genreSlug}/${worldSlug}`
+                    : null
+                }
+              />
             </div>
           </div>
         )}

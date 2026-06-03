@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
+import type { RefObject } from "react";
 
-export type ChromeArchetype = "parchment" | "terminal" | "rugged";
+export type ChromeArchetype = "parchment" | "terminal" | "rugged" | "house";
 
 const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
@@ -52,36 +53,84 @@ export const ARCHETYPE_PROPERTIES: Record<
     "--font-display": "'Pirata One', 'Oswald', serif",
     "--border-radius": "4px",
   },
+  // House — the neutral SideQuest lobby chrome. NOT a genre: a humanist serif
+  // body over a clean UI sans, distinct 3px radius (parchment=2px, terminal=0px,
+  // rugged=4px, so all four stay distinct). Reads as "the menu", so a themed
+  // world-preview card visibly lights up against it.
+  house: {
+    "--font-body": "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif",
+    "--font-ui": "'Inter', 'Helvetica Neue', system-ui, sans-serif",
+    "--font-display": "'Iowan Old Style', Georgia, serif",
+    "--border-radius": "3px",
+  },
 };
 
-export function useChromeArchetype(genreSlug: string | null): ChromeArchetype | null {
+/**
+ * Apply (or clear) a chrome archetype on a specific element. Sets the
+ * `data-archetype` attribute and the archetype's structural CSS custom
+ * properties. Returns the list of property keys it set, so the caller can
+ * remove exactly those on the next change (no leak across archetype swaps).
+ * Passing `null` removes the attribute and clears previously-set keys.
+ */
+export function applyArchetypeToElement(
+  el: HTMLElement,
+  archetype: ChromeArchetype | null,
+  prevKeys: string[],
+): string[] {
+  const style = el.style;
+  for (const key of prevKeys) {
+    style.removeProperty(key);
+  }
+  if (!archetype) {
+    el.removeAttribute("data-archetype");
+    return [];
+  }
+  el.setAttribute("data-archetype", archetype);
+  const props = ARCHETYPE_PROPERTIES[archetype];
+  const newKeys: string[] = [];
+  for (const [key, value] of Object.entries(props)) {
+    style.setProperty(key, value);
+    newKeys.push(key);
+  }
+  return newKeys;
+}
+
+/**
+ * Apply a chrome archetype to the document root (`<html>`). Pass `null` to
+ * clear it. Callers resolve genre slugs via `getArchetypeForGenre` before
+ * calling — the hook itself is archetype-driven so it can also apply the
+ * non-genre `house` chrome.
+ */
+export function useChromeArchetype(
+  archetype: ChromeArchetype | null,
+): ChromeArchetype | null {
   const prevKeysRef = useRef<string[]>([]);
-  const archetype = genreSlug ? getArchetypeForGenre(genreSlug) : null;
 
   useEffect(() => {
-    if (!archetype) return;
-
-    const root = document.documentElement;
-    const style = root.style;
-
-    // Clean up previous archetype CSS properties
-    for (const key of prevKeysRef.current) {
-      style.removeProperty(key);
-    }
-
-    // Set data-archetype attribute for CSS selector targeting
-    root.setAttribute("data-archetype", archetype);
-
-    // Inject archetype structural CSS properties
-    const props = ARCHETYPE_PROPERTIES[archetype];
-    const newKeys: string[] = [];
-    for (const [key, value] of Object.entries(props)) {
-      style.setProperty(key, value);
-      newKeys.push(key);
-    }
-
-    prevKeysRef.current = newKeys;
+    prevKeysRef.current = applyArchetypeToElement(
+      document.documentElement,
+      archetype,
+      prevKeysRef.current,
+    );
   }, [archetype]);
 
   return archetype;
+}
+
+/**
+ * Apply a chrome archetype to a specific element (a subtree), leaving the
+ * document root untouched. Used to confine a world's genre flavor to the
+ * lobby preview card without leaking onto the lobby shell.
+ */
+export function useScopedChromeArchetype(
+  ref: RefObject<HTMLElement | null>,
+  archetype: ChromeArchetype | null,
+): void {
+  const prevKeysRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    prevKeysRef.current = applyArchetypeToElement(el, archetype, prevKeysRef.current);
+  }, [ref, archetype]);
 }

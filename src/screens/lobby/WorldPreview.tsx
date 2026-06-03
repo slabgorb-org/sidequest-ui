@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { GenreMeta, WorldMeta } from "@/types/genres";
 import { getToneChips } from "./toneAxes";
+import { useScopedChromeArchetype, type ChromeArchetype } from "@/hooks/useChromeArchetype";
 
 export interface WorldPreviewProps {
   /** Pack-level metadata. Null when no genre is selected. */
   pack: GenreMeta | null;
   /** World-level metadata. Null when no world is selected. */
   world: WorldMeta | null;
+  /** Selected world's genre archetype, scoped to this card only. */
+  archetype?: ChromeArchetype | null;
+  /** World-scoped lore reference href, or null when unavailable. */
+  loreHref?: string | null;
 }
 
 /**
@@ -18,7 +23,17 @@ export interface WorldPreviewProps {
  * the current implementation because data is prop-driven), loaded (full
  * content), and image-failed (hero placeholder with literary copy).
  */
-export function WorldPreview({ pack, world }: WorldPreviewProps) {
+export function WorldPreview({
+  pack,
+  world,
+  archetype = null,
+  loreHref = null,
+}: WorldPreviewProps) {
+  // Confine the selected world's genre archetype to THIS card's subtree — the
+  // lobby shell stays neutral `house` while the card shows a taste of the genre.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useScopedChromeArchetype(cardRef, archetype);
+
   // Track image-failed per world. Uses the React "adjust state during
   // render" pattern (preferred over useEffect for prop-derived resets,
   // see https://react.dev/learn/you-might-not-need-an-effect#adjusting-state-when-a-prop-changes)
@@ -58,7 +73,11 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
       : "the page is faded…";
 
   return (
-    <div className="flex-1 flex flex-col gap-4 px-6">
+    <div
+      ref={cardRef}
+      data-testid="world-preview-card"
+      className="flex-1 flex flex-col gap-4 px-6"
+    >
       {/* Hero image frame — 4:3 to match the POI render aspect (1024×768)
           so the whole plate shows uncropped. Fixed ratio still prevents
           layout jump (every hero is the same shape). */}
@@ -123,11 +142,24 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
         )}
       </div>
 
-      {/* Title + era subtitle. */}
+      {/* Title + era subtitle, with the world-scoped Lore reference. */}
       <div>
-        <h2 className="text-2xl text-foreground/90 tracking-wide">
-          {world.name}
-        </h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-2xl text-foreground/90 tracking-wide">
+            {world.name}
+          </h2>
+          {loreHref && (
+            <a
+              href={loreHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${world.name} lore`}
+              className="text-sm underline hover:no-underline text-muted-foreground/70 shrink-0"
+            >
+              Lore
+            </a>
+          )}
+        </div>
         {(world.setting || world.era) && (
           <p className="text-sm italic text-muted-foreground/70 mt-1">
             {world.setting}
