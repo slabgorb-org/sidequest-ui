@@ -66,6 +66,31 @@ export interface SecondaryStats {
   damage_tier?: string;
 }
 
+/**
+ * Story 73-4: player-facing beat-kind impact descriptor, server-derived in
+ * `sidequest/game/beat_kinds.py::describe_beat_impact` (single source of truth).
+ * Surfaced on the CONFRONTATION payload's `last_beat_impact` so the overlay can
+ * explain a no-dial-move CritSuccess ("Clean Exit — resolves the confrontation,
+ * no dial change by design") instead of a bare 0 that reads as a broken roll.
+ *
+ * `effect` is the categorical readout the UI styles on:
+ *   `advance`  — a dial moved in your favor
+ *   `setback`  — a dial moved against you
+ *   `resolution` — the beat ends the confrontation (no dial change by design)
+ *   `tag`      — a scene tag was granted (no dial change by design)
+ *   `backfire` — an angle rebounded
+ *   `inert`    — the beat landed but nothing happened (a genuine miss)
+ */
+export interface BeatImpactView {
+  effect: string;
+  dial_moved: boolean;
+  summary: string;
+  own?: number;
+  opponent?: number;
+  resolution?: boolean;
+  tag?: string | null;
+}
+
 export interface ConfrontationData {
   type: string;
   label: string;
@@ -102,6 +127,12 @@ export interface ConfrontationData {
    * dispatch in App.tsx (search: `payload.active !== false`).
    */
   active?: boolean;
+  /**
+   * Story 73-4: server-derived readout of the last beat the PLAYER resolved.
+   * Absent on legacy payloads / before any beat — the overlay renders nothing
+   * for it then.
+   */
+  last_beat_impact?: BeatImpactView | null;
 }
 
 /**
@@ -592,6 +623,29 @@ function ConfrontationOutcomeReveal({ outcome }: { outcome: ConfrontationOutcome
 }
 
 // ═══════════════════════════════════════════════════════════
+// Beat-kind impact reveal — Story 73-4
+//
+// Explains what the player's last beat actually did, so a no-dial-move
+// CritSuccess (push "Clean Exit" / angle tag-grant) reads as intended instead
+// of a bare 0 that looks like a broken roll. `data-effect` lets genre CSS render
+// a "resolution"/"tag" by-design outcome as GOOD, distinct from an inert miss or
+// a setback. It is an adjunct to the dial bars, never a replacement.
+// ═══════════════════════════════════════════════════════════
+
+function BeatImpactPanel({ impact }: { impact: BeatImpactView }) {
+  return (
+    <div
+      data-testid="beat-impact"
+      data-effect={impact.effect}
+      data-dial-moved={impact.dial_moved ? "true" : "false"}
+      className={`beat-impact mt-2 p-2 rounded border beat-impact-${impact.effect}`}
+    >
+      <span className="text-xs">{impact.summary}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════════════
 
@@ -632,6 +686,13 @@ export function ConfrontationOverlay({
        * above the next move-set rather than detached above the dial row.
        */}
       {outcome && <ConfrontationOutcomeReveal outcome={outcome} />}
+
+      {/*
+       * Story 73-4: beat-kind impact reveal in the same "what just resolved"
+       * zone — explains a no-dial-move CritSuccess so it reads as intended.
+       * Adjunct to the dial bars (which still render below), never a replacement.
+       */}
+      {data.last_beat_impact && <BeatImpactPanel impact={data.last_beat_impact} />}
 
       {/*
        * Commit row — beats (the submit verbs for the InputBar draft) on the
