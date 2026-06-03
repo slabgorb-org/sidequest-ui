@@ -81,8 +81,22 @@ export interface SecondaryStats {
  *   `backfire` — an angle rebounded
  *   `inert`    — the beat landed but nothing happened (a genuine miss)
  */
+/**
+ * Closed set of beat-impact categories — mirrors the server's
+ * `describe_beat_impact` (`sidequest/game/beat_kinds.py`). Typed as a union (not
+ * bare `string`) so consumers get exhaustiveness checking and a typo'd/renamed
+ * effect can't silently produce a dead `beat-impact-${effect}` CSS class.
+ */
+export type BeatEffect =
+  | "advance"
+  | "setback"
+  | "resolution"
+  | "tag"
+  | "backfire"
+  | "inert";
+
 export interface BeatImpactView {
-  effect: string;
+  effect: BeatEffect;
   dial_moved: boolean;
   summary: string;
   own?: number;
