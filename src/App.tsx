@@ -1340,6 +1340,13 @@ function AppInner() {
   // assigned here (alongside apply/clear) because handleMessage is declared
   // before peerReveals exists. The snapshot mirrors the e2e Host bridge exactly.
   const persistedPeerActions = usePersistedPeerActions();
+  // GUARD (Story 71-12): MUST capture from the RAW reveals (`peerReveals.reveals`),
+  // NEVER from `mergedPeerReveals` (defined just below). `mergedPeerReveals` folds in
+  // TURN_STATUS submitted-status for display, so a row's status can be frozen at a past
+  // turn's value. Snapshotting the merged map would persist that stale draft into the
+  // accumulator — peer actions would then surface under out-of-date context (the
+  // stale-draft regression). The merged map is display-only; the accumulator is canonical.
+  // Keep this fed from `peerReveals.reveals`. See ADR-104/105 (perception firewall) and 71-10.
   peerRevealsSnapshotRef.current = () =>
     persistedPeerActions.capture(currentRound, peerReveals.reveals);
   persistedPeerActionsResetRef.current = persistedPeerActions.reset;
