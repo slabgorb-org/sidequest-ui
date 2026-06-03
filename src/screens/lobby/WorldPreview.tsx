@@ -59,11 +59,13 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
 
   return (
     <div className="flex-1 flex flex-col gap-4 px-6">
-      {/* Hero image frame — fixed aspect ratio so layout doesn't jump. */}
+      {/* Hero image frame — 4:3 to match the POI render aspect (1024×768)
+          so the whole plate shows uncropped. Fixed ratio still prevents
+          layout jump (every hero is the same shape). */}
       <div
         data-testid="world-hero-frame"
         data-image-status={imageStatus}
-        className={`relative w-full aspect-video overflow-hidden rounded border border-muted-foreground/20 bg-muted/10 ${
+        className={`relative w-full aspect-[4/3] overflow-hidden rounded border border-muted-foreground/20 bg-muted/10 ${
           imageStatus === "loading" ? "animate-pulse" : ""
         }`}
       >
@@ -76,7 +78,7 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
             key={world.slug}
             src={world.hero_image!}
             alt={`${world.name} — ${world.setting ?? pack.name}`}
-            className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
+            className="w-full h-full object-contain opacity-0 transition-opacity duration-300"
             onLoad={(e) => {
               (e.currentTarget as HTMLImageElement).style.opacity = "1";
               setImageStatus("loaded");

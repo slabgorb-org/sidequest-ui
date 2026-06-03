@@ -73,6 +73,21 @@ describe("WorldPreview — hero image states", () => {
     expect(screen.getByText(/tore in transit/i)).toBeInTheDocument();
   });
 
+  it("frames the hero 4:3 and contains (not covers) the image so it never crops", () => {
+    const { container } = render(
+      <WorldPreview pack={makePack()} world={makeWorld()} />,
+    );
+    // POI heroes render at 1024×768 (4:3); the frame must match so the
+    // whole plate shows. aspect-video (16:9) + object-cover cropped the
+    // top/bottom — guard against that regression.
+    const frame = screen.getByTestId("world-hero-frame");
+    expect(frame.className).toMatch(/aspect-\[4\/3\]/);
+    expect(frame.className).not.toMatch(/aspect-video/);
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.className).toMatch(/object-contain/);
+    expect(img.className).not.toMatch(/object-cover/);
+  });
+
   it("shows an idle diamond glyph when the world has no hero_image", () => {
     render(
       <WorldPreview
