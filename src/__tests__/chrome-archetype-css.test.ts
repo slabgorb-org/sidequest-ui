@@ -33,6 +33,11 @@ describe("archetype CSS selectors", () => {
     const css = loadArchetypeCSS();
     expect(css).toContain('[data-archetype="rugged"]');
   });
+
+  it("contains [data-archetype=\"house\"] selector", () => {
+    const css = loadArchetypeCSS();
+    expect(css).toContain('[data-archetype="house"]');
+  });
 });
 
 // ---------------------------------------------------------------------------

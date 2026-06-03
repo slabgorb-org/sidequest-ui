@@ -1,18 +1,15 @@
 /**
  * ConnectScreen reference surface integration tests.
  *
- * These tests verify that ReferenceLinks is wired into ConnectScreen and
- * responds correctly to lobby state. The harness mirrors ConnectScreen.test.tsx
- * exactly — same GENRES fixture, same fetch mock, same MemoryRouter wrapper.
+ * After the lobby redesign (story 80-1) the two reference links no longer sit
+ * in one orphaned block: **Rules** (pack-scoped) lives on each genre header in
+ * the grouped world picker, and **Lore** (world-scoped) lives in the
+ * WorldPreview card header. The standalone `ReferenceLinks` block is gone from
+ * the lobby (the component itself is retained for the in-game NarrativeWidget).
+ * These tests verify the relocated links are wired into ConnectScreen.
  *
- * Note on "pack selected, world unselected" state: ConnectScreen's world
- * picker (`handleSelectWorld`) always derives both genreSlug and worldSlug
- * from the same composite "genre/world" string in a single setState pair.
- * There is no UI path that produces a pack-without-world state, so the
- * "enabled Rules, disabled Lore" branch is covered by the ReferenceLinks
- * unit tests (ReferenceLinks.disabled.test.tsx) but cannot be exercised
- * through ConnectScreen interaction — that test case is intentionally absent
- * here.
+ * The harness mirrors ConnectScreen.test.tsx exactly — same GENRES fixture,
+ * same fetch mock, same MemoryRouter wrapper.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -95,33 +92,42 @@ describe("ConnectScreen reference surface", () => {
     }) as unknown as typeof fetch;
   });
 
-  it("renders ReferenceLinks (both disabled) before any world is selected", () => {
+  it("renders a pack-scoped Rules link on each genre header (no world selection needed)", () => {
     renderConnect({ genres: GENRES });
 
-    // The wrapping div is always present.
-    expect(screen.getByTestId("reference-links")).toBeInTheDocument();
+    // Rules is pack-scoped — present on every genre header regardless of
+    // whether a world is selected yet.
+    const rules = screen.getAllByRole("link", { name: /rules$/i });
+    expect(rules.length).toBeGreaterThan(0);
+    expect(rules[0]).toHaveAttribute("href", expect.stringMatching(/^\/reference\/rules\//));
 
-    // No real links — both are disabled spans.
-    expect(screen.queryByRole("link", { name: /rules/i })).toBeNull();
-    expect(screen.queryByRole("link", { name: /lore/i })).toBeNull();
+    // The orphaned standalone link block is gone.
+    expect(screen.queryByTestId("reference-links")).toBeNull();
 
-    expect(screen.getByText(/^Rules$/i).closest('[aria-disabled="true"]')).not.toBeNull();
-    expect(screen.getByText(/^Lore$/i).closest('[aria-disabled="true"]')).not.toBeNull();
+    // Lore is world-scoped — absent until a world is picked (empty-state card).
+    expect(screen.queryByRole("link", { name: /lore$/i })).toBeNull();
   });
 
-  // "Pack selected, world unselected" state is unreachable through ConnectScreen
-  // interaction — handleSelectWorld always sets both genreSlug and worldSlug
-  // simultaneously. That branch is tested in ReferenceLinks.disabled.test.tsx.
+  it("Rules sits on the matching genre header with the pack href", () => {
+    renderConnect({ genres: GENRES });
+    const lowFantasyRules = screen.getByRole("link", { name: "Low Fantasy rules" });
+    expect(lowFantasyRules).toHaveAttribute("href", "/reference/rules/low_fantasy");
+    const roadWarriorRules = screen.getByRole("link", { name: "Road Warrior rules" });
+    expect(roadWarriorRules).toHaveAttribute("href", "/reference/rules/road_warrior");
+  });
 
-  it("shows both Rules and Lore enabled once a world is selected", async () => {
+  it("surfaces the world-scoped Lore link in the preview card once a world is selected", async () => {
     const user = userEvent.setup();
     renderConnect({ genres: GENRES });
 
     await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
 
-    const rules = screen.getByRole("link", { name: /rules/i });
-    const lore = screen.getByRole("link", { name: /lore/i });
-    expect(rules).toHaveAttribute("href", "/reference/rules/low_fantasy");
+    // Rules still on the header (pack-scoped); Lore now appears in the card.
+    expect(screen.getByRole("link", { name: "Low Fantasy rules" })).toHaveAttribute(
+      "href",
+      "/reference/rules/low_fantasy",
+    );
+    const lore = screen.getByRole("link", { name: "Greyhawk lore" });
     expect(lore).toHaveAttribute("href", "/reference/lore/low_fantasy/greyhawk");
   });
 
@@ -139,7 +145,9 @@ describe("ConnectScreen reference surface", () => {
     const user = userEvent.setup();
     renderConnect({ genres: GENRES });
 
-    const rules = screen.getByRole("link", { name: /rules/i });
+    // Grouped picker renders one Rules link per genre header, so target a
+    // specific one rather than a fuzzy /rules/i match (which now multi-matches).
+    const rules = screen.getByRole("link", { name: "Low Fantasy rules" });
     expect(rules).toBeInTheDocument();
 
     // ConnectScreen does not hold a WebSocket connection — it uses fetch

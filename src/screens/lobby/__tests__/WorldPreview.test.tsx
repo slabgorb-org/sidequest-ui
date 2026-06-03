@@ -120,3 +120,61 @@ describe("WorldPreview — tone chips wiring", () => {
     expect(screen.getByText("medium outlook")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Scoped theming — the card adopts the selected world's genre archetype on its
+// OWN element, never the document root. This is the "house in shell, genre in
+// card" invariant: the lobby shell stays neutral while the card lights up.
+// ---------------------------------------------------------------------------
+
+describe("WorldPreview — scoped genre archetype", () => {
+  it("scopes the genre archetype to the card element, not the document root", () => {
+    document.documentElement.removeAttribute("data-archetype");
+    render(
+      <WorldPreview
+        pack={makePack()}
+        world={makeWorld()}
+        archetype="terminal"
+        loreHref={null}
+      />,
+    );
+    const card = screen.getByTestId("world-preview-card");
+    expect(card.getAttribute("data-archetype")).toBe("terminal");
+    // The shell (document root) must stay untouched by the card's scoping.
+    expect(document.documentElement.getAttribute("data-archetype")).toBeNull();
+  });
+
+  it("leaves the document root untouched when no archetype is supplied", () => {
+    document.documentElement.removeAttribute("data-archetype");
+    render(<WorldPreview pack={makePack()} world={makeWorld()} />);
+    expect(document.documentElement.getAttribute("data-archetype")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lore relocation — the world-scoped Lore reference moves OUT of the orphaned
+// lobby link block and INTO the preview card header, beside the world title.
+// ---------------------------------------------------------------------------
+
+describe("WorldPreview — world-scoped Lore link", () => {
+  it("renders a world-scoped Lore link when loreHref is provided", () => {
+    const world = makeWorld();
+    render(
+      <WorldPreview
+        pack={makePack()}
+        world={world}
+        archetype="terminal"
+        loreHref="/reference/lore/space_opera/coyote_star"
+      />,
+    );
+    const lore = screen.getByRole("link", { name: `${world.name} lore` });
+    expect(lore).toHaveAttribute("href", "/reference/lore/space_opera/coyote_star");
+    expect(lore).toHaveAttribute("target", "_blank");
+    expect(lore).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("omits the Lore link when loreHref is null", () => {
+    render(<WorldPreview pack={makePack()} world={makeWorld()} loreHref={null} />);
+    expect(screen.queryByRole("link", { name: /lore$/i })).toBeNull();
+  });
+});

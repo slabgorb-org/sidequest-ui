@@ -99,15 +99,16 @@ describe("ConnectScreen", () => {
     expect(screen.getByLabelText(/what name shall be yours/i)).toBeInTheDocument();
   });
 
-  it("renders a flat world radio group with one row per world across all genres", () => {
+  it("renders one world radiogroup spanning every world across all genres", () => {
     renderConnect({ genres: GENRES });
     const worldGroup = screen.getByRole("radiogroup", { name: /world/i });
     expect(worldGroup).toBeInTheDocument();
-    // All worlds from every genre appear up front — no genre pre-pick.
+    // All worlds from every genre appear up front in a single radiogroup —
+    // grouped under genre headers, but still one see-all-worlds-at-once view.
     expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /forgotten realms/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /wasteland/i })).toBeInTheDocument();
-    // No standalone genre radiogroup — flattened away 2026-05-05.
+    // Genre is a presentation header, never a second radiogroup.
     expect(screen.queryByRole("radiogroup", { name: /^genre$/i })).toBeNull();
   });
 
@@ -129,14 +130,32 @@ describe("ConnectScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the genre name as a hint on each world row", () => {
+  it("groups worlds under their genre headers (genre is a header, not an inline row hint)", () => {
     renderConnect({ genres: GENRES });
-    // Genre label appears in the same row as the world name. Use the row
-    // accessible-name (button text concatenation) to assert presence.
-    const greyhawkRow = screen.getByRole("radio", { name: /greyhawk/i });
-    expect(greyhawkRow).toHaveTextContent(/low fantasy/i);
-    const wastelandRow = screen.getByRole("radio", { name: /wasteland/i });
-    expect(wastelandRow).toHaveTextContent(/road warrior/i);
+    // Genre name appears ONCE as a sticky section header — not repeated as an
+    // inline hint on each world row. (low_fantasy ships two worlds; the header
+    // must be singular, so getByText must resolve to exactly one node.)
+    expect(screen.getByText("Low Fantasy")).toBeInTheDocument();
+    expect(screen.getByText("Road Warrior")).toBeInTheDocument();
+    // Worlds render as radios under their header.
+    expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /wasteland/i })).toBeInTheDocument();
+    // The genre label must NOT bleed onto the world row anymore.
+    expect(screen.getByRole("radio", { name: /greyhawk/i })).not.toHaveTextContent(
+      /low fantasy/i,
+    );
+  });
+
+  it("renders a pack-scoped Rules link on each genre header", () => {
+    renderConnect({ genres: GENRES });
+    expect(screen.getByRole("link", { name: "Low Fantasy rules" })).toHaveAttribute(
+      "href",
+      "/reference/rules/low_fantasy",
+    );
+    expect(screen.getByRole("link", { name: "Road Warrior rules" })).toHaveAttribute(
+      "href",
+      "/reference/rules/road_warrior",
+    );
   });
 
   // -- validation ------------------------------------------------------------

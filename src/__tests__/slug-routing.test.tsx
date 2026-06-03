@@ -422,26 +422,64 @@ describe('slug routing — metadata fetch gates WS connect', () => {
 // ---------------------------------------------------------------------------
 //
 // The regression was "currentGenre permanently null". This test verifies that
-// after GET /api/games/:slug resolves with genre_slug:'low_fantasy', the
-// useChromeArchetype hook receives the genre and sets
-// document.documentElement[data-archetype]="parchment" (the archetype for
-// low_fantasy). This is the DOM-observable downstream effect of currentGenre:
+// after GET /api/games/:slug resolves with genre_slug:'low_fantasy', the genre
+// flows through to the chrome archetype.
+//
+// Story 80-1 made the root archetype PHASE-GATED: the lobby/connect phase
+// renders the neutral `house` chrome (so the menu never inherits the last
+// world's theme), and the genre archetype applies only once the session leaves
+// connect (creation/game). In slug-mode the connect phase is a transient
+// loader, so we drive the app to game phase (SESSION_EVENT{ready}) and THEN
+// assert the genre archetype — the real DOM-observable downstream effect of
+// currentGenre, now correctly gated:
 //   metadata fetch → setCurrentGenre('low_fantasy')
-//   → useChromeArchetype('low_fantasy')
+//   → (game phase) resolveRootArchetype('game','low_fantasy') → 'parchment'
+//   → useChromeArchetype('parchment')
 //   → document.documentElement.setAttribute('data-archetype', 'parchment')
 
 describe('slug routing — currentGenre flows through to chrome archetype', () => {
-  it('sets data-archetype="parchment" on documentElement after low_fantasy metadata resolves', async () => {
+  it('sets data-archetype="parchment" on documentElement in game phase after low_fantasy metadata resolves', async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
     render(
       <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
         <App />
       </MemoryRouter>,
     );
 
+    await server.connected;
+    await server.nextMessage; // consume SESSION_EVENT connect
+
+    // Leave the transient connect phase (house chrome) for game phase, where
+    // the genre archetype applies.
+    act(() => {
+      server.send({ type: 'SESSION_EVENT', payload: { event: 'ready' } });
+    });
+
     // GAME_META.genre_slug is 'low_fantasy' → archetype 'parchment'.
-    // Wait for useChromeArchetype to set the attribute after the fetch resolves.
     await waitFor(() => {
       expect(document.documentElement.getAttribute('data-archetype')).toBe('parchment');
+    });
+  });
+
+  // Companion guard for the leak fix: during the slug-mode connect transient
+  // (before `ready`), the root must be the neutral `house` chrome, never the
+  // genre — proving the lobby-theme leak is closed even on the slug path.
+  it('renders neutral house chrome during the connect transient (no genre leak)', async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected; // connected but not yet `ready` → still connect phase
+
+    await waitFor(() => {
+      expect(document.documentElement.getAttribute('data-archetype')).toBe('house');
     });
   });
 });

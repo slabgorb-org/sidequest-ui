@@ -9,7 +9,11 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
-import { useChromeArchetype } from "@/hooks/useChromeArchetype";
+import {
+  useChromeArchetype,
+  getArchetypeForGenre,
+  type ChromeArchetype,
+} from "@/hooks/useChromeArchetype";
 import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
 import { useStateMirror } from "@/hooks/useStateMirror";
@@ -56,6 +60,21 @@ const LazyDashboard = lazy(() =>
 // for isolated testing.
 
 type SessionPhase = "connect" | "creation" | "game";
+
+/**
+ * The chrome archetype for the document root. The lobby (`connect`) renders
+ * the neutral `house` chrome so it never inherits the last-entered world's
+ * genre theme; once a world is committed (creation/game) the genre archetype
+ * applies. Exported for wiring tests.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function resolveRootArchetype(
+  phase: SessionPhase,
+  currentGenre: string | null,
+): ChromeArchetype | null {
+  if (phase === "connect") return "house";
+  return currentGenre ? getArchetypeForGenre(currentGenre) : null;
+}
 
 // Server ERROR codes that mean the session is unrecoverable and the user
 // must escape (full-screen fatal panel, disconnect WS, no auto-reconnect).
@@ -539,8 +558,10 @@ function AppInner() {
   // MUST arrive or the transport is declared broken (No-Silent-Fallbacks).
   useGenreTheme(messages, connected);
 
-  // Chrome archetype: structural CSS (fonts, borders) based on genre family
-  useChromeArchetype(currentGenre);
+  // Chrome archetype: structural CSS (fonts, borders). The lobby renders the
+  // neutral `house` chrome; genre archetype applies once a world is committed
+  // (creation/game), so the menu never cosplays the last-entered world.
+  useChromeArchetype(resolveRootArchetype(sessionPhase, currentGenre));
 
   // State mirror: process state_delta from server messages into GameStateContext
   useStateMirror(messages);

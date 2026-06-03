@@ -554,3 +554,28 @@
   font-style: italic;
   font-weight: 500;
 }
+
+/* ── House ─────────────────────────────────────────────────────────────────
+   Neutral SideQuest chrome for the lobby/menu. NOT a genre — deliberately
+   plain so a themed world-preview card visibly stands apart from the shell.
+   Soft neutral vignette, hairline borders, no texture noise.
+   ──────────────────────────────────────────────────────────────────────── */
+
+[data-archetype="house"] .running-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="house"] .character-panel {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="house"] .background-canvas {
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--surface, var(--card)) 85%, transparent),
+      color-mix(in srgb, var(--surface, var(--background)) 96%, transparent)
+    );
+}
