@@ -33,6 +33,7 @@ const GENRES: GenresResponse = {
         inspirations: [],
         axis_snapshot: {},
         hero_image: null,
+        navigation_mode: null,
       },
     ],
   },

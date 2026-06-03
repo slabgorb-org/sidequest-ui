@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -53,7 +54,6 @@ describe("Story 67-1 — ErrorBoundary crash signal", () => {
     const onCrashReport = vi.fn();
 
     render(
-      // @ts-expect-error — onCrashReport is the planned prop this story adds.
       <ErrorBoundary name="Game" onCrashReport={onCrashReport}>
         <Boom />
       </ErrorBoundary>,
@@ -71,7 +71,6 @@ describe("Story 67-1 — ErrorBoundary crash signal", () => {
     const onCrashReport = vi.fn();
 
     render(
-      // @ts-expect-error — onCrashReport is the planned prop this story adds.
       <ErrorBoundary name="Game" onCrashReport={onCrashReport}>
         <Boom />
       </ErrorBoundary>,
@@ -87,7 +86,6 @@ describe("Story 67-1 — ErrorBoundary crash signal", () => {
     const onCrashReport = vi.fn();
 
     render(
-      // @ts-expect-error — onCrashReport is the planned prop this story adds.
       <ErrorBoundary name="Game" onCrashReport={onCrashReport}>
         <div>healthy board</div>
       </ErrorBoundary>,
