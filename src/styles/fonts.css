@@ -1,0 +1,69 @@
+/* Global chrome/UI fonts — self-hosted from R2 (cdn.slabgorb.com).
+ *
+ * These are the NON-genre-scoped faces: the ones the chrome archetype
+ * (useChromeArchetype.ts ARCHETYPE_PROPERTIES) and the Orrery HUD reference,
+ * which previously loaded eagerly from the Google Fonts CDN in index.html.
+ * Genre-specific faces are delivered per-session by the injected genre
+ * client_theme.css (@font-face rewritten to R2 by the server's asset_urls
+ * seam) — they are NOT duplicated here.
+ *
+ * The face files live in sidequest-content/genre_packs/assets/fonts/ and are
+ * mirrored to R2 by scripts/r2_sync_packs.py. Cross-origin @font-face loads
+ * rely on the R2 bucket CORS policy (GET/HEAD, allow-origin). No external
+ * font CDN — killing the Google-Fonts brain (2026-06-03).
+ */
+
+/* parchment archetype — body/ui + display */
+@font-face {
+  font-family: "EB Garamond";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/EBGaramond-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/EBGaramond-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Cinzel";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/Cinzel-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* terminal archetype — body + ui/display */
+@font-face {
+  font-family: "Share Tech Mono";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/ShareTechMono-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Orbitron";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/Orbitron-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* rugged archetype — body + ui + display */
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/SourceSans3-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Oswald";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/Oswald-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Pirata One";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/PirataOne-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* Orrery / HUD — CRT terminal numerics */
+@font-face {
+  font-family: "VT323";
+  src: url("https://cdn.slabgorb.com/genre_packs/assets/fonts/VT323-Regular.woff2") format("woff2");
+  font-display: swap;
+}

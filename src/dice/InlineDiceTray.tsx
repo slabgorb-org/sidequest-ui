@@ -22,10 +22,15 @@ import {
 } from "@local/dice-lib";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 
-// Archetype → dice label font (matches useChromeArchetype UI fonts)
-const PARCHMENT_FONT = "/fonts/EBGaramond.ttf";
-const TERMINAL_FONT = "/fonts/Orbitron.ttf";
-const RUGGED_FONT = "/fonts/Oswald.ttf";
+// Archetype → dice label font (matches useChromeArchetype UI fonts).
+// Self-hosted from R2 — troika fetches these by URL for canvas glyphs, so the
+// R2 bucket CORS policy (GET/HEAD allow-origin) must be live. troika's parser
+// reads TTF/OTF/WOFF (not WOFF2), so the dice faces stay TTF. (2026-06-03: was
+// /fonts/*.ttf in ui/public; moved to content + R2 to kill the local store.)
+const DICE_FONT_BASE = "https://cdn.slabgorb.com/genre_packs/assets/fonts";
+const PARCHMENT_FONT = `${DICE_FONT_BASE}/EBGaramond.ttf`;
+const TERMINAL_FONT = `${DICE_FONT_BASE}/Orbitron.ttf`;
+const RUGGED_FONT = `${DICE_FONT_BASE}/Oswald.ttf`;
 
 /** Per-genre dice themes. Genres not listed here fall back to DEFAULT_DICE_THEME. */
 const GENRE_DICE_THEMES: Record<string, DiceTheme> = {
@@ -93,7 +98,7 @@ const GENRE_DICE_THEMES: Record<string, DiceTheme> = {
     metalness: 0.1,
     normalMap: "/textures/dice/worn-stone-normal.jpg",
     normalScale: 0.3,
-    labelFont: "/fonts/AmericanTypewriter.ttf",
+    labelFont: `${DICE_FONT_BASE}/AmericanTypewriter.ttf`,
   },
   road_warrior: {
     dieColor: "#2a2a2a",    // matte black
@@ -129,7 +134,7 @@ const GENRE_DICE_THEMES: Record<string, DiceTheme> = {
     metalness: 0.6,
     normalMap: "/textures/dice/scratched-metal-normal.jpg",
     normalScale: 0.2,
-    labelFont: "/fonts/Bastarda-K.ttf",
+    labelFont: `${DICE_FONT_BASE}/Bastarda-K.ttf`,
   },
 };
 

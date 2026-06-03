@@ -4,37 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Parchment archetype body font (low_fantasy, victoria, elemental_harmony,
-         heavy_metal). Loaded eagerly so useChromeArchetype's --font-body
-         setting is not silently falling back to Georgia. See
-         src/hooks/useChromeArchetype.ts ARCHETYPE_PROPERTIES.parchment. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
-    />
-    <!-- Pirata One — display face for the CharacterPanel dark-Folio header,
-         tabs, stat cards, and ability versal initials. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Pirata+One&display=swap"
-    />
-    <!-- Cinzel — parchment-archetype display face (--font-display in
-         useChromeArchetype.ts ARCHETYPE_PROPERTIES.parchment). Required
-         so the parchment dropcap/header token resolves to its declared
-         primary instead of silently falling back to EB Garamond. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap"
-    />
-    <!-- Orrery / HUD fonts: Orbitron (sci-fi sans, label headings) and
-         VT323 (CRT terminal, monospace flavor). Loaded eagerly for the
-         Orrery view; harmless elsewhere. See src/components/Orrery. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=VT323&display=swap"
-    />
+    <!-- Chrome/UI fonts (EB Garamond, Pirata One, Cinzel, Orbitron, VT323, …)
+         are self-hosted from R2 via src/styles/fonts.css (imported by
+         src/index.css). No external font CDN — the Google-Fonts links that
+         used to live here were retired 2026-06-03. -->
     <title>Sidequest</title>
   </head>
   <body>

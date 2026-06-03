@@ -119,6 +119,37 @@ describe("useGenreTheme", () => {
     expect(document.documentElement.getAttribute("data-genre")).toBe("active");
   });
 
+  it("does NOT inject any Google Fonts <link> when applying theme_css (fonts come from R2 @font-face)", () => {
+    // Quoted family exercises the (now-retired) dynamic font path.
+    const css =
+      ":root[data-genre]{--primary:#111;}" +
+      "@font-face{font-family:'Cinzel';" +
+      "src:url('genre_packs/assets/fonts/Cinzel-Regular.woff2') format('woff2');}";
+    const msg = makeSessionEvent("theme_css", { css });
+    renderHook(() => useGenreTheme([msg], true));
+
+    // The retired dynamic-injection brain used id="genre-google-font".
+    expect(document.getElementById("genre-google-font")).toBeNull();
+    const googleLinks = Array.from(
+      document.querySelectorAll('link[href*="googleapis"], link[href*="gstatic"]'),
+    );
+    expect(googleLinks).toHaveLength(0);
+  });
+
+  it("still applies the genre font-family to :root when theme_css carries one", () => {
+    const css =
+      ":root[data-genre]{--primary:#111;}" +
+      "@font-face{font-family:'Cinzel';" +
+      "src:url('genre_packs/assets/fonts/Cinzel-Regular.woff2') format('woff2');}";
+    const msg = makeSessionEvent("theme_css", { css });
+    renderHook(() => useGenreTheme([msg], true));
+    // The base document font should be set to the genre face (which itself
+    // loads via the injected @font-face from R2).
+    expect(document.documentElement.style.getPropertyValue("font-family")).toContain(
+      "Cinzel",
+    );
+  });
+
   it("updates CSS when a new theme_css event arrives", () => {
     const first = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
     const { rerender } = renderHook(
