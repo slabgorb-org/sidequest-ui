@@ -388,7 +388,10 @@ function getUniqueConnections(explored: ExploredLocation[]): [string, string][] 
   const result: [string, string][] = [];
 
   for (const loc of explored) {
-    for (const conn of loc.connections) {
+    // Fail-soft: region-mode locations may arrive without a `connections`
+    // field (server populates it from `adjacent`). A missing field on one
+    // sub-widget must never take down the whole GameBoard. (ui #330)
+    for (const conn of loc.connections ?? []) {
       const key = [loc.name, conn].sort().join('↔');
       if (!seen.has(key)) {
         seen.add(key);

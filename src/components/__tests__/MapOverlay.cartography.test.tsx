@@ -193,6 +193,25 @@ describe('MapOverlay — Cartography Wiring (Story 26-10)', () => {
       render(<MapOverlay mapData={MAP_WITH_ROOM_GRAPH} onClose={() => {}} />);
       expect(screen.queryByTestId('map-region-graph')).not.toBeInTheDocument();
     });
+
+    // Regression (ui #330): region-mode explored entries that arrive WITHOUT
+    // a `connections` field must not crash the whole GameBoard. The server
+    // now populates connections from `adjacent` (server #632), but a missing
+    // field on one sub-widget must always fail soft, never take the board down.
+    it('does not crash when an explored location has no connections field', () => {
+      const map = {
+        ...MAP_WITH_CARTOGRAPHY,
+        explored: [
+          // No `connections` key at all — mimics a pre-#632 / malformed payload.
+          { name: 'The Ashwood Tavern', x: 5, y: 3, type: 'settlement' },
+          { name: 'Forest Path', x: 6, y: 4, type: 'road', connections: ['The Ashwood Tavern'] },
+        ],
+      } as unknown as MapState;
+      expect(() =>
+        render(<MapOverlay mapData={map} onClose={() => {}} />)
+      ).not.toThrow();
+      expect(screen.getByTestId('map-region-graph')).toBeInTheDocument();
+    });
   });
 
   // --- Backward compat ---
