@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
 import { YieldButton } from "@/components/YieldButton";
@@ -303,7 +304,7 @@ function EdgeBar({
       <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden min-w-[24px]">
         <div
           data-testid="metric-bar-fill"
-          className={`h-full transition-all duration-300 ${atThreshold ? "animate-pulse" : ""}`}
+          className={`h-full transition-all duration-300 motion-reduce:transition-none ${atThreshold ? "animate-pulse motion-reduce:animate-none" : ""}`}
           style={{
             width: `${fillPct}%`,
             background: SIDE_COLOR_VAR[side],
@@ -311,7 +312,7 @@ function EdgeBar({
           }}
         />
       </div>
-      <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
+      <span className="text-sm font-semibold text-foreground tabular-nums flex-shrink-0">
         {metric.current}/{metric.threshold}
         <span className="sr-only"> {metric.name}</span>
       </span>
@@ -370,6 +371,7 @@ function StatusLine({ data }: { data: ConfrontationData }) {
   const isHpDepletion = data.win_condition === "hp_depletion";
   return (
     <div
+      data-testid="dial-scoreboard"
       className="flex items-center gap-3 px-3 py-1.5 rounded-md mb-2 border"
       style={{
         background: "oklch(0.21 0.008 80)",
@@ -458,11 +460,11 @@ function BeatTile({
     <button
       type="button"
       title={tooltip}
-      aria-label={tooltip}
+      aria-label={finisher ? `${tooltip} — resolution beat` : tooltip}
       data-resolution={finisher ? "true" : undefined}
       data-risk={Math.min(1, Math.abs(base) / 10).toFixed(2)}
       onClick={() => onSelect?.(beat.id)}
-      className="relative text-left cursor-pointer rounded-md transition-colors flex flex-col justify-center gap-0.5 min-h-[40px] px-2.5 pl-3.5 py-1.5 border"
+      className="relative text-left cursor-pointer rounded-md transition-colors motion-reduce:transition-none flex flex-col justify-center gap-0.5 min-h-[40px] px-2.5 pl-3.5 py-1.5 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-finisher)]"
       style={{
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
         background: finisher ? finisherBg : normalBg,
@@ -490,7 +492,7 @@ function BeatTile({
       <div className="flex items-center gap-1.5 min-w-0">
         <span
           className={[
-            "text-[13px] truncate min-w-0",
+            "text-[13px] min-w-0 break-words",
             finisher ? "font-bold" : "font-semibold",
           ].join(" ")}
         >
@@ -550,11 +552,64 @@ function BeatGrid({
     <div
       data-testid="beat-grid"
       className="grid gap-1.5 content-start"
-      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
     >
       {sortedBeats(beats).map((beat) => (
         <BeatTile key={beat.id} beat={beat} onSelect={onSelect} />
       ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Beat-history ledger (Story 85-1, A5) — visible mechanical provenance for the
+// dial. The crunch players (Sebastien/Jade) want to SEE the engine moved the
+// dial, not just trust the prose. The current CONFRONTATION payload carries
+// only the most-recent impact (BeatImpactView has no roll/DC/actor and no
+// history array), so this renders the latest beat's provenance per side; the
+// full multi-row "actor · beat · roll vs DC · dial Δ" ledger needs a payload
+// history field and is deferred — see session deviation D1 / Story 85-3.
+// ═══════════════════════════════════════════════════════════
+
+function LedgerRow({ impact, side }: { impact: BeatImpactView; side: "You" | "Them" }) {
+  // `impact` is already the acting entity's own BeatImpactView (player vs
+  // opponent), so the dial delta to show is always `.own` — the same field
+  // BeatImpactPanel reads for each side, pinned by Story 73-7. (Review fix: the
+  // Them row previously read `.opponent`, the cross-effect on the OTHER dial,
+  // and so reported the opponent's progress as ~0.) `side` is the label only.
+  const delta = impact.own ?? 0;
+  const signed = delta > 0 ? `+${delta}` : `${delta}`;
+  return (
+    <div className="flex items-center gap-2 text-[11px] tabular-nums">
+      <span className="w-10 flex-shrink-0 font-semibold uppercase tracking-wider text-muted-foreground">
+        {side}
+      </span>
+      <span className="min-w-0 flex-1 break-words text-foreground/90">{impact.summary}</span>
+      <span
+        className="flex-shrink-0 font-semibold"
+        style={{ color: delta >= 0 ? "var(--accent-finisher, #d8a657)" : "var(--destructive, #e06c75)" }}
+        aria-label={`dial delta ${signed}`}
+      >
+        Δ{signed}
+      </span>
+    </div>
+  );
+}
+
+function BeatHistoryLedger({
+  impact,
+  opponent,
+}: {
+  impact: BeatImpactView;
+  opponent?: BeatImpactView | null;
+}) {
+  return (
+    <div
+      data-testid="beat-history-ledger"
+      className="mb-2 flex flex-col gap-0.5 rounded-md border border-border/40 px-2 py-1"
+    >
+      <LedgerRow impact={impact} side="You" />
+      {opponent && <LedgerRow impact={opponent} side="Them" />}
     </div>
   );
 }
@@ -706,7 +761,28 @@ export function ConfrontationOverlay({
   onYield,
   outcome,
 }: ConfrontationOverlayProps) {
+  // Track the committed beat so the anchored die (A3) reads as belonging to it
+  // — beat → roll → result is one spatial unit. Declared before the early
+  // return to keep hook order stable (rules of hooks).
+  const [committedBeatId, setCommittedBeatId] = useState<string | null>(null);
+  // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
+  // this handler is handed to every beat button; a stable identity avoids
+  // re-rendering the whole grid each frame (matches GameBoard's own wrapping).
+  // Declared with useState above the early return to keep hook order stable.
+  const handleBeatSelect = useCallback(
+    (id: string) => {
+      setCommittedBeatId(id);
+      onBeatSelect?.(id);
+    },
+    [onBeatSelect],
+  );
   if (!data) return null;
+
+  // Keep the optional chain: although `beats` is typed required, the server can
+  // broadcast a confrontation before its beats materialize (wire payload with
+  // `beats` undefined) — pinned by the "beatless confrontation" regression test.
+  // Dropping `?.` here crashes that real production path.
+  const committedBeat = data.beats?.find((b) => b.id === committedBeatId) ?? null;
 
   return (
     <div
@@ -737,18 +813,35 @@ export function ConfrontationOverlay({
         />
       )}
 
+      {/* Story 85-1 (A5): beat-history ledger — the dial movement gets a legible
+          cause (Δ per side) so the scoreboard isn't an unexplained jump. */}
+      {data.last_beat_impact && (
+        <BeatHistoryLedger
+          impact={data.last_beat_impact}
+          opponent={data.opponent_last_beat_impact}
+        />
+      )}
+
       {/*
-       * Commit row — beats (the submit verbs for the InputBar draft) on the
-       * left, the persistent die lane on the right (Klinger design,
-       * 2026-05-26). Side-by-side rather than stacked so the die gets a
-       * stable, examinable home that never reflows the beats and never
-       * flashes in/out: it shares the row's height instead of adding to it.
-       * When the dice tray isn't wired (no onDiceThrow/playerId, e.g. in
-       * isolation tests) the beats reclaim the full width.
+       * Commit row (Story 85-1) — STACKED: the beat grid on top, the die tray
+       * anchored directly below the committed beat. This retired the old
+       * side-by-side fixed 200px "persistent die lane" (Klinger design,
+       * 2026-05-26) so beat → roll → result reads as one spatial unit. When the
+       * dice tray isn't wired (no onDiceThrow/playerId, e.g. in isolation tests)
+       * the beats reclaim the full width.
        */}
-      <div className="flex gap-3 items-start">
-        <div className="flex-1 min-w-0">
-          <BeatGrid beats={data.beats ?? []} onSelect={onBeatSelect} />
+      <div className="flex flex-col gap-2">
+        <div className="min-w-0">
+          {/* a11y (Story 85-1): beats are the ONLY commit path — plain Enter is
+              locked during an active confrontation. Announce that politely so a
+              screen-reader user doesn't hit a silent dead-end on Enter. */}
+          {(data.beats?.length ?? 0) > 0 && (
+            <div aria-live="polite" className="sr-only">
+              Pick a beat to commit.
+            </div>
+          )}
+
+          <BeatGrid beats={data.beats ?? []} onSelect={handleBeatSelect} />
 
           {/* Yield — only when the player has spent edge to refund. */}
           {onYield !== undefined &&
@@ -759,10 +852,17 @@ export function ConfrontationOverlay({
             )}
         </div>
 
-        {/* Persistent die lane — rolls here on beat commit, then the settled
-            die stays put (examinable, no flash) until the next commit. */}
+        {/* Story 85-1 (A3): die anchored to the committed beat. The roll lives
+            in the beats' own column flow — beat → roll → result is one spatial
+            unit — instead of floating in a detached fixed-width side lane (the
+            old 200px void is retired). */}
         {onDiceThrow && playerId && (
-          <div className="flex-shrink-0" style={{ width: 200 }}>
+          <div data-testid="beat-roll-anchor" className="min-w-0">
+            {committedBeat && (
+              <div className="mb-1 text-[11px] text-muted-foreground">
+                ▸ {committedBeat.label}
+              </div>
+            )}
             <InlineDiceTray
               diceRequest={diceRequest ?? null}
               diceResult={diceResult ?? null}
