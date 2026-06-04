@@ -1,20 +1,21 @@
 /**
- * ADR-136 Task 15: end-to-end wiring of the Relationships widget into GameBoard.
+ * Relationships widget wiring — always-present tab with empty state.
  *
+ * Playtest override 2026-06-04: Keith wants the Relationships tab present
+ * from session start rather than popping in when the first NPC is met.
  * Two contracts are proven here:
  *   1. Wiring — RelationshipsWidget is importable and the registry entry is
- *      dataGated:true.
- *   2. Data gating — the Relationships tab appears in GameBoard's dock when
- *      `relationshipsData` carries at least one entry, and is absent when the
- *      data is null. Mirrors the Location tab pattern (GameBoard-location-tab),
- *      but the Relationships gate is on the transient data payload (no stable
- *      world-capability signal), so an empty/null roster yields no tab clutter.
+ *      dataGated:false (always registered).
+ *   2. Always-present — the Relationships tab appears in GameBoard's dock
+ *      regardless of whether `relationshipsData` is null or populated.
+ *   3. Empty state — when data is null the panel renders the "No one met yet"
+ *      copy instead of nothing.
  *
  * The behavior tests render GameBoard (jsdom → mobile MobileTabView path) and
  * assert the tab via its accessible "tab" role + "Relationships" label.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { GameBoard, type GameBoardProps } from "../GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 
@@ -61,16 +62,16 @@ describe("GameBoard — relationships widget wiring", () => {
     expect(typeof mod.RelationshipsWidget).toBe("function");
   });
 
-  it("widgetRegistry includes the 'relationships' entry with dataGated:true", async () => {
+  it("widgetRegistry includes the 'relationships' entry with dataGated:false (always present)", async () => {
     const mod = await import("@/components/GameBoard/widgetRegistry");
     const entry = (mod.WIDGET_REGISTRY as Record<string, { dataGated?: boolean }>).relationships;
     expect(entry).toBeDefined();
-    expect(entry!.dataGated).toBe(true);
+    expect(entry!.dataGated).toBe(false);
   });
 });
 
-describe("GameBoard — relationships tab rendering", () => {
-  it("shows the Relationships tab when relationshipsData is present", () => {
+describe("GameBoard — relationships tab always present", () => {
+  it("shows the Relationships tab when relationshipsData is populated", () => {
     renderBoard({
       relationshipsData: [
         {
@@ -91,8 +92,24 @@ describe("GameBoard — relationships tab rendering", () => {
     expect(relationshipsTab()).toBeInTheDocument();
   });
 
-  it("does NOT show the Relationships tab when relationshipsData is null", () => {
+  it("shows the Relationships tab even when relationshipsData is null (stable from session start)", () => {
     renderBoard({ relationshipsData: null });
-    expect(relationshipsTab()).not.toBeInTheDocument();
+    expect(relationshipsTab()).toBeInTheDocument();
+  });
+
+  it("shows the Relationships tab when relationshipsData is an empty array", () => {
+    renderBoard({ relationshipsData: [] });
+    expect(relationshipsTab()).toBeInTheDocument();
+  });
+
+  it("renders the empty state copy when no relationships data is present", () => {
+    renderBoard({ relationshipsData: null });
+    // MobileTabView renders only the active widget. Activate the Relationships
+    // tab first so its content is rendered, then assert the empty state.
+    const tab = relationshipsTab();
+    expect(tab).toBeInTheDocument();
+    fireEvent.click(tab!);
+    expect(screen.getByTestId("relationships-empty")).toBeInTheDocument();
+    expect(screen.getByText(/no one yet/i)).toBeInTheDocument();
   });
 });

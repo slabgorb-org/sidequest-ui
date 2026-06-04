@@ -118,8 +118,10 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     closable: true,
     dataGated: true,
   },
-  // ADR-136 Task 14: NPC relationship roster. dataGated so the tab is hidden
-  // until a RELATIONSHIPS snapshot arrives (no one met yet → no tab clutter).
+  // ADR-136 Task 14: NPC relationship roster. Always present from session
+  // start — renders an empty state ("No one met yet") until a RELATIONSHIPS
+  // snapshot arrives. Playtest override 2026-06-04: Keith prefers a stable
+  // tab over a pop-in surprise when the first NPC is met.
   relationships: {
     id: "relationships",
     label: "Relationships",
@@ -129,7 +131,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     defaultW: 4,
     defaultH: 5,
     closable: true,
-    dataGated: true,
+    dataGated: false,
   },
   gallery: {
     id: "gallery",
