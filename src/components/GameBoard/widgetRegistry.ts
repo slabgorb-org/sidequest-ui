@@ -10,9 +10,12 @@
 //   - JournalView component (the UI shell, ready for re-mounting)
 // These can be reattached when the feature ships properly. Only the
 // visible tab + JournalWidget wrapper + /journal slash command were removed.
-// Confrontation is intentionally not a widget id — it renders as a dedicated
-// panel between the dockview workspace and the InputBar (D2 mock, 2026-05-13),
-// not as a dockable tab.
+// Story 85-3 (Tier B): confrontation is promoted BACK into the dockview as a
+// data-gated, auto-focused panel (it was a panel before 2026-05-13, then moved
+// to a bottom strip when chandelier-swinging free actions were wired in). It
+// now claims the board canvas while an encounter is active — SPLIT with
+// `narrative` (which stays always-present), never a full takeover. See
+// docs/design/confrontation-space-usage.md.
 export type WidgetId =
   | "narrative"
   | "character"
@@ -24,7 +27,8 @@ export type WidgetId =
   | "relationships"
   | "quests"
   | "gallery"
-  | "audio";
+  | "audio"
+  | "confrontation";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -171,6 +175,21 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     defaultH: 1,
     closable: true,
     dataGated: false,
+  },
+  // Story 85-3 (Tier B): confrontation mode. dataGated → GameBoard adds the
+  // panel and auto-focuses it when confrontationData arrives, and removes it on
+  // resolution (claims the canvas only while active). closable so a player can
+  // dismiss the focus. NO hotkey — it auto-focuses on data, it isn't a manual
+  // toggle. Wide default: it's the drama peak (Cost Scales with Drama).
+  confrontation: {
+    id: "confrontation",
+    label: "Confrontation",
+    minW: 4,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 7,
+    closable: true,
+    dataGated: true,
   },
 };
 

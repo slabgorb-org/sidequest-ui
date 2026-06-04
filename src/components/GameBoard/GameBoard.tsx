@@ -74,8 +74,10 @@ import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 import { QuestsWidget } from "./widgets/QuestsWidget";
-// ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
-// dedicated panel between the dockview workspace and the InputBar (D2 mock).
+// ConfrontationWidget removed 2026-05-13 — confrontation rendered as a bottom
+// strip between the dockview workspace and the InputBar (D2 mock) until Story
+// 85-3 (2026-06-04) promoted it BACK into the dockview as the data-gated
+// `confrontation` panel. See widgetRegistry.ts + renderWidgetContent.
 import { AudioWidget } from "./widgets/AudioWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
 
@@ -348,8 +350,15 @@ export function GameBoard({
     if (navMode === "region" || navMode === "room_graph") {
       available.add("location");
     }
+    // Story 85-3 (Tier B): confrontation mode claims the canvas ONLY while an
+    // encounter is active — data-gated on confrontationData. The sync effect
+    // below adds the panel (and auto-focuses it) when this set gains
+    // "confrontation", and removes it on resolution.
+    if (confrontationData != null) {
+      available.add("confrontation");
+    }
     return available;
-  }, [worldSlug, navMode]);
+  }, [worldSlug, navMode, confrontationData]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -449,6 +458,21 @@ export function GameBoard({
   // present via PARTY_STATUS (collapsed CHARACTER_SHEET / INVENTORY model),
   // so the null branches below exist only for the brief window between
   // GameBoard mount and the first PARTY_STATUS arrival on a fresh session.
+  // The beat-tile click goes through ``handleBeatTileSelect`` which reads the
+  // InputBar's draft text via an imperative ref and forwards it to the
+  // App-level ``onBeatSelect``. That gives App.handleBeatSelect both the beat id
+  // AND the chandelier-swing the player typed, so the resulting DICE_THROW can
+  // carry ``player_action`` to the server. Declared above renderWidgetContent
+  // (Story 85-3) because the confrontation dockview panel renders through it.
+  const inputBarRef = useRef<InputBarHandle | null>(null);
+  const handleBeatTileSelect = useCallback(
+    (beatId: string) => {
+      const draft = inputBarRef.current?.consumeDraft() ?? "";
+      onBeatSelect?.(beatId, draft);
+    },
+    [onBeatSelect],
+  );
+
   const renderWidgetContent = useCallback((id: WidgetId): ReactNode => {
     switch (id) {
       case "narrative":
@@ -530,6 +554,33 @@ export function GameBoard({
         );
       case "gallery":
         return <ImageGalleryWidget />;
+      case "confrontation": {
+        // Story 85-3 (Tier B): confrontation mode renders here, in the
+        // auto-focused dockview panel (not the old bottom strip). Beat tiles
+        // still read the InputBar draft via handleBeatTileSelect → the
+        // chandelier-swing the player typed rides the commit (the InputBar
+        // lives on, SPLIT alongside this panel — never a takeover).
+        if (!confrontationData) return null;
+        // The Guitar Solo: the non-soloing players' concurrent verbs this round
+        // (exclude the local player and OOC asides) feed the "meanwhile at the
+        // table" strip so a solo never becomes silence. Collapses when empty.
+        const meanwhile = (peerActionsByRound?.get(round) ?? [])
+          .filter((e) => e.player_id !== currentPlayerId && !e.aside)
+          .map((e) => ({ actor: e.character_name, verb: e.action }));
+        return (
+          <ConfrontationOverlay
+            data={confrontationData}
+            meanwhileActions={meanwhile}
+            outcome={confrontationOutcome ?? null}
+            onBeatSelect={handleBeatTileSelect}
+            onYield={onYield}
+            diceRequest={diceRequest}
+            diceResult={diceResult}
+            playerId={currentPlayerId}
+            onDiceThrow={onDiceThrow}
+          />
+        );
+      }
       default:
         return null;
     }
@@ -539,7 +590,10 @@ export function GameBoard({
       peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
-      sessionBoundEpoch]);
+      sessionBoundEpoch,
+      // Story 85-3: confrontation-mode panel inputs.
+      confrontationData, confrontationOutcome, handleBeatTileSelect, onYield,
+      diceRequest, diceResult, onDiceThrow, round]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
   const isMultiplayer =
@@ -550,37 +604,12 @@ export function GameBoard({
     characters?.find((c) => c.player_id === currentPlayerId)?.character_name ??
     characters?.find((c) => c.player_id === currentPlayerId)?.name ??
     null;
-  // Confrontation panel — D2 mock (2026-05-13). Mounts between the dockview
-  // workspace and the InputBar when a confrontation is active. Beat tiles
-  // are alternate submit verbs for whatever's in the InputBar; plain Enter
-  // is locked while the panel is up.
-  //
-  // The beat-tile click goes through ``handleBeatTileSelect`` which reads
-  // the InputBar's draft text via an imperative ref and forwards it to
-  // the App-level ``onBeatSelect``. That gives App.handleBeatSelect both
-  // the beat id AND the chandelier-swing the player typed, so the
-  // resulting DICE_THROW can carry ``player_action`` to the server.
-  const inputBarRef = useRef<InputBarHandle | null>(null);
-  const handleBeatTileSelect = useCallback(
-    (beatId: string) => {
-      const draft = inputBarRef.current?.consumeDraft() ?? "";
-      onBeatSelect?.(beatId, draft);
-    },
-    [onBeatSelect],
-  );
-  const confrontationPanel = confrontationData ? (
-    <ConfrontationOverlay
-      data={confrontationData}
-      outcome={confrontationOutcome ?? null}
-      onBeatSelect={handleBeatTileSelect}
-      onYield={onYield}
-      diceRequest={diceRequest}
-      diceResult={diceResult}
-      playerId={currentPlayerId}
-      onDiceThrow={onDiceThrow}
-    />
-  ) : null;
-
+  // Story 85-3 (Tier B): confrontation no longer mounts as a bottom strip here
+  // — it renders in the auto-focused `confrontation` dockview panel (see
+  // renderWidgetContent + availableWidgets). `inputBarRef` / `handleBeatTileSelect`
+  // moved ABOVE renderWidgetContent (the panel needs them); the InputBar still
+  // owns the ref below, SPLIT alongside the panel so typed creative actions
+  // (the chandelier swing) survive the promotion.
   const inputBar = (
     <div data-testid="gameboard-input-region" className="flex flex-col w-full">
       <PeerRevealList
@@ -605,7 +634,6 @@ export function GameBoard({
         mpInputState={mpInputState}
         peersOutstanding={peersOutstanding}
       />
-      {confrontationPanel}
       {/* Slow-typist reassurance (sq-playtest 2026-05-27, for Alex): when a
           peer has already sealed and the local player is still composing,
           a calm, TIMER-FREE line tells them they aren't holding the table
@@ -724,13 +752,17 @@ export function GameBoard({
   }, [availableWidgets]);
 
   // Sync widget visibility with dockview panels (add/remove as data-gates change).
-  // In practice this only fires for `confrontation` — every other widget is
-  // unconditional in `availableWidgets`, so the initial `onDockviewReady`
-  // pass creates them once and this effect has nothing to add on their behalf.
+  // Fires for the data-gated widgets: `confrontation` (Story 85-3 — added when
+  // an encounter starts, removed on resolution), plus `location`/`ship` on
+  // world/nav changes. The unconditional widgets are created once by the initial
+  // `onDockviewReady` pass, so this effect has nothing to add on their behalf.
   //
   // When a dynamic panel is added, anchor it to an existing right-group panel
   // (`character` is the most stable reference) so it joins the tab strip
-  // instead of being created in a detached floating group.
+  // instead of being created in a detached floating group. `confrontation`
+  // additionally auto-FOCUSES (it's the drama peak — Cost Scales with Drama);
+  // its removal on resolution lets dockview re-activate a sibling tab, which is
+  // the "release focus on resolution" half of AC2.
   useEffect(() => {
     const api = dockviewApiRef.current;
     if (!api) return;
@@ -757,13 +789,19 @@ export function GameBoard({
     for (const id of availableWidgets) {
       if (!dockviewIds.has(id)) {
         const def = WIDGET_REGISTRY[id];
-        api.addPanel({
+        const panel = api.addPanel({
           id,
           component: "PanelAdapter",
           params: { panelId: id },
           title: def.label,
           ...(anchorId ? { position: { referencePanel: anchorId } } : {}),
         });
+        // Story 85-3 (Tier B): confrontation mode auto-focuses the moment it
+        // appears so the drama peak claims the canvas (AC2). Other dynamic
+        // panels join the tab strip without stealing focus.
+        if (id === "confrontation") {
+          panel.api.setActive();
+        }
       }
     }
   }, [availableWidgets]);
