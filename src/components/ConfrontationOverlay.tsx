@@ -147,6 +147,11 @@ export interface ConfrontationData {
    * for it then.
    */
   last_beat_impact?: BeatImpactView | null;
+  /**
+   * Story 73-7: opponent-side sibling of last_beat_impact. Absent/null when the
+   * opponent hasn't acted — the overlay then renders only the player readout.
+   */
+  opponent_last_beat_impact?: BeatImpactView | null;
 }
 
 /**
@@ -646,7 +651,13 @@ function ConfrontationOutcomeReveal({ outcome }: { outcome: ConfrontationOutcome
 // a setback. It is an adjunct to the dial bars, never a replacement.
 // ═══════════════════════════════════════════════════════════
 
-function BeatImpactPanel({ impact }: { impact: BeatImpactView }) {
+function BeatImpactPanel({
+  impact,
+  opponent,
+}: {
+  impact: BeatImpactView;
+  opponent?: BeatImpactView | null;
+}) {
   return (
     <div
       data-testid="beat-impact"
@@ -655,6 +666,19 @@ function BeatImpactPanel({ impact }: { impact: BeatImpactView }) {
       className={`beat-impact mt-2 p-2 rounded border beat-impact-${impact.effect}`}
     >
       <span className="text-xs">{impact.summary}</span>
+      {/*
+       * Story 73-7: numeric delta readouts so mechanics-first players see what
+       * happened to the numbers on BOTH sides — the player's own dial delta and
+       * (when the server sent one) the opponent's. 73-10 owns labels/styling.
+       */}
+      <span data-testid="beat-impact-own" className="text-xs">
+        {impact.own ?? 0}
+      </span>
+      {opponent != null && (
+        <span data-testid="beat-impact-opponent" className="text-xs">
+          {opponent.own ?? 0}
+        </span>
+      )}
     </div>
   );
 }
@@ -706,7 +730,12 @@ export function ConfrontationOverlay({
        * zone — explains a no-dial-move CritSuccess so it reads as intended.
        * Adjunct to the dial bars (which still render below), never a replacement.
        */}
-      {data.last_beat_impact && <BeatImpactPanel impact={data.last_beat_impact} />}
+      {data.last_beat_impact && (
+        <BeatImpactPanel
+          impact={data.last_beat_impact}
+          opponent={data.opponent_last_beat_impact}
+        />
+      )}
 
       {/*
        * Commit row — beats (the submit verbs for the InputBar draft) on the
