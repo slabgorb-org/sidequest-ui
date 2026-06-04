@@ -167,8 +167,11 @@ describe("GameBoard — Location tab stability (navMode gating)", () => {
 // tracks an intra-region move WITHOUT any server re-emit — the shared,
 // region-keyed payload is unchanged within a region (ADR-109).
 //
-// RED today: GameBoard does not yet thread the local PC's current_location into
-// the Location widget, so the breadcrumb shows the region alone.
+// The wiring is live (GameBoard → LocationWidget → LocationPanel `subregion`).
+// These tests are deliberately discriminating: the split-party case orders the
+// local PC LAST so an index-based `characters[0]` pick fails it, and the
+// intra-region case holds the region payload constant so only the per-PC
+// current_location can move the breadcrumb.
 // ---------------------------------------------------------------------------
 
 const BREADCRUMB_SEP = " — "; // space · EM DASH (U+2014) · space — locked
@@ -219,13 +222,15 @@ function renderBreadcrumbBoard(
 }
 
 describe("GameBoard — Region — Subregion breadcrumb wiring (Story 85-2)", () => {
-  it("composes the breadcrumb from the LOCAL player's current_location, not a peer's (RED)", () => {
-    // Split party in one region: local p1 at "Docking Crescent", peer p2 at
-    // "Engine Room". The breadcrumb must show MY subregion — picking a peer's
-    // would silently regress useRunningHeader's per-PC `ignores non-local
-    // party members` invariant.
+  it("composes the breadcrumb from the LOCAL player's current_location, not a peer's", () => {
+    // Split party in one region. Peer p2 ("Engine Room") is FIRST in the array;
+    // local p1 ("Docking Crescent") is LAST. Ordering the local PC last is what
+    // makes this discriminating: an index-based `characters[0]` pick would show
+    // the peer's "Engine Room" and FAIL — only a correct player_id lookup shows
+    // my "Docking Crescent" (guards useRunningHeader's per-PC `ignores non-local
+    // party members` invariant).
     renderBreadcrumbBoard(
-      [pc("p1", "Docking Crescent"), pc("p2", "Engine Room")],
+      [pc("p2", "Engine Room"), pc("p1", "Docking Crescent")],
       "p1",
     );
     fireEvent.click(screen.getByRole("tab", { name: /^location$/i }));
@@ -236,7 +241,7 @@ describe("GameBoard — Region — Subregion breadcrumb wiring (Story 85-2)", ()
     expect(header.textContent).not.toContain("Engine Room");
   });
 
-  it("updates the breadcrumb subregion on an intra-region move — no stale tab (RED)", () => {
+  it("updates the breadcrumb subregion on an intra-region move — no stale tab", () => {
     // The core L105 a/b defect, fixed client-side: the region payload is
     // unchanged (still The Outer Coyote Star) but the local PC moved to a new
     // subregion. The tab must follow the per-turn current_location, not freeze.
