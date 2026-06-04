@@ -298,3 +298,135 @@ describe("LocationPanel (Story 54-9)", () => {
     expect(screen.queryByTestId("location-poi-image")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 85-2: Region — Subregion breadcrumb.
+//
+// AC-1 decision (operator, 2026-06-04): "where am I" is a two-level hierarchy
+// Region › Subregion, rendered in the Location-tab header as a
+// "Region — Subregion" breadcrumb so the tab and the running-header chip read
+// as ONE hierarchy instead of two surfaces that look like they disagree
+// (playtest L105 a/b).
+//
+// Contract (Architect, White Queen):
+//   - region segment  = the SHARED, region-keyed payload (region_name, ADR-109)
+//   - subregion segment = the LOCAL player's per-PC current_location — the same
+//     every-turn-fresh value useRunningHeader already reads. It is composed
+//     CLIENT-SIDE from a new `subregion` prop; it is NOT a new payload field
+//     (a per-PC value must not ride the shared region record — split party).
+//   - separator is locked to a space-EM-DASH-space.
+//   - useRunningHeader does NOT change (S2-UX(c) per-PC freshness preserved).
+//
+// The positive-composition cases verify the breadcrumb composes correctly; the
+// negative guards keep a naive implementation honest (no always-append, no
+// dangling dash, no doubling, slug-fallback still carries the subregion).
+// ---------------------------------------------------------------------------
+
+const BREADCRUMB_SEP = " — "; // space · EM DASH (U+2014) · space — locked
+
+function region(
+  over: Partial<LocationDescriptionPayload> = {},
+): LocationDescriptionPayload {
+  // terrain:null keeps the badge out of the header so textContent assertions
+  // see only the breadcrumb.
+  return payload({
+    region_id: "outer_coyote_star",
+    region_name: "The Outer Coyote Star",
+    terrain: null,
+    ...over,
+  });
+}
+
+describe("LocationPanel — Region — Subregion breadcrumb (Story 85-2)", () => {
+  it("composes 'Region — Subregion' when a distinct subregion is supplied", () => {
+    render(
+      <LocationPanel data={region()} subregion="Docking Crescent" />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+  });
+
+  it("shows the region alone — no separator — when no subregion is supplied (guard)", () => {
+    render(<LocationPanel data={region()} />);
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Outer Coyote Star");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+  });
+
+  it("does not double the name when subregion equals the region, case/trim-insensitive (guard)", () => {
+    render(
+      <LocationPanel data={region()} subregion="  the outer coyote star " />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Outer Coyote Star");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+  });
+
+  it("no silent fallback: a blank/whitespace subregion never yields a dangling dash or 'undefined'/'null' (guard)", () => {
+    render(
+      <LocationPanel data={region()} subregion="   " />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+    expect(header.textContent?.toLowerCase()).not.toContain("undefined");
+    expect(header.textContent?.toLowerCase()).not.toContain("null");
+  });
+
+  it("composes the FULL slug-fallback breadcrumb when region_name is absent (guard)", () => {
+    // Honest fallback: an old snapshot with no authored region_name still
+    // anchors the breadcrumb on the slug — AND must still carry the subregion.
+    // Asserting the full `slug — subregion` string makes this RED against an
+    // implementation that drops the subregion on the region_name-absent branch.
+    render(
+      <LocationPanel
+        data={region({ region_name: null })}
+        subregion="Docking Crescent"
+      />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain(
+      `outer_coyote_star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+    expect(header.textContent?.toLowerCase()).not.toContain("undefined");
+  });
+
+  it("treats an explicit null subregion the same as absent — no separator (guard)", () => {
+    // `subregion` is typed string | null | undefined; the guards above cover
+    // undefined (omitted) and whitespace. This pins the literal-null branch of
+    // the `(subregion ?? "")` coalesce so a null/undefined mishandling is caught.
+    render(<LocationPanel data={region()} subregion={null} />);
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Outer Coyote Star");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+    expect(header.textContent?.toLowerCase()).not.toContain("null");
+  });
+
+  it("keeps the POI image alt region-only — the breadcrumb is header-only (guard)", () => {
+    // Intentional divergence: the POI landscape is region-level art, so its alt
+    // text stays the region name even when a subregion is supplied. This pins
+    // that decision so a well-meaning change to the one-arg regionDisplayName
+    // call site doesn't leak the subregion into screen-reader output.
+    render(
+      <LocationPanel
+        data={region({
+          region_name: "The Outer Coyote Star",
+          poi_image_url:
+            "https://cdn.slabgorb.com/genre_packs/space_opera/worlds/coyote_star/assets/poi/outer_coyote_star.png",
+        })}
+        subregion="Docking Crescent"
+      />,
+    );
+    // Header carries the full breadcrumb...
+    expect(screen.getByTestId("location-header").textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+    // ...but the image alt is region-only (no separator, no subregion).
+    const alt = screen
+      .getByTestId("location-poi-image")
+      .getAttribute("alt");
+    expect(alt).toBe("The Outer Coyote Star");
+    expect(alt).not.toContain(BREADCRUMB_SEP);
+  });
+});

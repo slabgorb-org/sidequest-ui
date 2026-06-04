@@ -14,7 +14,7 @@
  *      location capability, and stable across a null transition.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { GameBoard, type GameBoardProps } from "../GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 
@@ -153,5 +153,124 @@ describe("GameBoard — Location tab stability (navMode gating)", () => {
       </ImageBusProvider>,
     );
     expect(locationTab()).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 85-2: Region — Subregion breadcrumb wiring.
+//
+// The mandatory end-to-end wiring (CLAUDE.md "Every Test Suite Needs a Wiring
+// Test"): prove the LOCAL player's per-PC current_location actually reaches the
+// Location-tab breadcrumb through the real GameBoard → LocationWidget →
+// LocationPanel chain. This is also where the staleness defect (L105 a/b) is
+// actually fixed: the subregion rides PARTY_STATUS (every turn), so the tab
+// tracks an intra-region move WITHOUT any server re-emit — the shared,
+// region-keyed payload is unchanged within a region (ADR-109).
+//
+// The wiring is live (GameBoard → LocationWidget → LocationPanel `subregion`).
+// These tests are deliberately discriminating: the split-party case orders the
+// local PC LAST so an index-based `characters[0]` pick fails it, and the
+// intra-region case holds the region payload constant so only the per-PC
+// current_location can move the breadcrumb.
+// ---------------------------------------------------------------------------
+
+const BREADCRUMB_SEP = " — "; // space · EM DASH (U+2014) · space — locked
+
+function pc(player_id: string, current_location: string): GameBoardProps["characters"][number] {
+  return {
+    player_id,
+    name: player_id,
+    character_name: player_id,
+    class: "Sleuth",
+    level: 1,
+    hp: 10,
+    hp_max: 10,
+    status_effects: [],
+    portrait_url: "",
+    current_location,
+  };
+}
+
+const REGION: NonNullable<GameBoardProps["currentLocation"]> = {
+  region_id: "outer_coyote_star",
+  region_name: "The Outer Coyote Star",
+  prose: "Docks ring the station core.",
+  terrain: null,
+  entities: [],
+  overlays: [],
+};
+
+function renderBreadcrumbBoard(
+  characters: GameBoardProps["characters"],
+  currentPlayerId: string,
+) {
+  return render(
+    <ImageBusProvider messages={[]}>
+      <GameBoard
+        messages={[]}
+        characters={characters}
+        currentPlayerId={currentPlayerId}
+        onSend={vi.fn()}
+        disabled={false}
+        genreSlug="space_opera"
+        worldSlug="coyote_star"
+        navMode="region"
+        currentLocation={REGION}
+      />
+    </ImageBusProvider>,
+  );
+}
+
+describe("GameBoard — Region — Subregion breadcrumb wiring (Story 85-2)", () => {
+  it("composes the breadcrumb from the LOCAL player's current_location, not a peer's", () => {
+    // Split party in one region. Peer p2 ("Engine Room") is FIRST in the array;
+    // local p1 ("Docking Crescent") is LAST. Ordering the local PC last is what
+    // makes this discriminating: an index-based `characters[0]` pick would show
+    // the peer's "Engine Room" and FAIL — only a correct player_id lookup shows
+    // my "Docking Crescent" (guards useRunningHeader's per-PC `ignores non-local
+    // party members` invariant).
+    renderBreadcrumbBoard(
+      [pc("p2", "Engine Room"), pc("p1", "Docking Crescent")],
+      "p1",
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /^location$/i }));
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+    expect(header.textContent).not.toContain("Engine Room");
+  });
+
+  it("updates the breadcrumb subregion on an intra-region move — no stale tab", () => {
+    // The core L105 a/b defect, fixed client-side: the region payload is
+    // unchanged (still The Outer Coyote Star) but the local PC moved to a new
+    // subregion. The tab must follow the per-turn current_location, not freeze.
+    const { rerender } = renderBreadcrumbBoard([pc("p1", "Docking Crescent")], "p1");
+    fireEvent.click(screen.getByRole("tab", { name: /^location$/i }));
+    expect(screen.getByTestId("location-header").textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+
+    // Intra-region move: SAME region payload, new per-PC current_location.
+    rerender(
+      <ImageBusProvider messages={[]}>
+        <GameBoard
+          messages={[]}
+          characters={[pc("p1", "Cargo Spine")]}
+          currentPlayerId="p1"
+          onSend={vi.fn()}
+          disabled={false}
+          genreSlug="space_opera"
+          worldSlug="coyote_star"
+          navMode="region"
+          currentLocation={REGION}
+        />
+      </ImageBusProvider>,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Cargo Spine`,
+    );
+    expect(header.textContent).not.toContain("Docking Crescent");
   });
 });

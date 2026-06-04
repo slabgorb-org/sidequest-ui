@@ -3,7 +3,15 @@ import type { LocationDescriptionPayload } from "@/types/payloads";
 
 export interface LocationPanelProps {
   data: LocationDescriptionPayload | null;
+  /** Story 85-2: the LOCAL player's per-PC current_location (the scene within
+   * the region). Rendered as the subregion segment of the "Region — Subregion"
+   * breadcrumb in the header. Composed client-side from PARTY_STATUS — it is
+   * NOT a field on the shared, region-keyed LocationDescriptionPayload. */
+  subregion?: string | null;
 }
+
+// Story 85-2: locked breadcrumb separator — space · EM DASH (U+2014) · space.
+const BREADCRUMB_SEP = " — ";
 
 // Folio palette — mirrors CharacterPanel / InventoryPanel / KnowledgeJournal
 // so all dock panels read as the same artifact. Resolved via CSS custom
@@ -38,7 +46,7 @@ const FONT_BODY = "var(--font-body, 'EB Garamond', serif)";
 // entries is a Zork-Problem violation (CLAUDE.md doctrine; spec §6.1
 // "Reinforced exclusion"). Do not add entity chips here.
 
-export function LocationPanel({ data }: LocationPanelProps) {
+export function LocationPanel({ data, subregion }: LocationPanelProps) {
   if (!data) {
     return (
       <div
@@ -100,10 +108,10 @@ export function LocationPanel({ data }: LocationPanelProps) {
             rel="noopener noreferrer"
             style={{ color: FOLIO.ink, textDecoration: "underline" }}
           >
-            {regionDisplayName(data)}
+            {regionDisplayName(data, subregion)}
           </a>
         ) : (
-          <span>{regionDisplayName(data)}</span>
+          <span>{regionDisplayName(data, subregion)}</span>
         )}
         {data.terrain ? (
           <span data-testid="location-terrain-badge" style={badgeStyle()}>
@@ -197,10 +205,25 @@ function splitParagraphs(prose: string): string[] {
 // the key for the lore deep-link (data.reference_url). When no authored name
 // is available (old snapshots / nameless sources) we fall back to the slug
 // rather than inventing one — an honest, if ugly, label beats a wrong guess.
-function regionDisplayName(data: LocationDescriptionPayload): string {
-  return data.region_name && data.region_name.length > 0
-    ? data.region_name
-    : data.region_id;
+//
+// Story 85-2: when the LOCAL player is in a subregion (scene) within the
+// region, the header reads as a "Region — Subregion" breadcrumb. The subregion
+// segment is appended only when it is present, non-blank, and distinct from
+// the region (case/trim-insensitive) — so a blank value never leaves a
+// dangling separator and an echo of the region never doubles it.
+function regionDisplayName(
+  data: LocationDescriptionPayload,
+  subregion?: string | null,
+): string {
+  const region =
+    data.region_name && data.region_name.length > 0
+      ? data.region_name
+      : data.region_id;
+  const sub = (subregion ?? "").trim();
+  if (sub.length === 0 || sub.toLowerCase() === region.toLowerCase()) {
+    return region;
+  }
+  return `${region}${BREADCRUMB_SEP}${sub}`;
 }
 
 function badgeStyle(): CSSProperties {
