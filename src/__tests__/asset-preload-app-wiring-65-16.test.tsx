@@ -289,4 +289,42 @@ describe("Story 65-16 — App surfaces a failed preload via onError (AC2b)", () 
     await waitFor(() => screen.getByTestId("gameboard-stub"));
     expect(screen.queryByTestId("transient-error-banner")).not.toBeInTheDocument();
   });
+
+  it("clears the failed-preload banner on leave (no cross-session bleed)", async () => {
+    // Review finding (Story 65-16): handleLeave clears ~two dozen fields but not
+    // transientError. With AC2b now routing a failed preload to that banner, the
+    // "Couldn't load this session's saved images" strip survives the leave,
+    // shows in the lobby, and bleeds into the NEXT session — the exact
+    // cross-session leak this story exists to prevent. RED until handleLeave
+    // also calls setTransientError(null).
+    const slug = freshSlug();
+    vi.stubGlobal(
+      "fetch",
+      makeFetchMock(() => ({ kind: "error", status: 503 })),
+    );
+
+    const server = new WS(`ws://${location.host}/ws`, { jsonProtocol: true });
+    render(
+      <MemoryRouter initialEntries={[`/solo/${slug}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    await handshake(server);
+
+    // The failed preload raises the banner inside the session.
+    await waitFor(() =>
+      expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument(),
+    );
+
+    // Leave the session.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("stub-leave"));
+    });
+
+    // Back in the lobby, the prior session's preload-error banner must be gone.
+    await waitFor(() =>
+      expect(screen.getByTestId("lobby-root")).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("transient-error-banner")).not.toBeInTheDocument();
+  });
 });

@@ -1625,6 +1625,9 @@ function AppInner() {
     // a pure ImageBus input that deliberately survives the reconnect purge
     // (65-4), but on an explicit leave it must NOT leak into the next session.
     setPreloadedAssets([]);
+    // A failed-preload banner (AC2b) is per-session too — clear it so it does
+    // not bleed into the lobby or the next session.
+    setTransientError(null);
     setCharacter(null);
     setCreationScene(null);
     setThinking(false);
