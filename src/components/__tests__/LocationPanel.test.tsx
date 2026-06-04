@@ -272,4 +272,29 @@ describe("LocationPanel (Story 54-9)", () => {
     // No overlay prose section when no suffix text exists across all overlays.
     expect(screen.queryByTestId("location-overlay-prose")).toBeNull();
   });
+
+  // POI landscape (2026-06-04): the server emits poi_image_url for the region;
+  // the panel shows it above the prose and degrades to text-only when absent.
+  it("renders the POI landscape image when poi_image_url is present", () => {
+    render(
+      <LocationPanel
+        data={payload({
+          region_name: "The Munchkin Country",
+          poi_image_url:
+            "https://cdn.slabgorb.com/genre_packs/wry_whimsy/worlds/oz/assets/poi/munchkin_country.png",
+        })}
+      />,
+    );
+    const img = screen.getByTestId("location-poi-image") as HTMLImageElement;
+    expect(img.getAttribute("src")).toContain(
+      "assets/poi/munchkin_country.png",
+    );
+    // Alt text is the human-readable region name, not the slug.
+    expect(img.getAttribute("alt")).toBe("The Munchkin Country");
+  });
+
+  it("renders no POI image when poi_image_url is absent (text-only)", () => {
+    render(<LocationPanel data={payload()} />);
+    expect(screen.queryByTestId("location-poi-image")).toBeNull();
+  });
 });
