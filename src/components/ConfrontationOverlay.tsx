@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
 import { YieldButton } from "@/components/YieldButton";
@@ -572,7 +572,12 @@ function BeatGrid({
 // ═══════════════════════════════════════════════════════════
 
 function LedgerRow({ impact, side }: { impact: BeatImpactView; side: "You" | "Them" }) {
-  const delta = side === "You" ? impact.own ?? 0 : impact.opponent ?? 0;
+  // `impact` is already the acting entity's own BeatImpactView (player vs
+  // opponent), so the dial delta to show is always `.own` — the same field
+  // BeatImpactPanel reads for each side, pinned by Story 73-7. (Review fix: the
+  // Them row previously read `.opponent`, the cross-effect on the OTHER dial,
+  // and so reported the opponent's progress as ~0.) `side` is the label only.
+  const delta = impact.own ?? 0;
   const signed = delta > 0 ? `+${delta}` : `${delta}`;
   return (
     <div className="flex items-center gap-2 text-[11px] tabular-nums">
@@ -760,12 +765,23 @@ export function ConfrontationOverlay({
   // — beat → roll → result is one spatial unit. Declared before the early
   // return to keep hook order stable (rules of hooks).
   const [committedBeatId, setCommittedBeatId] = useState<string | null>(null);
+  // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
+  // this handler is handed to every beat button; a stable identity avoids
+  // re-rendering the whole grid each frame (matches GameBoard's own wrapping).
+  // Declared with useState above the early return to keep hook order stable.
+  const handleBeatSelect = useCallback(
+    (id: string) => {
+      setCommittedBeatId(id);
+      onBeatSelect?.(id);
+    },
+    [onBeatSelect],
+  );
   if (!data) return null;
 
-  const handleBeatSelect = (id: string) => {
-    setCommittedBeatId(id);
-    onBeatSelect?.(id);
-  };
+  // Keep the optional chain: although `beats` is typed required, the server can
+  // broadcast a confrontation before its beats materialize (wire payload with
+  // `beats` undefined) — pinned by the "beatless confrontation" regression test.
+  // Dropping `?.` here crashes that real production path.
   const committedBeat = data.beats?.find((b) => b.id === committedBeatId) ?? null;
 
   return (
@@ -807,13 +823,12 @@ export function ConfrontationOverlay({
       )}
 
       {/*
-       * Commit row — beats (the submit verbs for the InputBar draft) on the
-       * left, the persistent die lane on the right (Klinger design,
-       * 2026-05-26). Side-by-side rather than stacked so the die gets a
-       * stable, examinable home that never reflows the beats and never
-       * flashes in/out: it shares the row's height instead of adding to it.
-       * When the dice tray isn't wired (no onDiceThrow/playerId, e.g. in
-       * isolation tests) the beats reclaim the full width.
+       * Commit row (Story 85-1) — STACKED: the beat grid on top, the die tray
+       * anchored directly below the committed beat. This retired the old
+       * side-by-side fixed 200px "persistent die lane" (Klinger design,
+       * 2026-05-26) so beat → roll → result reads as one spatial unit. When the
+       * dice tray isn't wired (no onDiceThrow/playerId, e.g. in isolation tests)
+       * the beats reclaim the full width.
        */}
       <div className="flex flex-col gap-2">
         <div className="min-w-0">
