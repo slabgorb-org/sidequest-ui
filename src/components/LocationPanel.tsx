@@ -121,6 +121,29 @@ export function LocationPanel({ data }: LocationPanelProps) {
         ) : null}
       </header>
 
+      {data.poi_image_url ? (
+        // POI landscape for the region. The server builds the URL from the
+        // region_id verbatim; a region whose art isn't rendered yet 404s, so
+        // we hide the <img> on error rather than show a broken-image glyph
+        // (graceful degradation to text-only — no broken img).
+        <img
+          data-testid="location-poi-image"
+          src={data.poi_image_url}
+          alt={regionDisplayName(data)}
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+          style={{
+            width: "100%",
+            borderRadius: "4px",
+            border: `1px solid ${FOLIO.rule}`,
+            marginBottom: "0.75rem",
+            display: "block",
+          }}
+        />
+      ) : null}
+
       <section data-testid="location-base-prose">
         {baseParagraphs.map((p, i) => (
           <p

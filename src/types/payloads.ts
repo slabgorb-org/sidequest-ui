@@ -786,6 +786,10 @@ export interface LocationDescriptionPayload {
   /** Story 63-6: deep-link from the region header into the /reference/lore
    * wiki; null/absent when the region has no lore-page anchor. */
   reference_url?: string | null;
+  /** POI landscape image URL for the region (built server-side from region_id
+   * verbatim). The panel renders it above the prose and hides it on a load
+   * error, so a region with no rendered landscape degrades to text-only. */
+  poi_image_url?: string | null;
 }
 
 // ADR-136: NPC relationship roster snapshot. Field names mirror the server
