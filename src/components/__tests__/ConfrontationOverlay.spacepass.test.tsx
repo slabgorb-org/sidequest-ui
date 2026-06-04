@@ -244,7 +244,7 @@ describe('Accessibility — beats are a reachable, announced commit path', () =>
   });
 
   it('guards the dial animation behind prefers-reduced-motion', () => {
-    const { container } = render(<ConfrontationOverlay data={makeData()} />);
+    render(<ConfrontationOverlay data={makeData()} />);
     // The dial pulse / die roll must respect prefers-reduced-motion. Today the
     // animated nodes (animate-pulse / transition-all) have no motion-reduce guard.
     const board = screen.getByTestId('dial-scoreboard');
