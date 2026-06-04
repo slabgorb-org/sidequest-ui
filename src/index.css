@@ -5,6 +5,7 @@
 @import "./styles/fonts.css"; /* self-hosted chrome fonts from R2 — replaces the index.html Google Fonts links (2026-06-03) */
 @import "./styles/archetype-chrome.css"; /* reprocess-bump 2026-05-27: force Vite to re-inline archetype partial (terminal em legibility) */
 @import "./styles/lobby-folio.css"; /* Standing Folio lobby presentation (story 83-1) */
+@import "./styles/beat-impact.css"; /* Beat-impact effect styling — 6 distinct effect states (story 73-10) */
 
 @custom-variant dark (&:is(.dark *));
 
@@ -89,6 +90,17 @@
     --encounter-player: oklch(0.55 0.14 240);
     --encounter-opponent: oklch(0.62 0.16 70);
     --accent-finisher: oklch(0.70 0.14 85);
+    /* Beat-impact semantic tokens (story 73-10). Derived from the base palette so
+       a genre's :root[data-genre] override of --destructive / --encounter-player /
+       --accent-finisher automatically recolors the beat-impact panel; a genre may
+       also override these directly. resolution + backfire have no base-palette
+       analogue, so they carry literal hues (success green / deep danger red). */
+    --beat-impact-resolution: oklch(0.62 0.17 150);
+    --beat-impact-inert: var(--muted-foreground);
+    --beat-impact-setback: var(--destructive);
+    --beat-impact-advance: var(--encounter-player);
+    --beat-impact-tag: var(--accent-finisher);
+    --beat-impact-backfire: oklch(0.50 0.22 25);
 }
 
 .dark {
@@ -128,6 +140,15 @@
     --encounter-player: oklch(0.72 0.12 240);
     --encounter-opponent: oklch(0.80 0.16 70);
     --accent-finisher: oklch(0.85 0.14 85);
+    /* Beat-impact semantic tokens — dark-mode (story 73-10). inert/setback/advance/
+       tag inherit the already dark-adjusted base tokens; resolution + backfire
+       lighten their literal hues for contrast on a dark card. */
+    --beat-impact-resolution: oklch(0.75 0.16 150);
+    --beat-impact-inert: var(--muted-foreground);
+    --beat-impact-setback: var(--destructive);
+    --beat-impact-advance: var(--encounter-player);
+    --beat-impact-tag: var(--accent-finisher);
+    --beat-impact-backfire: oklch(0.62 0.22 25);
 }
 
 @layer base {
