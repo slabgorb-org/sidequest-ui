@@ -207,7 +207,7 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                           fontWeight: 400,
                         }}
                       >
-                        Equip
+                        Equipped
                       </span>
                     )}
 
