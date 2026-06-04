@@ -637,15 +637,19 @@ function BeatHistoryLedger({
   impact,
   opponent,
 }: {
-  impact: BeatImpactView;
+  impact?: BeatImpactView | null;
   opponent?: BeatImpactView | null;
 }) {
+  // Story 73-13: the ledger shares the impact panel's gate, so the
+  // opponent-acts-first window must not suppress it either. Render the "You" row
+  // only when the player has acted; the "Them" row carries the window on its own.
+  if (!impact && !opponent) return null;
   return (
     <div
       data-testid="beat-history-ledger"
       className="mb-2 flex flex-col gap-0.5 rounded-md border border-border/40 px-2 py-1"
     >
-      <LedgerRow impact={impact} side="You" />
+      {impact && <LedgerRow impact={impact} side="You" />}
       {opponent && <LedgerRow impact={opponent} side="Them" />}
     </div>
   );
@@ -747,25 +751,35 @@ function BeatImpactPanel({
   impact,
   opponent,
 }: {
-  impact: BeatImpactView;
+  impact?: BeatImpactView | null;
   opponent?: BeatImpactView | null;
 }) {
+  // Story 73-13: in the opponent-acts-first window (legacy beat_selection path /
+  // surprise round / player took a non-combat action) the opponent has an impact
+  // but the player has not acted yet. Drive the panel container from whichever
+  // side is present so the opponent "hit you" readout still renders. The
+  // player-own readout is omitted — not shown as a misleading 0 — when the
+  // player half is absent (symmetric to how the opponent half is omitted).
+  const head = impact ?? opponent;
+  if (!head) return null;
   return (
     <div
       data-testid="beat-impact"
-      data-effect={impact.effect}
-      data-dial-moved={impact.dial_moved ? "true" : "false"}
-      className={`beat-impact mt-2 p-2 rounded border beat-impact-${impact.effect}`}
+      data-effect={head.effect}
+      data-dial-moved={head.dial_moved ? "true" : "false"}
+      className={`beat-impact mt-2 p-2 rounded border beat-impact-${head.effect}`}
     >
-      <span className="text-xs">{impact.summary}</span>
+      <span className="text-xs">{head.summary}</span>
       {/*
        * Story 73-7: numeric delta readouts so mechanics-first players see what
        * happened to the numbers on BOTH sides — the player's own dial delta and
        * (when the server sent one) the opponent's. 73-10 owns labels/styling.
        */}
-      <span data-testid="beat-impact-own" className="text-xs">
-        {impact.own ?? 0}
-      </span>
+      {impact != null && (
+        <span data-testid="beat-impact-own" className="text-xs">
+          {impact.own ?? 0}
+        </span>
+      )}
       {opponent != null && (
         <span data-testid="beat-impact-opponent" className="text-xs">
           {opponent.own ?? 0}
@@ -953,7 +967,10 @@ export function ConfrontationOverlay({
        * zone — explains a no-dial-move CritSuccess so it reads as intended.
        * Adjunct to the dial bars (which still render below), never a replacement.
        */}
-      {data.last_beat_impact && (
+      {/* Story 73-13: gate on EITHER side — the opponent-acts-first window has an
+          opponent impact but no player impact yet, and must still surface the
+          opponent "hit you" readout instead of suppressing the whole panel. */}
+      {(data.last_beat_impact || data.opponent_last_beat_impact) && (
         <BeatImpactPanel
           impact={data.last_beat_impact}
           opponent={data.opponent_last_beat_impact}
@@ -961,8 +978,9 @@ export function ConfrontationOverlay({
       )}
 
       {/* Story 85-1 (A5): beat-history ledger — the dial movement gets a legible
-          cause (Δ per side) so the scoreboard isn't an unexplained jump. */}
-      {data.last_beat_impact && (
+          cause (Δ per side) so the scoreboard isn't an unexplained jump.
+          Story 73-13: same either-side gate as the impact panel above. */}
+      {(data.last_beat_impact || data.opponent_last_beat_impact) && (
         <BeatHistoryLedger
           impact={data.last_beat_impact}
           opponent={data.opponent_last_beat_impact}

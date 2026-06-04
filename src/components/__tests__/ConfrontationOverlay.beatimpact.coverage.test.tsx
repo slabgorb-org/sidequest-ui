@@ -57,11 +57,11 @@ const OPPONENT_IMPACT: BeatImpactView = {
 describe('Story 73-9: beat-impact coverage hardening (UI characterization)', () => {
   // ── AC5: explicit-null player impact ──────────────────────────────────────
   it('does not crash when player impact is null even with a valid opponent impact', () => {
-    // CURRENT behavior: the panel is gated on `data.last_beat_impact` (the player
-    // readout). With it null, the whole panel is omitted — no crash, but the
-    // opponent readout is NOT surfaced. Showing the opponent half when the player
-    // half is absent is tracked separately as the 73-13 bug (a production change,
-    // out of scope for this test-only story). This pins what ships TODAY.
+    // Updated for Story 73-13: this path used to suppress the whole panel (the
+    // 73-13 bug). The gate now fires on (player || opponent), so the
+    // opponent-acts-first window surfaces the opponent "hit you" readout while
+    // the absent player half is omitted (not shown as a misleading 0). The AC5
+    // intent — the explicit-null player path must not crash — still holds.
     expect(() =>
       render(
         <ConfrontationOverlay
@@ -70,10 +70,10 @@ describe('Story 73-9: beat-impact coverage hardening (UI characterization)', () 
       ),
     ).not.toThrow();
 
-    // Panel gated off → no player section, no opponent section, no malformed shell.
-    expect(screen.queryByTestId('beat-impact')).not.toBeInTheDocument();
+    // Panel renders the opponent half; the absent player readout is omitted.
+    expect(screen.getByTestId('beat-impact')).toBeInTheDocument();
     expect(screen.queryByTestId('beat-impact-own')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('beat-impact-opponent')).not.toBeInTheDocument();
+    expect(screen.getByTestId('beat-impact-opponent')).toHaveTextContent('2');
   });
 
   // ── AC6: inert-summary text renders legibly ───────────────────────────────
