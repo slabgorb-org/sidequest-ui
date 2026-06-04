@@ -502,8 +502,22 @@ export function GameBoard({
         // Always render — QuestsPanel shows an empty state when the spine is
         // null/empty. Tab is always present from session start (Story 77-5).
         return <QuestsWidget data={questsData ?? null} />;
-      case "location":
-        return <LocationWidget data={currentLocation ?? null} />;
+      case "location": {
+        // Story 85-2: the Location-tab header reads as a "Region — Subregion"
+        // breadcrumb. The region is the shared LOCATION_DESCRIPTION payload;
+        // the subregion is the LOCAL player's per-PC current_location (the same
+        // every-turn-fresh value useRunningHeader uses). Composed client-side —
+        // never a peer's location (preserves the per-PC scene invariant).
+        const localSubregion = characters?.find(
+          (c) => c.player_id === currentPlayerId,
+        )?.current_location;
+        return (
+          <LocationWidget
+            data={currentLocation ?? null}
+            subregion={localSubregion}
+          />
+        );
+      }
       case "audio":
         return (
           <AudioWidget
