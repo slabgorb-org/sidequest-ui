@@ -239,8 +239,21 @@ export function useStateMirror(messages: GameMessage[]): void {
       // Story 77-5 / ADR-137: full replace of the quest spine. QUESTS is a
       // snapshot — the latest message wins, mirroring RELATIONSHIPS. The rich
       // payload threads onto questsData; the legacy quests Record is untouched.
+      // No Silent Fallbacks: validate the shape at the boundary so a malformed
+      // wire payload (version skew, serialization bug) fails loud and leaves
+      // questsData unchanged rather than propagating garbage that crashes the
+      // panel (AC2). Mirrors the fact_id boundary guard elsewhere in this file.
       if (msg.type === MessageType.QUESTS) {
-        questsData = msg.payload as unknown as QuestsPayload;
+        const p = msg.payload as unknown as QuestsPayload;
+        if (
+          !Array.isArray(p.quest_log) ||
+          !Array.isArray(p.quest_anchors) ||
+          typeof p.active_stakes !== 'string'
+        ) {
+          console.error('[useStateMirror] malformed QUESTS payload — ignoring', p);
+          continue;
+        }
+        questsData = p;
         continue;
       }
 

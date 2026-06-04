@@ -59,6 +59,9 @@ export function QuestsPanel({ data }: QuestsPanelProps) {
   const spine = data;
   // Anchors keyed by id so each quest can surface its own resolution inline.
   const anchorsById = new Map(spine.quest_anchors.map((a) => [a.anchor_id, a]));
+  // Quest ids present in the log — used to detect anchors whose owning quest is
+  // absent (a dangling reference), so they are surfaced rather than dropped.
+  const loggedQuestIds = new Set(spine.quest_log.map((q) => q.quest_id));
 
   return (
     <div
@@ -115,10 +118,14 @@ export function QuestsPanel({ data }: QuestsPanelProps) {
         );
       })}
 
-      {/* Anchors with no owning quest in the log — surfaced explicitly rather
-          than silently dropped (mirrors the server's No-Silent-Fallbacks note). */}
+      {/* Anchors not attached to a rendered quest — either no owning quest
+          (quest_id null) OR a dangling reference (quest_id names a quest absent
+          from quest_log, e.g. after a server-side prune or in a partial
+          snapshot). Surfaced here rather than silently dropped — a quest anchor
+          the player should see must never vanish without a trace
+          (No-Silent-Fallbacks). */}
       {spine.quest_anchors
-        .filter((a) => !a.quest_id)
+        .filter((a) => !a.quest_id || !loggedQuestIds.has(a.quest_id))
         .map((a) => (
           <div
             key={a.anchor_id}
