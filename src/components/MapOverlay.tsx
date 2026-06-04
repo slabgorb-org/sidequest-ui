@@ -1,3 +1,5 @@
+import { computeCartographyLayout, NODE_R } from "@/lib/cartographyLayout";
+
 export interface RoomExitInfo {
   /** Target room ID this exit leads to. */
   target: string;
@@ -107,6 +109,27 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
   // Fall back to list view when no coordinate data (all x/y are 0)
   const hasCoordinates = explored.some((loc) => loc.x !== 0 || loc.y !== 0);
 
+  // Region-mode worlds carry an adjacency-only cartography (no coordinates), so
+  // the node-graph is the primary map view. Only render the graph when there
+  // are actual region nodes (room_graph cartography ships an empty regions map).
+  const showRegionGraph =
+    cartography !== undefined &&
+    Object.keys(cartography.regions ?? {}).length > 0;
+
+  // "You are here": for region-mode worlds the cartography MAP_UPDATE carries
+  // the current region id in `current_location` (the server's per-turn +
+  // connect/resume emit passes `snapshot.current_region`). `mapData.region` is
+  // the world slug, NOT a region id, so it is not a current-region signal.
+  const currentRegionId = mapData.current_location;
+  // Visited regions: the cartography payload does not yet carry
+  // discovered_regions / explored for region mode (server gap), so the only
+  // region we can mark visited today is the current one. When the server
+  // populates `explored` with region ids this set will light the rest up.
+  const visitedRegionIds = new Set<string>(
+    explored.map((loc) => loc.id ?? loc.name)
+  );
+  if (currentRegionId) visitedRegionIds.add(currentRegionId);
+
   return (
     <div data-testid="map-overlay" className="p-6 space-y-4 relative">
       <div className="flex justify-between items-center">
@@ -123,6 +146,14 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
           <div data-testid="map-navigation-mode" className="text-xs text-muted-foreground/60">
             {cartography.navigation_mode}
           </div>
+
+          {showRegionGraph && (
+            <RegionNodeGraph
+              cartography={cartography}
+              currentRegionId={currentRegionId}
+              visitedRegionIds={visitedRegionIds}
+            />
+          )}
 
           <div data-testid="map-regions-panel" className="space-y-1">
             {Object.entries(cartography.regions).map(([slug, region]) => (
@@ -251,6 +282,104 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
         </div>
       )}
     </div>
+  );
+}
+
+interface RegionNodeGraphProps {
+  cartography: CartographyMetadata;
+  /** Region id the player currently occupies ("you are here"), or "". */
+  currentRegionId: string;
+  /** Region ids the player has entered (current always included). */
+  visitedRegionIds: Set<string>;
+}
+
+/**
+ * The cartography region adjacency graph as a deterministic SVG node-link
+ * diagram — the in-game counterpart to the lore reference page's Map section.
+ *
+ * Layout (`computeCartographyLayout`) is a verbatim TS port of the server
+ * renderer (`reference_map.py`), so the same `cartography.yaml` yields the same
+ * topology and node positions on both surfaces. Edges paint first, then nodes
+ * paint over them. A runtime overlay distinguishes the current region ("you are
+ * here") and visited regions from the base layer.
+ */
+function RegionNodeGraph({
+  cartography,
+  currentRegionId,
+  visitedRegionIds,
+}: RegionNodeGraphProps) {
+  const layout = computeCartographyLayout(cartography);
+  const labelDx = NODE_R + 6;
+
+  return (
+    <svg
+      data-testid="map-region-graph"
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
+      className="w-full h-72 bg-[var(--surface)] rounded"
+      role="img"
+      aria-label="World region map"
+    >
+      <g>
+        {layout.edges.map(({ a, b }) => {
+          const na = layout.nodes.find((n) => n.id === a);
+          const nb = layout.nodes.find((n) => n.id === b);
+          if (!na || !nb) return null;
+          return (
+            <line
+              key={`${a}--${b}`}
+              data-testid={`map-region-edge-${a}--${b}`}
+              x1={na.x}
+              y1={na.y}
+              x2={nb.x}
+              y2={nb.y}
+              stroke="var(--accent, #888)"
+              strokeWidth={2}
+              strokeOpacity={0.5}
+            />
+          );
+        })}
+      </g>
+      <g>
+        {layout.nodes.map((node) => {
+          const isCurrent = node.id === currentRegionId;
+          const isVisited = visitedRegionIds.has(node.id);
+          return (
+            <g
+              key={node.id}
+              data-testid={`map-region-node-${node.id}`}
+              data-region-id={node.id}
+              data-current={isCurrent ? "true" : undefined}
+              data-visited={isVisited ? "true" : undefined}
+            >
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r={isCurrent ? NODE_R + 3 : NODE_R}
+                fill={
+                  isCurrent
+                    ? "var(--accent, gold)"
+                    : isVisited
+                      ? "var(--primary, #ccc)"
+                      : "var(--surface, #333)"
+                }
+                stroke="var(--primary, #ccc)"
+                strokeWidth={isCurrent ? 2.5 : 1.5}
+                fillOpacity={isCurrent || isVisited ? 1 : 0.4}
+              />
+              <text
+                x={node.x + labelDx}
+                y={node.y + 4}
+                fontSize={13}
+                fill="var(--primary, white)"
+                fillOpacity={isVisited ? 1 : 0.55}
+              >
+                {node.name}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    </svg>
   );
 }
 
