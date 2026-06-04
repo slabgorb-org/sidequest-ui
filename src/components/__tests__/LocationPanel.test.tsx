@@ -298,3 +298,93 @@ describe("LocationPanel (Story 54-9)", () => {
     expect(screen.queryByTestId("location-poi-image")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 85-2: Region — Subregion breadcrumb.
+//
+// AC-1 decision (operator, 2026-06-04): "where am I" is a two-level hierarchy
+// Region › Subregion, rendered in the Location-tab header as a
+// "Region — Subregion" breadcrumb so the tab and the running-header chip read
+// as ONE hierarchy instead of two surfaces that look like they disagree
+// (playtest L105 a/b).
+//
+// Contract (Architect, White Queen):
+//   - region segment  = the SHARED, region-keyed payload (region_name, ADR-109)
+//   - subregion segment = the LOCAL player's per-PC current_location — the same
+//     every-turn-fresh value useRunningHeader already reads. It is composed
+//     CLIENT-SIDE from a new `subregion` prop; it is NOT a new payload field
+//     (a per-PC value must not ride the shared region record — split party).
+//   - separator is locked to a space-EM-DASH-space.
+//   - useRunningHeader does NOT change (S2-UX(c) per-PC freshness preserved).
+//
+// These positive-composition cases are RED: LocationPanel does not yet accept
+// or compose a `subregion`. The negative cases are companion guards that keep
+// a naive GREEN implementation honest (no always-append, no dangling dash).
+// ---------------------------------------------------------------------------
+
+const BREADCRUMB_SEP = " — "; // space · EM DASH (U+2014) · space — locked
+
+function region(
+  over: Partial<LocationDescriptionPayload> = {},
+): LocationDescriptionPayload {
+  // terrain:null keeps the badge out of the header so textContent assertions
+  // see only the breadcrumb.
+  return payload({
+    region_id: "outer_coyote_star",
+    region_name: "The Outer Coyote Star",
+    terrain: null,
+    ...over,
+  });
+}
+
+describe("LocationPanel — Region — Subregion breadcrumb (Story 85-2)", () => {
+  it("composes 'Region — Subregion' when a distinct subregion is supplied (RED)", () => {
+    render(
+      <LocationPanel data={region()} subregion="Docking Crescent" />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain(
+      `The Outer Coyote Star${BREADCRUMB_SEP}Docking Crescent`,
+    );
+  });
+
+  it("shows the region alone — no separator — when no subregion is supplied (guard)", () => {
+    render(<LocationPanel data={region()} />);
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Outer Coyote Star");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+  });
+
+  it("does not double the name when subregion equals the region, case/trim-insensitive (guard)", () => {
+    render(
+      <LocationPanel data={region()} subregion="  the outer coyote star " />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("The Outer Coyote Star");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+  });
+
+  it("no silent fallback: a blank/whitespace subregion never yields a dangling dash or 'undefined'/'null' (guard)", () => {
+    render(
+      <LocationPanel data={region()} subregion="   " />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).not.toContain(BREADCRUMB_SEP);
+    expect(header.textContent?.toLowerCase()).not.toContain("undefined");
+    expect(header.textContent?.toLowerCase()).not.toContain("null");
+  });
+
+  it("surfaces the region_id slug (not a blank) as the region segment when region_name is absent (guard)", () => {
+    // Honest fallback: an old snapshot with no authored region_name still
+    // anchors the breadcrumb on the slug rather than a blank left side.
+    render(
+      <LocationPanel
+        data={region({ region_name: null })}
+        subregion="Docking Crescent"
+      />,
+    );
+    const header = screen.getByTestId("location-header");
+    expect(header.textContent).toContain("outer_coyote_star");
+    expect(header.textContent?.toLowerCase()).not.toContain("undefined");
+  });
+});
