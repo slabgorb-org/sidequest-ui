@@ -90,3 +90,54 @@ describe("QuestsPanel (Story 77-5 / ADR-137)", () => {
     ).toBeInTheDocument();
   });
 });
+
+// Review round-trip 1 (Reviewer REJECT, 2026-06-04). Hardening for the
+// blocking findings: dangling-reference anchors must not be silently dropped
+// (No-Silent-Fallbacks), and the orphan render branch needs coverage.
+describe("QuestsPanel — anchor surfacing (rework: No-Silent-Fallbacks)", () => {
+  it("renders an orphan anchor whose quest_id is null", () => {
+    const data: QuestsPayload = {
+      quest_log: [],
+      quest_anchors: [
+        { anchor_id: "free_anchor", quest_id: null, resolution: "Stand at the crossroads" },
+      ],
+      active_stakes: "",
+    };
+    render(<QuestsPanel data={data} />);
+    const orphan = screen.getByTestId("quests-orphan-anchor");
+    expect(orphan).toHaveTextContent(/free_anchor/);
+    expect(orphan).toHaveTextContent(/stand at the crossroads/i);
+  });
+
+  it("surfaces a dangling-reference anchor whose owning quest is absent from the log", () => {
+    // The anchor names a quest_id that does NOT appear in quest_log (a stale
+    // anchor after a server-side quest prune, or a partial snapshot). It is
+    // neither rendered inline (its quest row is absent) nor — pre-fix — caught
+    // by the `!a.quest_id` orphan filter (its quest_id is truthy). It MUST still
+    // be surfaced; silently dropping it violates No-Silent-Fallbacks and the
+    // panel's own comment claims it is not dropped.
+    const dangling: QuestsPayload = {
+      quest_log: [
+        {
+          quest_id: "q_home",
+          title: "Find a way home",
+          objective: "Reach the Emerald City",
+          status: "active",
+          anchor_id: null,
+        },
+      ],
+      quest_anchors: [
+        {
+          anchor_id: "lost_anchor",
+          quest_id: "q_deleted",
+          resolution: "The vault opens at midnight",
+        },
+      ],
+      active_stakes: "high",
+    };
+    render(<QuestsPanel data={dangling} />);
+    expect(
+      screen.getByText(/the vault opens at midnight/i),
+    ).toBeInTheDocument();
+  });
+});

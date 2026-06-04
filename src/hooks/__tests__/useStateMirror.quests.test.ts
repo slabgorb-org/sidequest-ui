@@ -68,7 +68,9 @@ function payload(title: string, stakes: string): QuestsPayload {
 describe("useStateMirror — QUESTS (Story 77-5 / ADR-137)", () => {
   it("starts with the quests projection null", () => {
     const result = mirror([]);
-    expect(result.current.state.questsData ?? null).toBeNull();
+    // Assert directly (no `?? null` coercion) so a misspelled field or a
+    // missing EMPTY_GAME_STATE default — undefined, not null — is caught.
+    expect(result.current.state.questsData).toBeNull();
   });
 
   it("populates questsData from a QUESTS message", () => {
@@ -97,5 +99,38 @@ describe("useStateMirror — QUESTS (Story 77-5 / ADR-137)", () => {
     // The legacy Record<string,string> stays untouched — the rich payload
     // travels on questsData, never back-filled into the thin field.
     expect(result.current.state.quests).toEqual({});
+  });
+
+  // Review round-trip 1 (Reviewer REJECT, 2026-06-04). No-Silent-Fallbacks:
+  // validate the QUESTS payload at the mirror boundary so a malformed wire
+  // payload (version skew, serialization bug) degrades to null — and the panel
+  // renders its empty state — rather than storing garbage that throws in the
+  // render path (AC2: "does not white-screen or throw on missing/undefined
+  // fields"). Boundary validation is the project idiom (cf. the fact_id guard
+  // in useStateMirror.ts).
+  it("degrades a malformed QUESTS payload (missing arrays) to null", () => {
+    const malformed = { active_stakes: "oops" } as unknown as QuestsPayload;
+    const result = mirror([questsMsg(malformed)]);
+    expect(result.current.state.questsData).toBeNull();
+  });
+
+  it("degrades a QUESTS payload with a non-string active_stakes to null", () => {
+    const malformed = {
+      quest_log: [],
+      quest_anchors: [],
+      active_stakes: null,
+    } as unknown as QuestsPayload;
+    const result = mirror([questsMsg(malformed)]);
+    expect(result.current.state.questsData).toBeNull();
+  });
+
+  it("keeps a valid projection after a malformed one is rejected", () => {
+    const malformed = { active_stakes: "oops" } as unknown as QuestsPayload;
+    const result = mirror([
+      questsMsg(malformed),
+      questsMsg(payload("Find a way home", "high")),
+    ]);
+    expect(result.current.state.questsData?.quest_log).toHaveLength(1);
+    expect(result.current.state.questsData?.active_stakes).toBe("high");
   });
 });
