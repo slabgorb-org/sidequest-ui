@@ -602,14 +602,22 @@ function AppInner() {
     }
     setPreloadedAssets(valid);
   }, []);
-  // No onError consumer here: useAssetPreload already logs preload failures
-  // loudly (unconditionally, independent of any onError callback), so a second
-  // App-level log would just duplicate it. The hook's onError remains available
-  // as an extension point if a future story surfaces preload errors in the UI.
+  // Story 65-16 AC2b: surface a failed ledger preload to the player instead of
+  // only logging it. Reuse the transient-error banner (Story 71-3) — a missing
+  // backfill is non-fatal (live renders still arrive), so it belongs on the
+  // dismissible strip, not the fatal panel. Stable identity (setTransientError
+  // is a stable setter) so the hook's edge effect doesn't refire.
+  const handlePreloadError = useCallback((err: unknown) => {
+    const detail = err instanceof Error ? `: ${err.message}` : "";
+    setTransientError(
+      `Couldn't load this session's saved images${detail}. They'll reappear as the next images render.`,
+    );
+  }, []);
   useAssetPreload({
     slug: slug ?? null,
     connected,
     onAssets: handlePreloadAssets,
+    onError: handlePreloadError,
   });
 
   const handleMessage = useCallback((msg: GameMessage) => {
@@ -1613,6 +1621,10 @@ function AppInner() {
     clearSession();
     setConnected(false);
     setMessages([]);
+    // Story 65-16 AC1: drop the prior session's R2 backfill. preloadedAssets is
+    // a pure ImageBus input that deliberately survives the reconnect purge
+    // (65-4), but on an explicit leave it must NOT leak into the next session.
+    setPreloadedAssets([]);
     setCharacter(null);
     setCreationScene(null);
     setThinking(false);
