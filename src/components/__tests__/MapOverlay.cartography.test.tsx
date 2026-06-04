@@ -131,6 +131,70 @@ describe('MapOverlay — Cartography Wiring (Story 26-10)', () => {
     });
   });
 
+  // --- Node-graph (region adjacency visualisation) ---
+  describe('Region node-graph', () => {
+    it('renders an SVG node-graph for region-mode cartography', () => {
+      render(<MapOverlay mapData={MAP_WITH_CARTOGRAPHY} onClose={() => {}} />);
+      expect(screen.getByTestId('map-region-graph')).toBeInTheDocument();
+    });
+
+    it('renders one graph node per region', () => {
+      render(<MapOverlay mapData={MAP_WITH_CARTOGRAPHY} onClose={() => {}} />);
+      // regions keyed by id (Eldergrove, Shadowlands)
+      expect(screen.getByTestId('map-region-node-Eldergrove')).toBeInTheDocument();
+      expect(screen.getByTestId('map-region-node-Shadowlands')).toBeInTheDocument();
+      const nodes = screen.getAllByTestId(/^map-region-node-/);
+      expect(nodes).toHaveLength(2);
+    });
+
+    it('renders an edge per de-duplicated adjacency', () => {
+      render(<MapOverlay mapData={MAP_WITH_CARTOGRAPHY} onClose={() => {}} />);
+      // Eldergrove↔Shadowlands is reciprocal → collapses to one edge.
+      const edges = screen.getAllByTestId(/^map-region-edge-/);
+      expect(edges).toHaveLength(1);
+      expect(
+        screen.getByTestId('map-region-edge-Eldergrove--Shadowlands')
+      ).toBeInTheDocument();
+    });
+
+    it('marks the current region ("you are here")', () => {
+      const map: MapState = {
+        ...MAP_WITH_CARTOGRAPHY,
+        // region-mode MAP_UPDATE carries the current region id in current_location
+        current_location: 'Shadowlands',
+      };
+      render(<MapOverlay mapData={map} onClose={() => {}} />);
+      expect(screen.getByTestId('map-region-node-Shadowlands')).toHaveAttribute(
+        'data-current',
+        'true'
+      );
+      expect(
+        screen.getByTestId('map-region-node-Eldergrove')
+      ).not.toHaveAttribute('data-current', 'true');
+    });
+
+    it('marks the current region as visited', () => {
+      const map: MapState = {
+        ...MAP_WITH_CARTOGRAPHY,
+        current_location: 'Eldergrove',
+      };
+      render(<MapOverlay mapData={map} onClose={() => {}} />);
+      expect(screen.getByTestId('map-region-node-Eldergrove')).toHaveAttribute(
+        'data-visited',
+        'true'
+      );
+      // Non-current, non-explored region is base-layer (unvisited).
+      expect(
+        screen.getByTestId('map-region-node-Shadowlands')
+      ).not.toHaveAttribute('data-visited', 'true');
+    });
+
+    it('does not render a region graph for room_graph cartography (empty regions)', () => {
+      render(<MapOverlay mapData={MAP_WITH_ROOM_GRAPH} onClose={() => {}} />);
+      expect(screen.queryByTestId('map-region-graph')).not.toBeInTheDocument();
+    });
+  });
+
   // --- Backward compat ---
   describe('Backward compatibility', () => {
     it('renders without cartography field (existing behavior preserved)', () => {
