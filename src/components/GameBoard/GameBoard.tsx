@@ -317,6 +317,7 @@ export function GameBoard({
     const available = new Set<WidgetId>();
     available.add("narrative");
     available.add("character");
+    available.add("relationships");
     available.add("inventory");
     available.add("map");
     available.add("knowledge");
@@ -336,16 +337,8 @@ export function GameBoard({
     if (navMode === "region" || navMode === "room_graph") {
       available.add("location");
     }
-    // ADR-136: the Relationships tab is data-gated — it appears only once a
-    // RELATIONSHIPS snapshot carries at least one met NPC. No stable
-    // world-capability signal exists for relationships (every world can have
-    // NPCs), so gating on the payload keeps an empty roster from cluttering
-    // the dock before anyone has been met.
-    if (relationshipsData != null && relationshipsData.length > 0) {
-      available.add("relationships");
-    }
     return available;
-  }, [worldSlug, navMode, relationshipsData]);
+  }, [worldSlug, navMode]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -491,7 +484,9 @@ export function GameBoard({
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "relationships":
-        return relationshipsData ? <RelationshipsWidget data={relationshipsData} /> : null;
+        // Always render — RelationshipsPanel shows an empty state when data is
+        // null/empty. Tab is always present from session start (playtest 2026-06-04).
+        return <RelationshipsWidget data={relationshipsData ?? null} />;
       case "location":
         return <LocationWidget data={currentLocation ?? null} />;
       case "audio":
