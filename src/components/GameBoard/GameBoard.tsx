@@ -74,8 +74,10 @@ import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 import { QuestsWidget } from "./widgets/QuestsWidget";
-// ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
-// dedicated panel between the dockview workspace and the InputBar (D2 mock).
+// ConfrontationWidget removed 2026-05-13 — confrontation rendered as a bottom
+// strip between the dockview workspace and the InputBar (D2 mock) until Story
+// 85-3 (2026-06-04) promoted it BACK into the dockview as the data-gated
+// `confrontation` panel. See widgetRegistry.ts + renderWidgetContent.
 import { AudioWidget } from "./widgets/AudioWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
 

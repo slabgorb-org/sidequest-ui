@@ -875,11 +875,16 @@ function MeanwhileStrip({ actions }: { actions?: MeanwhileAction[] }) {
 /**
  * Confrontation panel — D2 tile-grid design.
  *
- * Mounted between the dockview workspace and the InputBar (see GameBoard).
- * Beat tiles are alternate submit verbs for whatever the player has typed
- * into the InputBar; plain Enter is locked during an active confrontation,
- * so a tile click is the only way to commit the turn. The ▾ chevron on
- * each tile reserves the slot for the upcoming expand-for-details feature.
+ * Story 85-3 (Tier B): renders inside the auto-focused `confrontation` dockview
+ * panel (SPLIT layout alongside `narrative` — see GameBoard.tsx
+ * renderWidgetContent). It was a bottom strip between the workspace and the
+ * InputBar under the D2 mock; it is now a first-class panel. The InputBar stays
+ * live alongside this panel (SPLIT, not takeover), so the player can still type
+ * a free creative action (the chandelier swing). Beat tiles are the commit verbs
+ * for the typed action: plain Enter is locked during an active confrontation
+ * (InputBar `confrontationActive`), so a tile click commits the turn and carries
+ * the InputBar draft with it. The ▾ chevron on each tile reserves the slot for
+ * the upcoming expand-for-details feature.
  */
 export function ConfrontationOverlay({
   data,
@@ -915,6 +920,9 @@ export function ConfrontationOverlay({
   // Dropping `?.` here crashes that real production path.
   const committedBeat = data.beats?.find((b) => b.id === committedBeatId) ?? null;
 
+  // Story 85-3: the root keeps the legacy bottom-strip tokens (`border-t`, tight
+  // `pt-2 pb-1`) — they read acceptably inside the dockview panel; a full
+  // panel-layout pass (fill height, scroll) is deferred follow-up.
   return (
     <div
       data-testid="confrontation-overlay"

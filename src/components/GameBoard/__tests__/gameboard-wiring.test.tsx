@@ -71,7 +71,10 @@ describe("GameBoard wiring", () => {
     const requiredIds = [
       "narrative", "character", "inventory", "map", "ship",
       // "journal" removed playtest 2026-04-11 — empty Handouts tab.
-      // "confrontation" removed 2026-05-13 — panel renders above InputBar.
+      // "confrontation" was a bottom strip 2026-05-13; Story 85-3 (2026-06-04)
+      // promoted it back to a data-gated dockview widget — guard it here so it
+      // can't silently vanish from the registry again.
+      "confrontation",
       "knowledge", "gallery", "audio",
     ];
     for (const id of requiredIds) {
