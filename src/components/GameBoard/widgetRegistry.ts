@@ -22,6 +22,7 @@ export type WidgetId =
   | "ship"
   | "knowledge"
   | "relationships"
+  | "quests"
   | "gallery"
   | "audio";
 
@@ -126,6 +127,23 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     id: "relationships",
     label: "Relationships",
     hotkey: "r",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
+    closable: true,
+    dataGated: false,
+  },
+  // Story 77-5 / ADR-137: player-facing quest spine (quest_log + quest_anchors
+  // + active_stakes). Always present from session start — renders an empty
+  // state ("No objective yet") until a QUESTS snapshot arrives. dataGated:false
+  // mirrors the 2026-06-04 relationships override (stable tab over a pop-in);
+  // the spine is creation-seeded so it is non-empty almost immediately. Hotkey
+  // 'q' — free (verified against buildHotkeyMap).
+  quests: {
+    id: "quests",
+    label: "Quests",
+    hotkey: "q",
     minW: 3,
     minH: 3,
     defaultW: 4,

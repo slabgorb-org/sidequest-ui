@@ -10,6 +10,7 @@ import type {
   LocationDescriptionPayload,
   NarrationDelta,
   NarrationMessage,
+  QuestsPayload,
   RelationshipEntryPayload,
 } from '@/types/payloads';
 
@@ -80,6 +81,14 @@ export interface ClientGameState {
   currentLocation?: LocationDescriptionPayload | null;
   /** ADR-136: player-facing NPC relationship roster (full replace per message). */
   relationships?: RelationshipEntryPayload[] | null;
+  /**
+   * Story 77-5 / ADR-137: player-facing quest spine (quest_log + quest_anchors
+   * + active_stakes), mirrored from the QUESTS snapshot (full replace per
+   * message). Null until the first projection arrives. A SEPARATE field from
+   * the legacy `quests` Record above (never read) — the rich payload is the
+   * source of truth.
+   */
+  questsData?: QuestsPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -110,6 +119,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   knowledge: [],
   currentLocation: null,
   relationships: null,
+  questsData: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart } from "lucide-react";
+import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart, Scroll } from "lucide-react";
 import type { WidgetId } from "./widgetRegistry";
 
 interface MobileTab {
@@ -16,6 +16,11 @@ const TABS: MobileTab[] = [
   // NPCs). Kept in sync with the desktop dockview rightGroupOrder (after
   // character) so the Relationships tab has mobile/desktop layout parity.
   { id: "relationships", label: "Relationships", icon: <Heart size={18} /> },
+  // Story 77-5 / ADR-137: player-facing quest spine. Always present from
+  // session start (dataGated:false). Kept in sync with the desktop dockview
+  // rightGroupOrder (after relationships) so the Quests tab has mobile/desktop
+  // layout parity.
+  { id: "quests", label: "Quests", icon: <Scroll size={18} /> },
   { id: "map", label: "Map", icon: <Map size={18} /> },
   // Capability-gated like every non-narrative tab: only renders when
   // `location` is in availableWidgets (region / room_graph worlds). Kept in
