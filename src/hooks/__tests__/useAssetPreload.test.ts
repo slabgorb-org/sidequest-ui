@@ -134,3 +134,87 @@ describe("useAssetPreload (AC5)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+// Story 65-4 AC4 — hook hardening carried over from the 65-2 review:
+// `encodeURIComponent(slug)` on the fetch path, and an `onError` callback so
+// the mount site can surface a failed preload instead of the hook swallowing
+// it with a bare console.error + return.
+describe("useAssetPreload — 65-4 hardening (encode + onError)", () => {
+  it("percent-encodes the slug in the fetch URL", async () => {
+    // A session slug can carry characters that are not URL-path-safe. The hook
+    // must encode them, or the request lands on the wrong route (or 404s).
+    const onAssets = vi.fn();
+    const { rerender } = renderHook(
+      ({ connected }: { connected: boolean }) =>
+        useAssetPreload({
+          slug: "2026-04-25/flickering reach",
+          connected,
+          onAssets,
+        }),
+      { initialProps: { connected: false } },
+    );
+
+    await act(async () => {
+      rerender({ connected: true });
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/sessions/2026-04-25%2Fflickering%20reach/assets",
+    );
+  });
+
+  it("invokes onError (and NOT onAssets) on a non-ok response", async () => {
+    // A failed preload must reach the mount site, not vanish. The current hook
+    // logs + returns; AC4 requires an onError hand-off.
+    const onAssets = vi.fn();
+    const onError = vi.fn();
+    fetchMock.mockImplementationOnce(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => [],
+    }));
+
+    const { rerender } = renderHook(
+      ({ connected }: { connected: boolean }) =>
+        // onError is the AC4 addition to UseAssetPreloadArgs — absent on the
+        // current type, so this is a RED contract assertion until Dev adds it.
+        useAssetPreload({ slug: "s", connected, onAssets, onError }),
+      { initialProps: { connected: false } },
+    );
+
+    await act(async () => {
+      rerender({ connected: true });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onAssets).not.toHaveBeenCalled();
+  });
+
+  it("invokes onError when the fetch itself rejects", async () => {
+    const onAssets = vi.fn();
+    const onError = vi.fn();
+    fetchMock.mockImplementationOnce(async () => {
+      throw new Error("network down");
+    });
+
+    const { rerender } = renderHook(
+      ({ connected }: { connected: boolean }) =>
+        useAssetPreload({ slug: "s", connected, onAssets, onError }),
+      { initialProps: { connected: false } },
+    );
+
+    await act(async () => {
+      rerender({ connected: true });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onAssets).not.toHaveBeenCalled();
+  });
+});
