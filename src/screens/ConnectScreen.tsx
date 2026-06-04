@@ -49,7 +49,8 @@ function loadSavedState(): SavedConnectState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw) as SavedConnectState;
-  } catch {
+  } catch (err) {
+    console.warn("[lobby] failed to read saved connect state", err);
     return {};
   }
 }
@@ -60,8 +61,8 @@ function saveState(playerName: string, genre: string, world: string) {
       STORAGE_KEY,
       JSON.stringify({ playerName, genre, world }),
     );
-  } catch {
-    // localStorage full or unavailable — non-critical
+  } catch (err) {
+    console.warn("[lobby] failed to persist connect state", err);
   }
 }
 
@@ -112,8 +113,11 @@ export function ConnectScreen({
       .then((data) => {
         if (!cancelled) setScenes(data);
       })
-      .catch(() => {
-        /* Scene library fetch failure is non-fatal — section stays empty. */
+      .catch((err) => {
+        console.warn(
+          "[lobby] /dev/scenes fetch failed — scene library stays empty",
+          err,
+        );
       });
     return () => { cancelled = true; };
   }, []);
@@ -183,11 +187,19 @@ export function ConnectScreen({
   const selectedComposite =
     genreSlug && worldSlug ? `${genreSlug}/${worldSlug}` : null;
 
-  // Effective open genre: the explicit pin, else the selected world's genre,
-  // else the first genre. Derived (not stored) so it self-corrects when the
-  // catalogue arrives asynchronously.
+  // A saved genre whose pack has since been removed from the catalogue must
+  // not drive selection/accent/archetype: it crashes getArchetypeForGenre and
+  // wedges the accordion open on a genre that no longer exists. Sanitise once
+  // and use the validated slug for every derived/presentation lookup (story
+  // 83-2 AC3d). The raw genreSlug state is kept for the start/save paths, which
+  // only fire on a user selection of a live world.
+  const validGenreSlug = genreSlug && genres[genreSlug] ? genreSlug : null;
+
+  // Effective open genre: the explicit pin, else the selected (live) world's
+  // genre, else the first genre. Derived (not stored) so it self-corrects when
+  // the catalogue arrives asynchronously or a saved pack was removed.
   const effectiveOpenGenre =
-    openGenre === undefined ? (genreSlug ?? firstGenreSlug) : openGenre;
+    openGenre === undefined ? (validGenreSlug ?? firstGenreSlug) : openGenre;
 
   const handleToggleGenre = (slug: string) => {
     // Reuse the already-derived effective-open value rather than recomputing
@@ -204,7 +216,7 @@ export function ConnectScreen({
   }, []);
 
   const currentPack: GenreMeta | null =
-    genreSlug && genres[genreSlug] ? genres[genreSlug] : null;
+    validGenreSlug ? genres[validGenreSlug] : null;
 
   // Sessions matching the currently-selected world, for the panel below.
   const sessionsForWorld = useMemo(() => {
@@ -395,13 +407,20 @@ export function ConnectScreen({
     [genres],
   );
 
-  const showGenreError = genreError || Object.keys(genres).length === 0;
+  const genresEmpty = Object.keys(genres).length === 0;
+  // Only a genuine fetch failure shows the error. App sets `genreError` on a
+  // failed request AND on a successful-but-empty response, so an empty
+  // catalogue with `genreError === false` is the in-flight cold-mount state —
+  // show a neutral loading state, not "the server is down" (story 83-2 AC4).
+  const showGenreError = genreError;
+  const showWorldsLoading = !genreError && genresEmpty;
 
   return (
     <div
       className="lobby-folio flex flex-col items-center min-h-screen px-6 py-10"
-      data-genre={genreSlug ?? undefined}
-      style={{ "--accent": getGenreArt(genreSlug).accent } as CSSProperties}
+      data-testid="lobby-accent-root"
+      data-genre={validGenreSlug ?? undefined}
+      style={{ "--accent": getGenreArt(validGenreSlug).accent } as CSSProperties}
     >
       <div className="w-full max-w-5xl">
         {/* ── Masthead — the opening ritual ── */}
@@ -461,17 +480,27 @@ export function ConnectScreen({
               </button>
             )}
           </div>
+        ) : showWorldsLoading ? (
+          <div
+            data-testid="lobby-worlds-loading"
+            role="status"
+            className="text-center w-full max-w-sm mx-auto"
+          >
+            <p className="text-sm italic text-muted-foreground/60 animate-pulse motion-reduce:animate-none">
+              Gathering the worlds…
+            </p>
+          </div>
         ) : (
           <>
             {/* ── Folio card — two-pane: genre accordion index + preview ── */}
             <div
               data-testid="lobby-folio"
-              className="grid md:grid-cols-[296px_1fr] border border-[var(--accent)]/25
+              className="grid grid-cols-[296px_1fr] max-[880px]:grid-cols-1 border border-[var(--accent)]/25
                          bg-[linear-gradient(180deg,rgba(34,26,16,0.5),rgba(26,20,13,0.5))]
                          shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
             >
               {/* World index */}
-              <div className="md:border-r border-b md:border-b-0 border-[var(--accent)]/20 py-4 flex flex-col min-w-0">
+              <div className="min-[881px]:border-r border-b min-[881px]:border-b-0 border-[var(--accent)]/20 py-4 flex flex-col min-w-0">
                 <div className="flex items-baseline justify-between px-5 pb-2 text-[11px] uppercase tracking-[0.22em] text-muted-foreground/60">
                   <span className="text-foreground/90 font-semibold">Worlds</span>
                   <span
@@ -497,25 +526,25 @@ export function ConnectScreen({
                 <WorldPreview
                   pack={currentPack}
                   world={currentWorld}
-                  archetype={genreSlug ? getArchetypeForGenre(genreSlug) : null}
-                  genreSlug={genreSlug}
+                  archetype={validGenreSlug ? getArchetypeForGenre(validGenreSlug) : null}
+                  genreSlug={validGenreSlug}
                   loreHref={
-                    genreSlug && worldSlug
-                      ? `/reference/lore/${genreSlug}/${worldSlug}`
+                    validGenreSlug && worldSlug
+                      ? `/reference/lore/${validGenreSlug}/${worldSlug}`
                       : null
                   }
                 />
 
                 {/* Commit row — mode + reference links + start. Always present
                     so Start is reachable (disabled) before a world is chosen. */}
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-t border-[var(--accent)]/20">
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-t border-[var(--accent)]/20 max-[560px]:flex-col max-[560px]:items-stretch">
                   <div className="min-w-[12rem]">
                     <ModePicker value={mode} onChange={setMode} />
                   </div>
-                  <div className="flex items-center gap-5">
-                    {genreSlug && (
+                  <div className="flex items-center gap-5 max-[560px]:w-full max-[560px]:flex-col max-[560px]:items-stretch">
+                    {validGenreSlug && (
                       <a
-                        href={`/reference/rules/${genreSlug}`}
+                        href={`/reference/rules/${validGenreSlug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm underline underline-offset-4 text-muted-foreground/70 hover:text-foreground"
@@ -529,7 +558,7 @@ export function ConnectScreen({
                       onClick={handleStart}
                       disabled={!canStart || isConnecting || isStarting}
                       title={!canStart ? "Choose a world to begin" : undefined}
-                      className="font-semibold uppercase tracking-[0.22em] whitespace-nowrap
+                      className="font-semibold uppercase tracking-[0.22em] whitespace-nowrap max-[560px]:w-full
                                  text-[var(--primary-foreground)] bg-[var(--accent)]
                                  hover:shadow-[0_0_28px_color-mix(in_srgb,var(--accent)_45%,transparent)]
                                  disabled:bg-muted/40 disabled:text-muted-foreground/40
@@ -552,7 +581,7 @@ export function ConnectScreen({
             </div>
 
             {/* ── Below the fold ── */}
-            <div className="mt-8 grid md:grid-cols-2 gap-x-10 gap-y-8">
+            <div className="mt-8 grid min-[881px]:grid-cols-2 gap-x-10 gap-y-8">
               {/* Live presence panel — who else is in the selected world. */}
               <CurrentSessions sessions={sessionsForWorld} />
 
@@ -614,7 +643,7 @@ export function ConnectScreen({
         {isConnecting && (
           <p
             role="status"
-            className="mt-6 text-center text-sm italic text-muted-foreground/50 animate-pulse"
+            className="mt-6 text-center text-sm italic text-muted-foreground/50 animate-pulse motion-reduce:animate-none"
           >
             The pages are turning…
           </p>

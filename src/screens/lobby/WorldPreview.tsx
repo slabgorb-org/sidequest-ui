@@ -100,7 +100,7 @@ export function WorldPreview({
         data-image-status={imageStatus}
         style={hasImage ? undefined : { backgroundImage: genreArt.art }}
         className={`relative w-full aspect-[4/3] overflow-hidden rounded border border-muted-foreground/20 bg-muted/10 ${
-          imageStatus === "loading" ? "animate-pulse" : ""
+          imageStatus === "loading" ? "animate-pulse motion-reduce:animate-none" : ""
         }`}
       >
         {hasImage && imageStatus !== "failed" && (
@@ -130,7 +130,7 @@ export function WorldPreview({
               <span
                 data-testid="world-hero-spinner"
                 className="block w-10 h-10 rounded-full border-[3px] border-muted-foreground/20
-                           border-t-[var(--primary)] animate-spin"
+                           border-t-[var(--primary)] animate-spin motion-reduce:animate-none"
                 aria-hidden="true"
               />
             )}

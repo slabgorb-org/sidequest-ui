@@ -7,15 +7,14 @@
  * can't express cleanly. Scoped under `.lobby-folio` so nothing here leaks to
  * the rest of the app.
  *
- * NOTE: the design's display face is Pirata One (a Google webfont). The app
- * deliberately self-hosts its chrome fonts and dropped the Google Fonts links
- * (see index.css, 2026-06-03), and the handoff bundle does not ship a Pirata
- * One .ttf — so the wordmark falls back to the house heading serif until the
- * face is self-hosted. Tracked as a Delivery Finding.
+ * The design's display face is Pirata One. It is self-hosted from R2 via the
+ * @font-face in styles/fonts.css (no Google Fonts dependency, 2026-06-03), so
+ * the wordmark binds to it directly and falls back to the house heading serif
+ * only if the face fails to load (story 83-2 AC3a).
  */
 
 .lobby-folio .lobby-wordmark {
-  font-family: var(--font-heading, "Baskerville", Georgia, serif);
+  font-family: "Pirata One", var(--font-heading, "Baskerville", Georgia, serif);
   text-shadow: 0 0 30px color-mix(in srgb, var(--accent, #d4a945) 14%, transparent);
 }
 
