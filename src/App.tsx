@@ -8,6 +8,7 @@ import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
+import { useAssetPreload, type SessionAsset } from "@/hooks/useAssetPreload";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
 import {
   useChromeArchetype,
@@ -274,6 +275,10 @@ function AppInner() {
   })();
   const [messages, setMessages] = useState<GameMessage[]>(hmrState?.messages ?? []);
   const [connected, setConnected] = useState(false);
+  // Story 65-4: prior-turn art preloaded from the asset ledger on reconnect,
+  // fed into ImageBus as a separate pure input (survives the reconnect message
+  // purge; no pollution of the message stream). Populated by useAssetPreload.
+  const [preloadedAssets, setPreloadedAssets] = useState<SessionAsset[]>([]);
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>(initialPhase);
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
@@ -574,6 +579,38 @@ function AppInner() {
 
   // Game state for mapping to UI components
   const { state: gameState } = useGameState();
+
+  // Story 65-4: on (re)connect to a saved session, preload prior-turn art from
+  // the asset ledger so the gallery rehydrates from R2 without re-rendering.
+  // The hook lives here at the WebSocket-owning level; ImageBus stays a pure
+  // reducer. Callbacks are stable (useCallback) so the hook's rising-edge
+  // effect doesn't refire on unrelated re-renders.
+  const handlePreloadAssets = useCallback((rows: SessionAsset[]) => {
+    const valid: SessionAsset[] = [];
+    for (const row of rows) {
+      if (!row.url) {
+        // No-Silent-Fallbacks: a ledger row without a resolved CDN url is a
+        // server-contract violation — surface it loudly, don't gallery a
+        // blank card.
+        console.error(
+          "useAssetPreload: ledger row has no resolved url — dropping",
+          row,
+        );
+        continue;
+      }
+      valid.push(row);
+    }
+    setPreloadedAssets(valid);
+  }, []);
+  const handlePreloadError = useCallback((err: unknown) => {
+    console.error("useAssetPreload: asset preload failed", err);
+  }, []);
+  useAssetPreload({
+    slug: slug ?? null,
+    connected,
+    onAssets: handlePreloadAssets,
+    onError: handlePreloadError,
+  });
 
   const handleMessage = useCallback((msg: GameMessage) => {
     // MP-03 seq-dedupe + cache. Narrator-host tags durable events with
@@ -2206,7 +2243,7 @@ function AppInner() {
         )}
         {sessionPhase === "game" && (
           <ErrorBoundary name="Game" onCrashReport={handleGameCrash}>
-            <ImageBusProvider messages={gameMessages}>
+            <ImageBusProvider messages={gameMessages} preloadedAssets={preloadedAssets}>
               <GameBoard
                 // `key` forces React to unmount + remount GameBoard (and with
                 // it the Dockview instance) on genre switch, so the canonical
