@@ -19,6 +19,12 @@ export interface UseAssetPreloadArgs {
   connected: boolean;
   /** Receives the prior-turn assets to feed into the image pipeline. */
   onAssets: (assets: SessionAsset[]) => void;
+  /**
+   * Invoked when the preload fetch fails — a non-ok response or a thrown/
+   * rejected request. Lets the mount site surface the failure instead of the
+   * hook swallowing it. `onAssets` is NOT called on failure (Story 65-4 AC4).
+   */
+  onError?: (error: unknown) => void;
 }
 
 /**
@@ -31,7 +37,12 @@ export interface UseAssetPreloadArgs {
  * (context-story-65-2.md, AC5). Fires once per (re)connect edge, never on
  * unrelated re-renders.
  */
-export function useAssetPreload({ slug, connected, onAssets }: UseAssetPreloadArgs): void {
+export function useAssetPreload({
+  slug,
+  connected,
+  onAssets,
+  onError,
+}: UseAssetPreloadArgs): void {
   const wasConnected = useRef(false);
 
   useEffect(() => {
@@ -44,22 +55,32 @@ export function useAssetPreload({ slug, connected, onAssets }: UseAssetPreloadAr
 
     let cancelled = false;
     void (async () => {
-      const resp = await fetch(`/api/sessions/${slug}/assets`);
-      if (!resp.ok) {
-        // Loud, not silent — a failed preload must surface, not be swallowed.
-        console.error(
-          `useAssetPreload: GET /api/sessions/${slug}/assets failed (${resp.status})`,
-        );
-        return;
-      }
-      const rows = (await resp.json()) as SessionAsset[];
-      if (!cancelled) {
-        onAssets(rows);
+      try {
+        // encodeURIComponent: a session slug can carry characters that are not
+        // URL-path-safe; without encoding the request lands on the wrong route.
+        const resp = await fetch(`/api/sessions/${encodeURIComponent(slug)}/assets`);
+        if (!resp.ok) {
+          // Loud, not silent — a failed preload must surface, not be swallowed.
+          console.error(
+            `useAssetPreload: GET /api/sessions/${slug}/assets failed (${resp.status})`,
+          );
+          if (!cancelled) onError?.(new Error(`asset preload failed: ${resp.status}`));
+          return;
+        }
+        const rows = (await resp.json()) as SessionAsset[];
+        if (!cancelled) {
+          onAssets(rows);
+        }
+      } catch (err) {
+        // A thrown/rejected fetch (network down, abort) is loud too, and the
+        // mount site is notified via onError so it can react.
+        console.error("useAssetPreload: asset preload request threw", err);
+        if (!cancelled) onError?.(err);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [slug, connected, onAssets]);
+  }, [slug, connected, onAssets, onError]);
 }

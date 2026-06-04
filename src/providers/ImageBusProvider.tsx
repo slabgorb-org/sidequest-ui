@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import type { ScrapbookEntryNpcRef } from "@/types/payloads";
+import type { SessionAsset } from "@/hooks/useAssetPreload";
 
 export type NpcRole = "hostile" | "friendly" | "neutral";
 
@@ -79,6 +80,15 @@ const ImageBusContext = createContext<ImageBusContextValue>({ images: [] });
 
 interface ImageBusProviderProps {
   messages: GameMessage[];
+  /**
+   * Story 65-4: prior-turn assets preloaded from the session asset ledger on
+   * reconnect (GET /api/sessions/{slug}/assets). A SECOND pure reducer input —
+   * deliberately NOT folded into the message stream so it survives the
+   * reconnect message purge and never pollutes other `messages` consumers
+   * (useStateMirror, useGenreTheme, useAudioCue, the MP-03 cache). The reducer
+   * stays pure: output is a function of (messages, preloadedAssets).
+   */
+  preloadedAssets?: SessionAsset[];
   children: ReactNode;
 }
 
@@ -207,7 +217,11 @@ function projectNpcRefsToLegacy(refs: ScrapbookEntryNpcRef[]): ScrapbookNpc[] {
   return out;
 }
 
-export function ImageBusProvider({ messages, children }: ImageBusProviderProps) {
+export function ImageBusProvider({
+  messages,
+  preloadedAssets = [],
+  children,
+}: ImageBusProviderProps) {
   const images = useMemo(() => {
     // Pass 1: collect scrapbook entries keyed by turn_id. The entry carries
     // the metadata the widget cares about; the later image merge overlays
@@ -317,12 +331,50 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
       });
     }
 
+    // Pass 3 (Story 65-4): project preloaded prior-turn assets from the asset
+    // ledger. Cross-source dedupe is by URL — a live IMAGE for the same asset
+    // wins (it is the current-session render), so seed the seen-set from the
+    // live result first. Backfill predates the live session stream, so it gets
+    // a negative timestamp (older than any message-indexed entry, which is
+    // >= 0) while preserving created_turn order among preloaded assets.
+    const seenUrls = new Set<string>();
+    for (const img of result) {
+      if (img.url) seenUrls.add(img.url);
+    }
+    for (const asset of preloadedAssets) {
+      const url = asset.url;
+      // Defensive: a url-less row is loud-failed at the App mapping boundary
+      // before it reaches here; skip silently if one slips through.
+      if (!url || seenUrls.has(url)) continue;
+      seenUrls.add(url);
+      result.push({
+        url,
+        alt: asset.entity_ref || undefined,
+        caption: undefined,
+        render_id: undefined,
+        tier: asset.asset_type || undefined,
+        width: undefined,
+        height: undefined,
+        timestamp: asset.created_turn - 1_000_000,
+        isHandout: false,
+        turn_number: asset.created_turn,
+        scene_name: undefined,
+        scene_type: undefined,
+        narrative_beat: undefined,
+        chapter: undefined,
+        location: undefined,
+        world_facts: undefined,
+        npcs: undefined,
+        render_status: undefined,
+      });
+    }
+
     // Sort by timestamp so scrapbook-only entries interleave with image
     // cards in turn order. The final reverse() preserves the "newest first"
     // gallery ordering that existed before 33-18.
     result.sort((a, b) => a.timestamp - b.timestamp);
     return result.reverse();
-  }, [messages]);
+  }, [messages, preloadedAssets]);
 
   return (
     <ImageBusContext.Provider value={{ images }}>
