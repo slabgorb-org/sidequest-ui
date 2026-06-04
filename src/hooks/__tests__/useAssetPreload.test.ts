@@ -218,3 +218,84 @@ describe("useAssetPreload — 65-4 hardening (encode + onError)", () => {
     expect(onAssets).not.toHaveBeenCalled();
   });
 });
+
+// Story 65-16 AC2a — re-preload on a slug change WHILE CONNECTED.
+//
+// 65-4 only fired on the rising edge of `connected`. A modal can navigate
+// between sessions without dropping the socket, so the slug changes while
+// `connected` stays true — no `connected` flip, so the rising-edge guard never
+// re-arms and the new session's assets are silently never fetched (the prior
+// session's backfill leaks until the first live image of the new session).
+// These are RED against the current hook (which keys solely on the connected
+// edge) and GREEN once the effect also re-preloads on a distinct slug.
+describe("useAssetPreload — 65-16 slug-change re-preload (AC2a)", () => {
+  it("re-preloads for the NEW slug when the slug changes while staying connected", async () => {
+    const onAssets = vi.fn();
+    const { rerender } = renderHook(
+      ({ slug }: { slug: string }) =>
+        useAssetPreload({ slug, connected: true, onAssets }),
+      { initialProps: { slug: "game1" } },
+    );
+
+    // First mount with connected=true is itself a rising edge → fires for game1.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/sessions/game1/assets");
+
+    // Slug flips to game2 while the socket stays connected. RED today: no
+    // `connected` rising edge, so the hook never re-fetches.
+    await act(async () => {
+      rerender({ slug: "game2" });
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The second fetch must target the NEW slug, not re-fetch the stale one.
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/sessions/game2/assets");
+  });
+
+  it("does NOT re-preload on a slug change while DISCONNECTED (over-fire guard)", async () => {
+    // The AC2a fix must not become an always-fire effect: with no live socket
+    // there is nothing to back-fill, so a slug change while disconnected must
+    // stay silent. Passes today and must keep passing after the fix.
+    const onAssets = vi.fn();
+    const { rerender } = renderHook(
+      ({ slug }: { slug: string }) =>
+        useAssetPreload({ slug, connected: false, onAssets }),
+      { initialProps: { slug: "game1" } },
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      rerender({ slug: "game2" });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onAssets).not.toHaveBeenCalled();
+  });
+
+  it("does NOT re-preload when the slug is unchanged across a connected re-render", async () => {
+    // Guards the other direction: a re-render that does NOT change the slug
+    // (unrelated parent state) must not trigger a duplicate fetch even after
+    // the slug-aware fix lands.
+    const onAssets = vi.fn();
+    const { rerender } = renderHook(
+      ({ slug }: { slug: string }) =>
+        useAssetPreload({ slug, connected: true, onAssets }),
+      { initialProps: { slug: "game1" } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender({ slug: "game1" }); // same slug, still connected
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
