@@ -50,6 +50,7 @@ import type {
   DiceThrowParams,
   LocationDescriptionPayload,
   RelationshipEntryPayload,
+  QuestsPayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -72,6 +73,7 @@ import { InventoryWidget } from "./widgets/InventoryWidget";
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
+import { QuestsWidget } from "./widgets/QuestsWidget";
 // ConfrontationWidget removed 2026-05-13 — confrontation now renders as a
 // dedicated panel between the dockview workspace and the InputBar (D2 mock).
 import { AudioWidget } from "./widgets/AudioWidget";
@@ -174,6 +176,13 @@ export interface GameBoardProps {
    * tab clutter), mirroring the knowledge data-gate.
    */
   relationshipsData?: RelationshipEntryPayload[] | null;
+  /**
+   * Story 77-5 / ADR-137: player-facing quest spine, mirrored from
+   * state.questsData. Null until a QUESTS snapshot arrives; the Quests tab is
+   * always present (dataGated:false) and renders an empty state until then,
+   * mirroring the relationships tab.
+   */
+  questsData?: QuestsPayload | null;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -256,6 +265,7 @@ export function GameBoard({
   nowPlaying = null,
   knowledgeEntries,
   relationshipsData = null,
+  questsData = null,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -318,6 +328,7 @@ export function GameBoard({
     available.add("narrative");
     available.add("character");
     available.add("relationships");
+    available.add("quests");
     available.add("inventory");
     available.add("map");
     available.add("knowledge");
@@ -487,6 +498,10 @@ export function GameBoard({
         // Always render — RelationshipsPanel shows an empty state when data is
         // null/empty. Tab is always present from session start (playtest 2026-06-04).
         return <RelationshipsWidget data={relationshipsData ?? null} />;
+      case "quests":
+        // Always render — QuestsPanel shows an empty state when the spine is
+        // null/empty. Tab is always present from session start (Story 77-5).
+        return <QuestsWidget data={questsData ?? null} />;
       case "location":
         return <LocationWidget data={currentLocation ?? null} />;
       case "audio":
@@ -505,7 +520,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      currentLocation, knowledgeEntries, relationshipsData, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, relationshipsData, questsData, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
@@ -652,6 +667,7 @@ export function GameBoard({
     const rightGroupOrder: WidgetId[] = [
       "character",
       "relationships",
+      "quests",
       "inventory",
       "map",
       "location",

@@ -85,6 +85,12 @@ export const MessageType = {
   // disposition band/trend, beats, personality read, claims). Server emits
   // on demand for the relationship panel.
   RELATIONSHIPS: "RELATIONSHIPS",
+  // Story 77-5 / ADR-137: snapshot channel for the player-facing quest spine
+  // (quest_log + quest_anchors + active_stakes). The RELATIONSHIPS analog —
+  // emitted reactively when the spine changes (a quest minted/updated, an
+  // anchor added, stakes set), full-replace per message. UI consumer in 77-5
+  // (QuestsPanel + state-mirror).
+  QUESTS: "QUESTS",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

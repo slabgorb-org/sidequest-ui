@@ -7,6 +7,7 @@ import type {
   LocationDescriptionPayload,
   LocationOverlayChangedPayload,
   NarrationMessage,
+  QuestsPayload,
   RelationshipsPayload,
 } from '../types/payloads';
 import { reduceStreamingNarration, initialStreamingState } from '../providers/streamingNarration';
@@ -84,6 +85,10 @@ export function useStateMirror(messages: GameMessage[]): void {
     // snapshot — every message is a full replace (same idempotent-replay
     // contract as currentLocation). Null until the first roster arrives.
     let relationships: RelationshipsPayload['entries'] | null = null;
+    // Story 77-5 / ADR-137: player-facing quest spine. QUESTS is a snapshot —
+    // every message is a full replace (same idempotent-replay contract as
+    // relationships). Null until the first projection arrives.
+    let questsData: QuestsPayload | null = null;
 
     for (const msg of messages) {
       // narration.delta arrives with `kind` (not `type`) and is NOT a GameMessage
@@ -231,6 +236,14 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // Story 77-5 / ADR-137: full replace of the quest spine. QUESTS is a
+      // snapshot — the latest message wins, mirroring RELATIONSHIPS. The rich
+      // payload threads onto questsData; the legacy quests Record is untouched.
+      if (msg.type === MessageType.QUESTS) {
+        questsData = msg.payload as unknown as QuestsPayload;
+        continue;
+      }
+
       // Story 54-9: per-encounter overlay delta. When a baseline exists
       // for the same region_id, replace its overlays slice. When the
       // baseline is for a DIFFERENT region the delta is stale (room change
@@ -358,6 +371,11 @@ export function useStateMirror(messages: GameMessage[]): void {
     // otherwise. Same always-replace shape as currentLocation above so the
     // panel's data-gated surface stays hidden until the server sends a roster.
     current = { ...current, relationships };
+
+    // Story 77-5 / ADR-137: quest-spine slice. Always mirrored — null when no
+    // QUESTS message has arrived, the latest snapshot otherwise. Same
+    // always-replace shape as relationships above.
+    current = { ...current, questsData };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

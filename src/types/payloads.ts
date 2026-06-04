@@ -825,6 +825,31 @@ export interface RelationshipsPayload {
   entries: RelationshipEntryPayload[];
 }
 
+// Story 77-5 / ADR-137: player-facing quest spine snapshot. Field names mirror
+// the server pydantic models (QuestLogEntry / QuestAnchorEntry / QuestsPayload
+// in sidequest-server/sidequest/protocol/models.py) on the snake_case wire.
+// The rich shape (log + anchors + stakes) is the source of truth — distinct
+// from the legacy StateDelta.quests Record<string,string>, which is never read.
+export interface QuestLogEntry {
+  quest_id: string;
+  title: string;
+  objective: string;
+  status: string;
+  anchor_id: string | null;
+}
+
+export interface QuestAnchorEntry {
+  anchor_id: string;
+  quest_id: string | null;
+  resolution: string | null;
+}
+
+export interface QuestsPayload {
+  quest_log: QuestLogEntry[];
+  quest_anchors: QuestAnchorEntry[];
+  active_stakes: string;
+}
+
 // Story 54-7 / ADR-109: delta-channel payload for encounter location
 // overlay state changes. The overlays array carries the FULL
 // post-transition overlay set — UI replaces its overlay slice rather
