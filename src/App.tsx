@@ -602,14 +602,14 @@ function AppInner() {
     }
     setPreloadedAssets(valid);
   }, []);
-  const handlePreloadError = useCallback((err: unknown) => {
-    console.error("useAssetPreload: asset preload failed", err);
-  }, []);
+  // No onError consumer here: useAssetPreload already logs preload failures
+  // loudly (unconditionally, independent of any onError callback), so a second
+  // App-level log would just duplicate it. The hook's onError remains available
+  // as an extension point if a future story surfaces preload errors in the UI.
   useAssetPreload({
     slug: slug ?? null,
     connected,
     onAssets: handlePreloadAssets,
-    onError: handlePreloadError,
   });
 
   const handleMessage = useCallback((msg: GameMessage) => {
