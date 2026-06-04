@@ -87,6 +87,19 @@ describe('InventoryPanel', () => {
     expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
   });
 
+  it('shows "Equipped" badge (not "Equip") on equipped items', () => {
+    // BUG-LOW: the badge was labeled "Equip" which reads as a CTA implying the
+    // item is NOT equipped. The correct status label is "Equipped".
+    render(<InventoryPanel data={BASE_INVENTORY} />);
+    // Equipped item: badge must say "Equipped"
+    expect(screen.getByText('Equipped')).toBeInTheDocument();
+    // Must NOT say "Equip" (the old mislabeled string)
+    expect(screen.queryByText('Equip')).not.toBeInTheDocument();
+    // Non-equipped item: no badge at all
+    const shield = screen.getByText('Iron Shield').closest('li');
+    expect(shield?.textContent).not.toMatch(/Equipped/);
+  });
+
   it('handles items without quantity field', () => {
     const data = {
       items: [{ name: 'Sword', type: 'weapon', equipped: true, description: 'Sharp.' }],
