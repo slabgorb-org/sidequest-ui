@@ -194,10 +194,66 @@ describe('MapOverlay — Cartography Wiring (Story 26-10)', () => {
       expect(screen.queryByTestId('map-region-graph')).not.toBeInTheDocument();
     });
 
-    // Regression (ui #330): region-mode explored entries that arrive WITHOUT
-    // a `connections` field must not crash the whole GameBoard. The server
-    // now populates connections from `adjacent` (server #632), but a missing
-    // field on one sub-widget must always fail soft, never take the board down.
+    // Regression (DRIVER 2026-06-04, Groucho wonderland-2): the REAL region-mode
+    // MAP_UPDATE payload ships explored entries as {id, name, connections} with
+    // NO x/y coordinates (server #632/#637). The old `hasCoordinates` test
+    // (`loc.x !== 0 || loc.y !== 0`) read `undefined !== 0` as TRUE, so it
+    // rendered the COORDINATE fog SVG where `<text y={loc.y + 1.2}>` resolved to
+    // `undefined + 1.2` = NaN — 3× `<text> attribute y: Expected length, "NaN"`
+    // console errors on every render. The node-graph IS the map for region mode;
+    // the coordinate fog / list block must not render alongside it.
+    const MAP_REGION_MODE_NO_COORDS = {
+      current_location: 'the_hall_of_doors',
+      region: 'wonderland',
+      explored: [
+        { id: 'the_hall_of_doors', name: 'The Hall of Doors', connections: ['the_pool_of_tears'] },
+        { id: 'the_pool_of_tears', name: 'The Pool of Tears', connections: ['the_hall_of_doors'] },
+      ],
+      fog_bounds: { width: 10, height: 10 },
+      cartography: {
+        navigation_mode: 'region',
+        starting_region: 'the_hall_of_doors',
+        regions: {
+          the_hall_of_doors: { name: 'The Hall of Doors', adjacent: ['the_pool_of_tears'] },
+          the_pool_of_tears: { name: 'The Pool of Tears', adjacent: ['the_hall_of_doors'] },
+        },
+        routes: [],
+      },
+    } as unknown as MapState;
+
+    it('produces no NaN coordinate attributes for region-mode explored entries lacking x/y', () => {
+      const { container } = render(
+        <MapOverlay mapData={MAP_REGION_MODE_NO_COORDS} onClose={() => {}} />
+      );
+      const nanAttrs = container.querySelectorAll(
+        '[x="NaN"], [y="NaN"], [cx="NaN"], [cy="NaN"], [x1="NaN"], [y1="NaN"], [x2="NaN"], [y2="NaN"]'
+      );
+      expect(nanAttrs).toHaveLength(0);
+    });
+
+    it('does not render the coordinate fog map or list when the region node-graph is shown', () => {
+      render(<MapOverlay mapData={MAP_REGION_MODE_NO_COORDS} onClose={() => {}} />);
+      expect(screen.getByTestId('map-region-graph')).toBeInTheDocument();
+      // The node-graph is the sole map view for region mode — no coordinate fog,
+      // no redundant list (regions are already in the regions-panel).
+      expect(screen.queryByTestId('map-fog')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('map-list')).not.toBeInTheDocument();
+    });
+
+    it('gives region-graph labels a backing halo so adjacency edges do not cut through the text', () => {
+      const { container } = render(
+        <MapOverlay mapData={MAP_REGION_MODE_NO_COORDS} onClose={() => {}} />
+      );
+      const graph = container.querySelector('[data-testid="map-region-graph"]');
+      const labels = graph?.querySelectorAll('text') ?? [];
+      expect(labels.length).toBeGreaterThan(0);
+      // Each label paints its stroke (halo) under the fill so a line behind it
+      // can't visually cut through the glyphs.
+      labels.forEach((label) => {
+        expect(label.getAttribute('paint-order')).toBe('stroke');
+      });
+    });
+
     it('does not crash when an explored location has no connections field', () => {
       const map = {
         ...MAP_WITH_CARTOGRAPHY,
