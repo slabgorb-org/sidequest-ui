@@ -11,6 +11,14 @@ export interface EncounterActor {
   name: string;
   role: string;
   portrait_url?: string;
+  /**
+   * Server seat (mirrors `EncounterActor.side` on the wire): `"player"` allies,
+   * `"opponent"` adversaries, `"neutral"` bystanders. Story 85-3 uses it to pick
+   * the THEM-side actor for the dedicated opponent panel — the dial "has a face"
+   * (ADR-116). Optional/absent on legacy payloads; the THEM panel then renders
+   * nothing rather than guessing.
+   */
+  side?: "player" | "opponent" | "neutral";
 }
 
 /**
@@ -137,6 +145,14 @@ export interface ConfrontationData {
   genre_slug: string;
   mood: string;
   /**
+   * Story 85-3 (Tier B): the session's active stakes (set_stakes), surfaced on
+   * the CONFRONTATION channel so the promoted dockview panel renders a stakes
+   * banner up top (Cost Scales with Drama). Always present on the wire (None /
+   * absent when the session has no active stakes); the banner collapses on any
+   * falsy value.
+   */
+  stakes?: string;
+  /**
    * Server-side clear signal: when `false`, the confrontation has ended and
    * the overlay should unmount. Absent or `true` means active. Handled at
    * dispatch in App.tsx (search: `payload.active !== false`).
@@ -176,8 +192,29 @@ export interface ConfrontationOutcome {
   mandatory_outputs: string[];
 }
 
+/**
+ * Story 85-3 (The Guitar Solo): one non-soloing player's concurrent verb,
+ * surfaced in the "meanwhile at the table" strip so a confrontation spotlight
+ * never leaves the rest of the band as a silent audience. Sourced from existing
+ * MP peer-action state (ADR-036 2026-05-03 amendment — peer action text is
+ * visible during the wait phase); collapses to nothing in solo play.
+ */
+export interface MeanwhileAction {
+  /** Character (or player) name — "Spark". */
+  actor: string;
+  /** Optional role tag — "gunner". */
+  role?: string;
+  /** The concurrent action text — "lay down covering fire". */
+  verb: string;
+}
+
 interface ConfrontationOverlayProps {
   data: ConfrontationData | null;
+  /**
+   * Story 85-3: the table's concurrent verbs while one player is in the
+   * confrontation. Empty/undefined in solo play → the strip collapses.
+   */
+  meanwhileActions?: MeanwhileAction[];
   onBeatSelect?: (beatId: string) => void;
   /** Dice state — rendered inline below beats when active. */
   diceRequest?: DiceRequestPayload | null;
@@ -739,6 +776,99 @@ function BeatImpactPanel({
 }
 
 // ═══════════════════════════════════════════════════════════
+// Story 85-3 (Tier B) — promoted-panel surfaces
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Stakes banner (Cost Scales with Drama). Renders the session's active stakes
+ * prominently at the top of confrontation mode; collapses on any falsy value
+ * (no stakes set, or empty string normalized to None server-side).
+ */
+function StakesBanner({ stakes }: { stakes?: string }) {
+  if (!stakes) return null;
+  return (
+    <div
+      data-testid="confrontation-stakes-banner"
+      className="mb-2 px-3 py-1.5 rounded-md border flex items-baseline gap-2"
+      style={{ background: "oklch(0.21 0.008 80)", borderColor: "var(--accent-finisher)" }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent-finisher)] flex-shrink-0">
+        Stakes
+      </span>
+      <span className="font-serif italic text-[13px] text-foreground">{stakes}</span>
+    </div>
+  );
+}
+
+/**
+ * THEM panel (ADR-116 — the dial has a face). Surfaces the opponent's portrait
+ * + name + their last beat so the confrontation reads as *against someone*.
+ * Picks the first `side === "opponent"` actor; renders nothing when there is no
+ * opponent on the wire (legacy payload / pure-PvE dial with no seated Other).
+ * Degrades cleanly when the opponent has no portrait (ActorChip falls back to
+ * the name initial).
+ */
+function ThemPanel({ data }: { data: ConfrontationData }) {
+  const opponent = data.actors.find((a) => a.side === "opponent");
+  if (!opponent) return null;
+  const lastBeat = data.opponent_last_beat_impact;
+  return (
+    <div
+      data-testid="confrontation-them-panel"
+      className="mb-2 px-3 py-1.5 rounded-md border flex items-center gap-2"
+      style={{
+        background: "oklch(0.21 0.008 80)",
+        borderColor: "var(--encounter-opponent)",
+      }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--encounter-opponent)] flex-shrink-0">
+        Them
+      </span>
+      <ActorChip actor={opponent} />
+      <span className="font-semibold text-[13px] text-foreground">{opponent.name}</span>
+      {opponent.role && (
+        <span className="text-[11px] text-muted-foreground">{opponent.role}</span>
+      )}
+      {lastBeat && (
+        <span
+          data-testid="them-last-beat"
+          className="text-[11px] italic text-muted-foreground ml-auto truncate"
+        >
+          {lastBeat.summary}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Meanwhile at the table" strip (The Guitar Solo). Surfaces the non-soloing
+ * players' concurrent verbs in the reclaimed space so a solo never becomes
+ * silence. Collapses to nothing in solo play (no concurrent actions).
+ */
+function MeanwhileStrip({ actions }: { actions?: MeanwhileAction[] }) {
+  if (!actions || actions.length === 0) return null;
+  return (
+    <div
+      data-testid="confrontation-meanwhile-strip"
+      className="mt-2 px-3 py-1.5 rounded-md border border-border/40 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex-shrink-0">
+        Meanwhile at the table
+      </span>
+      {actions.map((a, i) => (
+        <span key={`${a.actor}-${i}`} className="text-[11px] text-foreground">
+          <span className="font-semibold">{a.actor}</span>
+          {a.role && <span className="text-muted-foreground"> ({a.role})</span>}
+          {": "}
+          <span className="italic">“{a.verb}”</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════════════
 
@@ -753,6 +883,7 @@ function BeatImpactPanel({
  */
 export function ConfrontationOverlay({
   data,
+  meanwhileActions,
   onBeatSelect,
   diceRequest,
   diceResult,
@@ -791,7 +922,15 @@ export function ConfrontationOverlay({
       data-genre={data.genre_slug}
       className="confrontation-panel bg-card/60 border-t border-border/40 px-3 pt-2 pb-1"
     >
+      {/* Story 85-3 (Tier B): stakes banner up top — the drama is legible, not
+          implied (Cost Scales with Drama). Collapses when no stakes. */}
+      <StakesBanner stakes={data.stakes} />
+
       <StatusLine data={data} />
+
+      {/* Story 85-3 (Tier B): dedicated THEM panel — opponent portrait + name +
+          their last beat, so the dial reads as *against someone* (ADR-116). */}
+      <ThemPanel data={data} />
 
       {/*
        * Phase 5 (Story 47-3): branch-explicit outcome reveal.
@@ -876,6 +1015,12 @@ export function ConfrontationOverlay({
 
       {/* Secondary stats — chase rigs, ship pools, etc. */}
       {data.secondary_stats && <SecondaryStatsPanel stats={data.secondary_stats} />}
+
+      {/* Story 85-3 (Tier B): "meanwhile at the table" — the non-soloing players'
+          concurrent verbs live in the reclaimed space (The Guitar Solo). The
+          reclaimed space is exactly why this panel earns the canvas; collapses
+          in solo play. */}
+      <MeanwhileStrip actions={meanwhileActions} />
     </div>
   );
 }
