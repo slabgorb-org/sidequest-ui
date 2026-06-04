@@ -106,8 +106,13 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
   const fogBounds = mapData.fog_bounds ?? { width: 10, height: 10 };
   const connections = getUniqueConnections(explored);
   const cartography = mapData.cartography;
-  // Fall back to list view when no coordinate data (all x/y are 0)
-  const hasCoordinates = explored.some((loc) => loc.x !== 0 || loc.y !== 0);
+  // Fall back to list view when no coordinate data (all x/y are 0). Region-mode
+  // explored entries arrive as {id, name, connections} with NO x/y, so guard on
+  // finite numbers first — an `undefined !== 0` truthiness slip rendered the
+  // coordinate SVG with NaN coords (`<text y={loc.y + 1.2}>` → NaN).
+  const hasCoordinates = explored.some(
+    (loc) => Number.isFinite(loc.x) && Number.isFinite(loc.y) && (loc.x !== 0 || loc.y !== 0)
+  );
 
   // Region-mode worlds carry an adjacency-only cartography (no coordinates), so
   // the node-graph is the primary map view. Only render the graph when there
@@ -192,7 +197,11 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
         </>
       )}
 
-      {hasCoordinates ? (
+      {/* Region-mode worlds use the node-graph above as their map view; the
+          coordinate fog SVG and the flat list are for room_graph / legacy
+          coordinate worlds only. Rendering them for region mode drew a second
+          (broken) map from x/y-less entries — see hasCoordinates note. */}
+      {!showRegionGraph && (hasCoordinates ? (
         <svg
           viewBox={`0 0 ${fogBounds.width} ${fogBounds.height}`}
           className="w-full h-64 bg-[var(--surface)] rounded"
@@ -280,7 +289,7 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
             </ul>
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -311,11 +320,19 @@ function RegionNodeGraph({
   const layout = computeCartographyLayout(cartography);
   const labelDx = NODE_R + 6;
 
+  // Render at natural pixel size inside a scroll container rather than scaling a
+  // long depth-chain into a fixed box. A near-linear 13-region world lays out
+  // ~2800px wide; `w-full` + a fixed height squished/clipped the deepest regions
+  // (DRIVER 2026-06-04). Natural size + overflow keeps labels readable at any
+  // chain length and lets the player scroll to the far edges.
   return (
+    <div className="overflow-auto max-h-80 bg-[var(--surface)] rounded">
     <svg
       data-testid="map-region-graph"
       viewBox={`0 0 ${layout.width} ${layout.height}`}
-      className="w-full h-72 bg-[var(--surface)] rounded"
+      width={layout.width}
+      height={layout.height}
+      className="block max-w-none"
       role="img"
       aria-label="World region map"
     >
@@ -372,6 +389,11 @@ function RegionNodeGraph({
                 fontSize={13}
                 fill="var(--primary, white)"
                 fillOpacity={isVisited ? 1 : 0.55}
+                paintOrder="stroke"
+                stroke="var(--surface, #1a1a1a)"
+                strokeWidth={3}
+                strokeLinejoin="round"
+                strokeOpacity={isVisited ? 0.9 : 0.6}
               >
                 {node.name}
               </text>
@@ -380,6 +402,7 @@ function RegionNodeGraph({
         })}
       </g>
     </svg>
+    </div>
   );
 }
 
