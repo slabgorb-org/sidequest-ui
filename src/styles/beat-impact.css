@@ -1,0 +1,93 @@
+/* Beat-impact effect styling — Story 73-10.
+ *
+ * BeatImpactPanel (ConfrontationOverlay.tsx) emits `data-effect` with six values.
+ * Unstyled, they all render alike — defeating the 73-4→73-10 legibility goal for
+ * mechanics-first players (Sebastien/Jade), who need to read "did I win / do
+ * nothing / get hurt?" at a glance. Each effect gets a distinct treatment on THREE
+ * non-color-redundant channels — a colored left border, a tinted background, and a
+ * leading glyph — so the states stay distinguishable in dark/light themes and for
+ * colorblind players. Colors come from the --beat-impact-* tokens (index.css),
+ * which derive from theme tokens (ADR-079), so a genre's palette recolors these.
+ *
+ * The three "zero-ish" / low-motion cases are the load-bearing distinction:
+ *   resolution → GOOD   (confrontation ended by design)  green  · ✓
+ *   inert      → NEUTRAL (a miss, or a 73-8 HP-suppressed dial) muted · –
+ *   setback    → BAD    (player's dial worsened / opponent rose) red · ▼
+ */
+
+.beat-impact {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.beat-impact::before {
+  font-weight: 700;
+  font-size: 0.85em;
+  line-height: 1;
+  flex: none;
+}
+
+/* resolution — positive terminal: the confrontation resolved by design. */
+.beat-impact[data-effect="resolution"] {
+  border-left-color: var(--beat-impact-resolution);
+  color: var(--beat-impact-resolution);
+  background-color: color-mix(in oklch, var(--beat-impact-resolution) 12%, transparent);
+}
+.beat-impact[data-effect="resolution"]::before {
+  content: "✓";
+}
+
+/* inert — neutral low-motion: the beat landed but moved no dial. Muted + faded so
+   it visibly recedes from both the good (resolution) and bad (setback) states. */
+.beat-impact[data-effect="inert"] {
+  border-left-color: var(--beat-impact-inert);
+  color: var(--beat-impact-inert);
+  background-color: transparent;
+  opacity: 0.7;
+}
+.beat-impact[data-effect="inert"]::before {
+  content: "–";
+}
+
+/* setback — negative: the player's edge slipped or the opponent's rose. */
+.beat-impact[data-effect="setback"] {
+  border-left-color: var(--beat-impact-setback);
+  color: var(--beat-impact-setback);
+  background-color: color-mix(in oklch, var(--beat-impact-setback) 12%, transparent);
+}
+.beat-impact[data-effect="setback"]::before {
+  content: "▼";
+}
+
+/* advance — the player advanced their own edge (or drained the opponent's). */
+.beat-impact[data-effect="advance"] {
+  border-left-color: var(--beat-impact-advance);
+  color: var(--beat-impact-advance);
+  background-color: color-mix(in oklch, var(--beat-impact-advance) 12%, transparent);
+}
+.beat-impact[data-effect="advance"]::before {
+  content: "▲";
+}
+
+/* tag — a scene tag was set (no dial change by design). */
+.beat-impact[data-effect="tag"] {
+  border-left-color: var(--beat-impact-tag);
+  color: var(--beat-impact-tag);
+  background-color: color-mix(in oklch, var(--beat-impact-tag) 12%, transparent);
+}
+.beat-impact[data-effect="tag"]::before {
+  content: "✦";
+}
+
+/* backfire — the player's angle rebounded onto them: the most dangerous read. */
+.beat-impact[data-effect="backfire"] {
+  border-left-color: var(--beat-impact-backfire);
+  color: var(--beat-impact-backfire);
+  background-color: color-mix(in oklch, var(--beat-impact-backfire) 16%, transparent);
+}
+.beat-impact[data-effect="backfire"]::before {
+  content: "⚠";
+}
