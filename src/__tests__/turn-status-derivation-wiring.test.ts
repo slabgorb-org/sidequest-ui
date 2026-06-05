@@ -54,4 +54,21 @@ describe("Wiring: turn-status derivation helpers consumed by App.tsx", () => {
       /mergePeerRevealsWithSubmittedStatus\s*\(\s*peerReveals\.reveals\s*,\s*turnStatusEntries\s*\)/,
     );
   });
+
+  it("snapshots the RAW peerReveals.reveals into the accumulator, never the display-only mergedPeerReveals (71-12 prose guard → 71-36 machine guard)", () => {
+    // Accumulator-direction invariant. The 71-12 review left this as a prose
+    // comment at App.tsx:~1395; 71-36 machine-guards it. mergedPeerReveals folds
+    // TURN_STATUS submitted-status in for *display*, so a row's status can be
+    // frozen at a past turn's value. Snapshotting the merged map would persist
+    // that stale draft into the canonical accumulator (the stale-draft
+    // regression). The capture call MUST be fed peerReveals.reveals.
+    expect(appSrc).toMatch(
+      /persistedPeerActions\.capture\(\s*currentRound\s*,\s*peerReveals\.reveals\s*\)/,
+    );
+    // Regression guard: fails fast if a future refactor flips the snapshot to
+    // the merged map.
+    expect(appSrc).not.toMatch(
+      /persistedPeerActions\.capture\([^)]*mergedPeerReveals/,
+    );
+  });
 });
