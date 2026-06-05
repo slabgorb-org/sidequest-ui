@@ -21,8 +21,14 @@ import { useStateMirror } from "@/hooks/useStateMirror";
 import { useSlashCommands } from "@/hooks/useSlashCommands";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
-import { MessageType, type GameMessage } from "@/types/protocol";
+import {
+  MessageType,
+  type GameMessage,
+  type NarratorVerbosity,
+  type NarratorVocabulary,
+} from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
+import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
 import { beatDispatchBlockReason } from "@/lib/beatDispatch";
 import { toCharacterSummary, toCharacterSheetData } from "@/lib/partyStatusMapping";
 import {
@@ -150,6 +156,7 @@ function clearSession() {
     // non-critical
   }
 }
+
 
 // Bug 2: HMR state persistence — survive Vite hot reload without losing game progress
 const HMR_STATE_KEY = "sidequest-hmr-state";
@@ -718,6 +725,20 @@ function AppInner() {
       if (event === "connected" || event === "ready") {
         setThinking(false);
         setCanType(true);
+        // Story 82-2 (ADR-049): rehydrate the lobby sliders to the player's
+        // persisted narrator tuning the server reports on resume, so a returning
+        // player sees their saved choice rather than the defaults. payload is
+        // Record<string, unknown> on GameMessage, so narrow the two fields.
+        const narratorPayload = msg.payload as {
+          narrator_verbosity?: NarratorVerbosity | null;
+          narrator_vocabulary?: NarratorVocabulary | null;
+        };
+        if (narratorPayload.narrator_verbosity || narratorPayload.narrator_vocabulary) {
+          saveNarratorPrefs({
+            narrator_verbosity: narratorPayload.narrator_verbosity ?? undefined,
+            narrator_vocabulary: narratorPayload.narrator_vocabulary ?? undefined,
+          });
+        }
         // sq-playtest-pingpong 2026-05-03 [BUG] Map widget stuck at
         // "Loading orbital chart…" after WS resume. The server's per-
         // connection state machine starts in AwaitingConnect; the orbital
@@ -1892,6 +1913,10 @@ function AppInner() {
             game_slug: slug,
             last_seen_seq: lastSeenSeq,
             player_name: displayName,
+            // Story 82-2 (ADR-049): carry the lobby-chosen narrator tuning so
+            // the server reads it into the per-turn TurnContext. Absent keys
+            // are omitted (server falls back to default_for_player_count).
+            ...loadNarratorPrefs(),
           },
           player_id: displayName,
         };
