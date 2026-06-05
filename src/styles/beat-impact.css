@@ -91,3 +91,20 @@
 .beat-impact[data-effect="backfire"]::before {
   content: "⚠";
 }
+
+/* Opponent-acts-first window (Story 73-13 follow-up). When only the opponent has
+ * acted, the panel container is driven by the OPPONENT's beat, whose effect
+ * taxonomy (advance/setback/backfire…) is PLAYER-relative. Left alone, an opponent
+ * 'advance' (they pressed their edge) renders in --beat-impact-advance =
+ * --encounter-player, reading as a player win. Re-key the actor-level coloring to
+ * --encounter-opponent so the panel reads as "the opponent acted on you" regardless
+ * of their player-relative effect value. Equal specificity to the [data-effect="…"]
+ * rules above (one class + one attribute); wins by source order. The effect glyph is
+ * kept — it honestly shows the opponent's beat direction — but now inherits the
+ * opponent color via currentColor, not player-green. */
+.beat-impact[data-actor="opponent"] {
+  border-left-color: var(--encounter-opponent);
+  color: var(--encounter-opponent);
+  background-color: color-mix(in oklch, var(--encounter-opponent) 12%, transparent);
+  opacity: 1;
+}

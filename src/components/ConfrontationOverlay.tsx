@@ -762,10 +762,18 @@ function BeatImpactPanel({
   // player half is absent (symmetric to how the opponent half is omitted).
   const head = impact ?? opponent;
   if (!head) return null;
+  // Story 73-13 follow-up: the effect taxonomy (advance/setback/backfire…) is
+  // PLAYER-relative — `beat-impact-advance` maps to --encounter-player. So when the
+  // container is driven by the OPPONENT's beat (opponent-acts-first window), its
+  // effect must NOT borrow the player's coloring: an opponent 'advance' would read
+  // as a player win. `data-actor` lets the CSS re-key the opponent-only state to
+  // --encounter-opponent (see beat-impact.css) so it reads as "the enemy acted".
+  const actor = impact == null && opponent != null ? "opponent" : "player";
   return (
     <div
       data-testid="beat-impact"
       data-effect={head.effect}
+      data-actor={actor}
       data-dial-moved={head.dial_moved ? "true" : "false"}
       className={`beat-impact mt-2 p-2 rounded border beat-impact-${head.effect}`}
     >
