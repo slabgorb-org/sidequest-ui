@@ -1571,6 +1571,31 @@ function AppInner() {
       // can't accidentally inherit a prior beat's draft text.
       const playerAction = pendingPlayerActionRef.current;
       pendingPlayerActionRef.current = "";
+      // REGRESSION fix (playtest 2026-06-04): in a confrontation the player's
+      // typed action rides the beat-commit DICE_THROW, not a PLAYER_ACTION
+      // frame, so the local transcript never grew a player-echo card — combat
+      // was unfollowable ("chandelier swinging completely broken"). The server
+      // records this as a `player` narrative author (save /timeline), but the
+      // UI dropped it. Mirror handleSend: push a PLAYER_ACTION echo into our own
+      // `messages` so the typed line renders alongside the narrator response,
+      // exactly as a free-text submit does out of combat. Only when the player
+      // actually typed something on a beat roll — a bare beat click (empty
+      // player_action) has no text to echo, and a free roll (no beatId) is not
+      // a turn action.
+      if (beatId && playerAction) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: MessageType.PLAYER_ACTION,
+            payload: {
+              action: playerAction,
+              aside: false,
+              round: currentRoundRef.current,
+            },
+            player_id: currentPlayerIdRef.current ?? "",
+          },
+        ]);
+      }
       send({
         type: MessageType.DICE_THROW,
         payload: {
