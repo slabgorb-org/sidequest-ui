@@ -17,6 +17,10 @@ import {
   type JourneyEntry,
 } from "./lobby/historyStore";
 import { ModePicker, type GameMode } from "./lobby/ModePicker";
+import { VerbositySlider } from "@/components/VerbositySlider";
+import { VocabularySlider } from "@/components/VocabularySlider";
+import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
+import type { NarratorVerbosity, NarratorVocabulary } from "@/types/protocol";
 import { useStartGame } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { getArchetypeForGenre } from "@/hooks/useChromeArchetype";
@@ -92,6 +96,23 @@ export function ConnectScreen({
     undefined,
   );
   const [mode, setMode] = useState<GameMode>("solo");
+  // Story 82-2 (ADR-049): narrator tuning, seeded from the player's persisted
+  // choice (or the standard/literary defaults). Each change persists to
+  // localStorage so App's slug-connect effect folds it into the CONNECT payload.
+  const [verbosity, setVerbosity] = useState<NarratorVerbosity>(
+    () => loadNarratorPrefs().narrator_verbosity ?? "standard",
+  );
+  const [vocabulary, setVocabulary] = useState<NarratorVocabulary>(
+    () => loadNarratorPrefs().narrator_vocabulary ?? "literary",
+  );
+  const handleVerbosity = (v: NarratorVerbosity) => {
+    setVerbosity(v);
+    saveNarratorPrefs({ narrator_verbosity: v });
+  };
+  const handleVocabulary = (v: NarratorVocabulary) => {
+    setVocabulary(v);
+    saveNarratorPrefs({ narrator_vocabulary: v });
+  };
   const { start } = useStartGame();
   const { setName: setDisplayName } = useDisplayName();
   const navigate = useNavigate();
@@ -534,6 +555,24 @@ export function ConnectScreen({
                       : null
                   }
                 />
+
+                {/* Story 82-2 (ADR-049): narrator tuning — verbosity (length)
+                    + vocabulary (diction), two independent axes. Choice persists
+                    to localStorage and rides the CONNECT payload. */}
+                <div className="px-6 py-3 border-t border-[var(--accent)]/20 flex flex-col gap-4 sm:flex-row sm:gap-8">
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground/60 mb-1">
+                      Narrator length
+                    </span>
+                    <VerbositySlider value={verbosity} onChange={handleVerbosity} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground/60 mb-1">
+                      Narrator diction
+                    </span>
+                    <VocabularySlider value={vocabulary} onChange={handleVocabulary} />
+                  </div>
+                </div>
 
                 {/* Commit row — mode + reference links + start. Always present
                     so Start is reachable (disabled) before a world is chosen. */}
