@@ -303,6 +303,13 @@ const SIDE_LABEL: Record<MetricSide, string> = {
   opponent: "Them",
 };
 
+// Story 73-14: a dial delta as a signed, human-legible string — positives gain a
+// leading "+", negatives keep their natural ASCII "-", and zero stays a bare "0"
+// (the guard is `> 0`, NOT `>= 0`, so a no-move reads as "0", not a phantom "+0"
+// gain). Shared by the BeatImpactPanel readouts and the LedgerRow Δ column so the
+// two surfaces can never drift in how they render the sign of a delta.
+const formatSignedDelta = (delta: number): string => (delta > 0 ? `+${delta}` : `${delta}`);
+
 // Player edge cool blue; opponent edge amber/red — matches the UX addendum
 // recommendation (Adora Belle Dearheart, 2026-04-25) and the D2 mock palette.
 // Backed by --encounter-player / --encounter-opponent tokens (D2 handoff,
@@ -615,7 +622,7 @@ function LedgerRow({ impact, side }: { impact: BeatImpactView; side: "You" | "Th
   // Them row previously read `.opponent`, the cross-effect on the OTHER dial,
   // and so reported the opponent's progress as ~0.) `side` is the label only.
   const delta = impact.own ?? 0;
-  const signed = delta > 0 ? `+${delta}` : `${delta}`;
+  const signed = formatSignedDelta(delta);
   return (
     <div className="flex items-center gap-2 text-[11px] tabular-nums">
       <span className="w-10 flex-shrink-0 font-semibold uppercase tracking-wider text-muted-foreground">
@@ -783,14 +790,21 @@ function BeatImpactPanel({
        * happened to the numbers on BOTH sides — the player's own dial delta and
        * (when the server sent one) the opponent's. 73-10 owns labels/styling.
        */}
+      {/*
+       * Story 73-14: each readout carries a "You"/"Them" label and a signed
+       * delta so two adjacent bare integers ("3" "2") are disambiguated for a
+       * human (mechanics-first players, Sebastien / Jade) — today only the DOM
+       * testid told them apart. Labels reuse SIDE_LABEL; the sign reuses the
+       * shared formatSignedDelta so this panel and the LedgerRow Δ never drift.
+       */}
       {impact != null && (
         <span data-testid="beat-impact-own" className="text-xs">
-          {impact.own ?? 0}
+          {SIDE_LABEL.player} {formatSignedDelta(impact.own ?? 0)}
         </span>
       )}
       {opponent != null && (
         <span data-testid="beat-impact-opponent" className="text-xs">
-          {opponent.own ?? 0}
+          {SIDE_LABEL.opponent} {formatSignedDelta(opponent.own ?? 0)}
         </span>
       )}
     </div>
