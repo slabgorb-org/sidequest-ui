@@ -188,6 +188,41 @@ describe("NarrationScroll — streaming display", () => {
 
     expect(screen.queryByTestId("narration-streaming-text")).not.toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // [BAR-2] Streamed narration must render markdown like the final card, not
+  // show naked `**…**` while the narrator composes. Same markdownToHtml +
+  // DOMPurify path the settled NarrationCards use.
+  // ---------------------------------------------------------------------------
+
+  it("renders markdown in the live streaming segment (no naked ** asterisks)", async () => {
+    const streaming: StreamingNarrationState = {
+      turns: new Map([
+        [
+          "md-1",
+          {
+            chunks: ["**The Dead Sea Bottom of Korad**\n\nThe moss stretches flat."],
+            canonical: null,
+            nextExpectedSeq: 1,
+          },
+        ],
+      ]),
+      activeTurnId: "md-1",
+      activeTurnStartedAt: null,
+    };
+
+    await act(async () => {
+      renderWithStreamingState([], streaming);
+    });
+
+    const streamingEl = screen.getByTestId("narration-streaming-text");
+    expect(streamingEl).toBeInTheDocument();
+    // The heading text survives...
+    expect(streamingEl.textContent).toContain("The Dead Sea Bottom of Korad");
+    // ...rendered as bold, not as literal markdown control characters.
+    expect(streamingEl.querySelector("strong")).not.toBeNull();
+    expect(streamingEl.textContent).not.toContain("**");
+  });
 });
 
 // ---------------------------------------------------------------------------

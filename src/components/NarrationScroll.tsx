@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useCallback, useState } from "react";
-import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
+import DOMPurify from "dompurify";
+import { buildSegments, groupPortraitSegments, markdownToHtml } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import type { ActionRevealEntry } from "@/types/payloads";
 import { renderSegment } from "./narrativeRenderers";
@@ -103,6 +104,17 @@ export function NarrationScroll({ messages, thinking, genreSlug, peerActionsByRo
       ? displayTextForTurn(streamingNarration, activeTurnId)
       : null;
 
+  // [BAR-2] Render the in-flight accumulator through the SAME markdown +
+  // sanitize pipeline the settled NarrationCards use (narrativeSegments.ts).
+  // Without this the streamed paragraph showed literal `**…**` heading markers
+  // while the narrator composed, then snapped to bold when canonical landed.
+  // Partial markdown (an unclosed `**`) simply renders as it completes — same
+  // behaviour as any live markdown preview.
+  const liveHtml = useMemo(
+    () => (liveText ? DOMPurify.sanitize(markdownToHtml(liveText)) : null),
+    [liveText],
+  );
+
   // Stall interstitial: shown when a turn has been open for 5+ seconds but
   // no delta chunks have arrived yet. This tells the player the narrator is
   // working, rather than leaving dead silence.
@@ -194,13 +206,16 @@ export function NarrationScroll({ messages, thinking, genreSlug, peerActionsByRo
                 (text-2xl leading-loose) to match canonical narration styling.
                 Trailing `streaming-cursor` is decorative — a blinking block
                 rendered by archetype-chrome.css (per the narration design). */}
-            {liveText && (
+            {liveText && liveHtml && (
               <div
                 data-testid="narration-streaming-text"
                 className="max-w-[85ch] mx-auto mb-6"
               >
                 <div className="narr-text narr-text-current narration-streaming-text prose dark:prose-invert text-2xl leading-loose">
-                  {liveText}
+                  {/* Markdown-rendered to match the settled card; the cursor is
+                      a decorative sibling (dangerouslySetInnerHTML can't share
+                      an element with React children). */}
+                  <span dangerouslySetInnerHTML={{ __html: liveHtml }} />
                   <span aria-hidden="true" className="streaming-cursor" />
                 </div>
               </div>
