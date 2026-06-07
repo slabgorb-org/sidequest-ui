@@ -40,15 +40,24 @@ export interface EncounterMetric {
  * `sidequest/genre/models/rules.py:73`). Most fields are advisory metadata
  * the UI doesn't need; we declare the ones the overlay + dice dispatcher
  * actually read. Per the dual-track schema migration, `base` is the scalar
- * magnitude that drives DC scaling (replaces the legacy `metric_delta`).
+ * magnitude that drives risk color and dial impact (replaces the legacy
+ * `metric_delta`); the DC is server-authored via `difficulty` (Story 97-3).
  */
 export interface BeatOption {
   id: string;
   label: string;
   /** Beat kind: closed enum from BeatKind (drives per-tier delta defaults). */
   kind?: string;
-  /** Scalar magnitude — drives DC scaling and risk color. Defaults to 1 server-side. */
+  /** Scalar magnitude — drives risk color. Defaults to 1 server-side. */
   base?: number;
+  /**
+   * Server-authored pre-roll target number (Story 97-3). The server is the
+   * ONLY DC author: native packs send the beat DC, SWN/hp_depletion packs
+   * send the target's armor class. The TARGET banner renders this value;
+   * the client computes nothing. A beat offer without it is malformed and
+   * the commit is refused loudly (No Silent Fallbacks).
+   */
+  difficulty?: number;
   stat_check: string;
   risk?: string;
   resolution?: boolean;
@@ -468,16 +477,20 @@ function BeatTile({
 }) {
   const base = beat.base ?? 1;
   // The roll the player makes is d20 + their stat modifier vs this DC. `base`
-  // is the dial-IMPACT magnitude (how far the dial moves on a success) and it
-  // ALSO scales the DC — it is NOT a roll bonus. Showing "+{base}" next to the
-  // stat name read as "Cunning +3" while the actual roll modifier was the
-  // ability mod (+1) — a self-contradicting player-facing number (playtest
-  // 59-8, Sebastien/Jade lane). Show the DC instead: it matches what the dice
-  // panel displays on commit ("need 16 on d20") and is the honest difficulty
-  // signal. Formula mirrors the server NativeRulesetModule.compute_dc /
-  // _opposed_dc (10 + 2*|base|, clamped 10..30) and App.tsx's dice-request
-  // builder, so all three agree on the same number.
-  const dc = Math.min(30, Math.max(10, 10 + Math.abs(base) * 2));
+  // is the dial-IMPACT magnitude (how far the dial moves on a success) — it
+  // is NOT a roll bonus. Showing "+{base}" next to the stat name read as
+  // "Cunning +3" while the actual roll modifier was the ability mod (+1) — a
+  // self-contradicting player-facing number (playtest 59-8, Sebastien/Jade
+  // lane). Show the DC instead: it matches what the dice panel displays on
+  // commit ("need 16 on d20") and is the honest difficulty signal.
+  // Story 97-3 (rework): the DC is SERVER-AUTHORED — `beat.difficulty` on the
+  // offer is the number resolution will use (native: beat-DC formula; SWN
+  // family: target armor class; opposed_check: per-side formula DC; cwn
+  // hacking: security DC). The old client formula here diverged from all of
+  // those except native and made the tile lie. A beat without a server DC
+  // renders NO chip — inventing a number would resurrect the exact silent
+  // fallback this story killed (App.tsx refuses the commit for such beats).
+  const dc = typeof beat.difficulty === "number" ? beat.difficulty : null;
   const color = riskColor(base);
   const finisher = !!beat.resolution;
   const tooltip = beat.risk
@@ -564,8 +577,14 @@ function BeatTile({
           {KIND_LABEL[beat.kind ?? ""] ?? beat.kind ?? ""}
           {beat.kind && <span className="opacity-50"> · </span>}
           {beat.stat_check}
-          <span className="opacity-50"> · </span>
-          <span className="tracking-normal normal-case" style={{ color: tileText }}>DC {dc}</span>
+          {dc !== null && (
+            <>
+              <span className="opacity-50"> · </span>
+              <span className="tracking-normal normal-case" style={{ color: tileText }}>
+                DC {dc}
+              </span>
+            </>
+          )}
         </span>
         {beat.risk && (
           <span

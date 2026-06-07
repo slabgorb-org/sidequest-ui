@@ -228,7 +228,7 @@ describe("transient-error banner auto-clear wiring (71-3)", () => {
         payload: {
           active: true,
           label: "Firefight",
-          beats: [{ id: "strike", label: "Strike", stat_check: "Reflex", base: 1 }],
+          beats: [{ id: "strike", label: "Strike", stat_check: "Reflex", base: 1, difficulty: 12 }],
         },
       });
     });
