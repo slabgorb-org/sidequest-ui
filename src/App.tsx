@@ -1890,7 +1890,18 @@ function AppInner() {
     // identity before the user could confirm. See playtest 2026-04-26
     // (Richie/Potsie regression). identityConfirmedForSlug is added to the
     // dep array so the effect re-fires after handleNameSubmit latches.
-    const slugKnown = loadHistory().some((e) => e.game_slug === slug);
+    // [BAR-1] 2026-06-05: scope "known" to THIS identity (kept identical to the
+    // render gate above). Matching on game_slug alone let a slug left in history
+    // by a PRIOR player skip the NamePrompt for a DIFFERENT joiner — the cached
+    // display-name was silently bound into that session (Groucho navigated to a
+    // barsoom URL, bounced through "/" which auto-resumed a prior player's
+    // the_circuit solo save, and the slug-in-history check connected Groucho
+    // into the foreign save with no confirmation). Same silent-rebind class as
+    // Lenny/Laverne and Richie/Potsie; same fix — re-prompt rather than assume
+    // identity. A returning player (display-name matches the entry) still skips.
+    const slugKnown = loadHistory().some(
+      (e) => e.game_slug === slug && e.player_name === displayName,
+    );
     const confirmedThisSlug = identityConfirmedForSlug === slug;
     if (!confirmedThisSlug && !slugKnown) return; // Wait for NamePrompt confirmation
     if (slugConnectFired.current) return;
@@ -2247,12 +2258,18 @@ function AppInner() {
     // "Trusted" sources for an identity on this slug:
     //   - This tab's user explicitly hit Begin in the NamePrompt for this slug
     //     (identityConfirmedForSlug latch).
-    //   - The slug appears in journey history (means this client created the
-    //     game via ConnectScreen, which appends history *with the slug* before
-    //     navigating).
+    //   - The slug appears in journey history UNDER THIS DISPLAY-NAME (means
+    //     this identity created/played the game via ConnectScreen, which
+    //     appends history *with the slug + player_name* before navigating).
     // The cached `sq:display-name` alone is NOT a trusted source — that's the
-    // silent-rebind footgun.
-    const slugKnown = loadHistory().some((e) => e.game_slug === slug);
+    // silent-rebind footgun. Nor is a slug left in history by a DIFFERENT
+    // player ([BAR-1] 2026-06-05: Groucho bounced through "/" into a prior
+    // player's the_circuit save; slug-in-history skipped the prompt). The
+    // match must be on (slug AND player_name) — kept identical to the slug-
+    // connect effect gate below so render and connect agree.
+    const slugKnown = loadHistory().some(
+      (e) => e.game_slug === slug && e.player_name === displayName,
+    );
     const confirmedThisSlug = identityConfirmedForSlug === slug;
     if (!confirmedThisSlug && !slugKnown) {
       return (

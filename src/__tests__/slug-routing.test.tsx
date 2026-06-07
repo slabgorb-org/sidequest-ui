@@ -258,6 +258,58 @@ describe('slug routing — NamePrompt shown when no display name is set', () => 
     expect(server.messages).toHaveLength(0);
   });
 
+  // Silent-rebind regression — identity-scoped slug-known gate ([BAR-1] 2026-06-05).
+  //
+  // The slug-known shortcut (which skips the NamePrompt for a returning player)
+  // matched on game_slug ALONE. If a prior player on this browser left the slug
+  // in journey history, a DIFFERENT joiner (whose cached sq:display-name differs)
+  // was silently bound into that session without a prompt. Playtest repro:
+  // Groucho navigated to a barsoom URL, bounced through "/" into a prior player's
+  // the_circuit solo save (slug in history) and was dropped into chargen as
+  // Groucho with no confirmation. Same class as Lenny/Laverne and Richie/Potsie;
+  // "known" must mean "THIS identity has played this slug", not just "this slug
+  // exists in history".
+  it('shows NamePrompt when the slug is in history under a DIFFERENT player', async () => {
+    localStorage.clear();
+    // A prior player ("alice") played this slug on this browser...
+    localStorage.setItem('sq:display-name', 'groucho'); // ...but the current cached identity is someone else.
+    localStorage.setItem(
+      'sidequest-history',
+      JSON.stringify([
+        {
+          player_name: 'alice',
+          genre: 'low_fantasy',
+          world: 'greyhawk',
+          last_played_iso: new Date().toISOString(),
+          game_slug: '2026-06-05-the_circuit',
+          mode: 'solo',
+        },
+      ]),
+    );
+
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/solo/2026-06-05-the_circuit']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // The prompt must show — groucho has not confirmed joining alice's session.
+    const input = (await screen.findByRole('textbox', {
+      name: /player name/i,
+    })) as HTMLInputElement;
+    expect(input.value).toBe('groucho');
+    // Critical: no SESSION_EVENT{connect} silently bound groucho into the save.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const connectFrames = server.messages.filter((m) => {
+      const parsed = m as { type?: string; payload?: { event?: string } };
+      return parsed.type === 'SESSION_EVENT' && parsed.payload?.event === 'connect';
+    });
+    expect(connectFrames).toHaveLength(0);
+  });
+
   // Silent-rebind regression — effect-level wiring proof (playtest 2026-04-26).
   //
   // The render-time gate above proves the prompt is shown, but the original
