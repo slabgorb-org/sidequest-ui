@@ -391,6 +391,20 @@ function AppInner() {
   // the PausedBanner can name them.
   const [paused, setPaused] = useState(false);
   const [pauseWaitingFor, setPauseWaitingFor] = useState<string[]>([]);
+  // sq-playtest 2026-06-07 (silent blocked-paused drop): the last real
+  // action this player submitted, held until the turn actually runs
+  // (cleared at NARRATION_END). If GAME_PAUSED arrives while it's set, the
+  // server refused the dispatch (`player_action_blocked_paused`) — the
+  // InputBar already cleared optimistically, so restore the draft and say
+  // why. Without this a brief peer reconnect (pause + resume inside a
+  // second) swallowed a full composition with zero feedback — the
+  // Alex-test failure.
+  const lastSubmittedActionRef = useRef<string | null>(null);
+  // Draft restoration channel to the InputBar (App → GameBoard → InputBar).
+  // Epoch bumps so the same text can be restored twice if it bounces twice.
+  const [restoredDraft, setRestoredDraft] = useState<{ text: string; epoch: number } | null>(
+    null,
+  );
 
   // MP-02 Task 5: seat handshake. After CHARACTER_CREATION{phase:complete},
   // the client claims a `character_slot` via PLAYER_SEAT. The server seats
@@ -731,6 +745,9 @@ function AppInner() {
           setTransientError(null);
         }
         localTurnInFlightRef.current = false;
+        // The turn ran — the submitted action was consumed, nothing to
+        // restore on a later pause (sq-playtest 2026-06-07 blocked-paused).
+        lastSubmittedActionRef.current = null;
       }
       return;
     }
@@ -1093,6 +1110,24 @@ function AppInner() {
       setPauseWaitingFor(waitingFor);
       setThinking(false);
       setCanType(true);
+      // sq-playtest 2026-06-07: if this pause arrived while OUR action was
+      // in flight, the server refused the dispatch
+      // (player_action_blocked_paused) and the action is GONE — but the
+      // InputBar cleared optimistically on submit. Restore the draft and
+      // surface a persistent, dismissible notice (the PausedBanner alone
+      // can blink away in under a second when the peer's socket bounces
+      // straight back — pause→resume swallowed the action invisibly).
+      const dropped = lastSubmittedActionRef.current;
+      if (dropped) {
+        lastSubmittedActionRef.current = null;
+        setRestoredDraft((prev) => ({ text: dropped, epoch: (prev?.epoch ?? 0) + 1 }));
+        const who = waitingFor.length > 0 ? waitingFor.join(", ") : "a player";
+        setTransientError(
+          `Your action didn't go through — the table was waiting while ${who} reconnected. ` +
+            "Your draft has been restored; submit it again when everyone's back.",
+        );
+        localTurnInFlightRef.current = false;
+      }
       return;
     }
     if (msg.type === MessageType.GAME_RESUMED) {
@@ -1432,6 +1467,10 @@ function AppInner() {
       // they must not arm the gate.
       if (!aside) {
         localTurnInFlightRef.current = true;
+        // Hold the submitted text until the turn actually runs — restored
+        // into the InputBar if the server bounces it with GAME_PAUSED
+        // (sq-playtest 2026-06-07 silent blocked-paused drop).
+        lastSubmittedActionRef.current = text;
       }
       // Optimistic thinking indicator: show the three-dinkus pulse + themed
       // placeholder immediately on submit instead of waiting for the server's
@@ -2435,6 +2474,7 @@ function AppInner() {
                 messages={gameMessages}
                 characters={characters}
                 onSend={handleSend}
+                restoredDraft={restoredDraft}
                 onLeave={handleLeave}
                 disabled={readyState !== WebSocket.OPEN || !canType}
                 thinking={thinking}

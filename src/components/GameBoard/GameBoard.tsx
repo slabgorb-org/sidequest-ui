@@ -254,6 +254,13 @@ export interface GameBoardProps {
   onReveal?: (call: InputBarRevealCall) => void;
   /** ADR-051 current round — forwarded to InputBar for seq reset. */
   round?: number;
+  /**
+   * Draft restoration channel (sq-playtest 2026-06-07 silent blocked-paused
+   * drop): when the server bounces a submitted action with GAME_PAUSED, App
+   * bumps the epoch and InputBar re-fills the (optimistically cleared)
+   * field with the dropped text.
+   */
+  restoredDraft?: { text: string; epoch: number } | null;
 }
 
 export function GameBoard({
@@ -303,6 +310,7 @@ export function GameBoard({
   partyOrder = [],
   onReveal,
   round = 0,
+  restoredDraft = null,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -667,6 +675,7 @@ export function GameBoard({
         onReveal={onReveal}
         round={round}
         confrontationActive={confrontationData != null}
+        restoredDraft={restoredDraft}
       />
       {/* Co-located high-contrast HP pip scale (Story 69-2): keeps the local
           player's HP glanceable right at the input for mechanics-first
