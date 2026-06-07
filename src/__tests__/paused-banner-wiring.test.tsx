@@ -12,6 +12,7 @@
 // banner pipeline is connected end-to-end.
 
 import { render, screen, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { WS } from "jest-websocket-mock";
@@ -147,5 +148,101 @@ describe("PausedBanner wiring (MP-02 Task 8)", () => {
     await waitFor(() => {
       expect(screen.queryByText(/paused/i)).toBeNull();
     });
+  });
+
+  // sq-playtest 2026-06-07: an action submitted during a peer's brief
+  // disconnect was refused server-side (player_action_blocked_paused) with
+  // ZERO client feedback — the optimistic clear ate the draft, and the
+  // PausedBanner blinked away when the peer's socket bounced straight back.
+  // Contract: GAME_PAUSED arriving while OUR action is in flight restores
+  // the draft into the input and raises a persistent dismissible notice
+  // that survives GAME_RESUMED.
+  it("restores the dropped draft + raises a persistent notice when GAME_PAUSED bounces a submitted action", async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={["/play/2026-04-22-moldharrow-keep"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage; // consume SESSION_EVENT connect
+
+    // Enter the game phase so the InputBar renders.
+    act(() => {
+      server.send({
+        type: "SESSION_EVENT",
+        payload: { event: "ready", has_character: true },
+      });
+    });
+    const input = await screen.findByPlaceholderText(/what do you do/i);
+
+    // Type and submit a real action — the optimistic path clears the field.
+    const user = userEvent.setup();
+    const ACTION = "I cut the fuel line and brace against the bulkhead";
+    await user.type(input, ACTION);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe(""));
+
+    // Server refuses the dispatch: GAME_PAUSED while our action in flight.
+    act(() => {
+      server.send({
+        type: "GAME_PAUSED",
+        payload: { waiting_for: ["bob"] },
+      });
+    });
+
+    // The draft is restored — not silently swallowed.
+    await waitFor(() => {
+      expect((input as HTMLInputElement).value).toBe(ACTION);
+    });
+    // A persistent, dismissible notice explains why.
+    const notice = await screen.findByTestId("transient-error-banner");
+    expect(notice.textContent).toMatch(/didn't go through/i);
+    expect(notice.textContent).toMatch(/bob/);
+
+    // The notice SURVIVES the (possibly near-instant) resume — the whole
+    // failure mode was pause+resume inside a second leaving no trace.
+    act(() => {
+      server.send({ type: "GAME_RESUMED", payload: {} });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/paused/i)).toBeNull();
+    });
+    expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
+    expect((input as HTMLInputElement).value).toBe(ACTION);
+  });
+
+  it("does NOT restore a draft or raise the notice on a pause with no action in flight", async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={["/play/2026-04-22-moldharrow-keep"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage;
+
+    act(() => {
+      server.send({
+        type: "SESSION_EVENT",
+        payload: { event: "ready", has_character: true },
+      });
+    });
+    const input = await screen.findByPlaceholderText(/what do you do/i);
+
+    act(() => {
+      server.send({ type: "GAME_PAUSED", payload: { waiting_for: ["bob"] } });
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/paused/i)).toBeInTheDocument();
+    });
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(screen.queryByTestId("transient-error-banner")).toBeNull();
   });
 });

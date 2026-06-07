@@ -55,6 +55,13 @@ export interface InputBarProps {
    * is visible (D2 mock, 2026-05-13).
    */
   confrontationActive?: boolean;
+  /**
+   * Draft restoration channel (sq-playtest 2026-06-07 silent blocked-paused
+   * drop): when the server bounces a submitted action with GAME_PAUSED, App
+   * bumps `epoch` and the field re-fills with the dropped text — but only
+   * when the field is currently empty, never clobbering fresh typing.
+   */
+  restoredDraft?: { text: string; epoch: number } | null;
 }
 
 const COMPOSING_DEBOUNCE_MS = 250;
@@ -69,11 +76,26 @@ function InputBarImpl(
     thinking,
     waitingForPlayer,
     confrontationActive = false,
+    restoredDraft = null,
   }: InputBarProps,
   ref: React.ForwardedRef<InputBarHandle>,
 ) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
+
+  // Restore a server-bounced draft (GAME_PAUSED while our action was in
+  // flight). Epoch-keyed so the same text restores again on a second
+  // bounce; empty-field guard so we never clobber what the player has
+  // started retyping. Render-phase state adjustment (the React-endorsed
+  // "adjusting state when a prop changes" pattern) — the lint rule
+  // forbids the setState-in-effect equivalent.
+  const [restoredEpochSeen, setRestoredEpochSeen] = useState(0);
+  if (restoredDraft && restoredDraft.epoch !== restoredEpochSeen) {
+    setRestoredEpochSeen(restoredDraft.epoch);
+    if (text.length === 0) {
+      setText(restoredDraft.text);
+    }
+  }
 
   // Ref-shadow of `text` so the imperative handle below can read the latest
   // value without rebinding on every keystroke.
