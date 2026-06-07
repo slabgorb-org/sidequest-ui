@@ -1,5 +1,7 @@
 /**
- * Story 97-3 (RED) — Dice banner DC has two sources of truth.
+ * Story 97-3 — the TARGET banner and beat tiles render the server-authored DC.
+ *
+ * Regression pin for the two-sources-of-truth fix. Pre-fix state:
  *
  * Measured (ping-pong 2026-06-07 dice entry, FIXER notes ui #352): the
  * pre-roll TARGET banner shows a CLIENT-side formula — `handleBeatSelect`
@@ -31,14 +33,46 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { WS } from "jest-websocket-mock";
+
+// R3F + drei + rapier stubs — the rework round renders the REAL
+// ConfrontationOverlay (BeatTile DC pin, review HIGH-2), which pulls in
+// InlineDiceTray → DiceScene → @react-three/fiber. Pattern copied from
+// confrontation-wiring.test.tsx.
+vi.mock("@react-three/fiber", () => ({
+  Canvas: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="r3f-canvas">{children}</div>
+  ),
+  useFrame: vi.fn(),
+  useThree: () => ({ camera: {}, size: { width: 800, height: 600 } }),
+  useLoader: () => {
+    const tex = {
+      wrapS: 0,
+      wrapT: 0,
+      clone() {
+        return { ...this, clone: this.clone };
+      },
+    };
+    return tex;
+  },
+}));
+vi.mock("@react-three/rapier", () => ({
+  Physics: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RigidBody: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CuboidCollider: () => null,
+  ConvexHullCollider: () => null,
+}));
+vi.mock("@react-three/drei", () => ({
+  Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
 import {
   installWebAudioMock,
   installLocalStorageMock,
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
-import type {
-  ConfrontationData,
-  BeatOption,
+import {
+  ConfrontationOverlay,
+  type ConfrontationData,
+  type BeatOption,
 } from "@/components/ConfrontationOverlay";
 import type { DiceRequestPayload, DiceThrowParams } from "@/types/payloads";
 
@@ -281,9 +315,61 @@ describe("97-3: the TARGET banner renders the server-authored DC, not a client f
         allCalls.some((msg) => /difficulty/i.test(msg)),
         `expected a loud console message naming the missing difficulty; got: ${JSON.stringify(allCalls)}`,
       ).toBe(true);
+
+      // Rework round 1 (review Devil's Advocate): loud must mean loud TO THE
+      // PLAYER, not just the console — Alex clicks the tile, nothing happens,
+      // and he will never open devtools. The refusal must surface on the
+      // existing transient-error strip (the same channel session_unbound
+      // refusals use).
+      await waitFor(() => {
+        expect(screen.getByTestId("transient-error-banner")).toBeInTheDocument();
+      });
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+});
+
+// ── Rework round 1 (review 2026-06-07, HIGH-2) ──────────────────────────────
+// BeatTile renders its own DC chip ("the honest difficulty signal", playtest
+// 59-8, Sebastien/Jade lane) — and the first pass left it computing the dead
+// client formula (10 + 2*|base| clamped). Under SWN the tile said 14 while
+// the armed banner said 17: two player-facing numbers for one roll. The tile
+// is a displayed pre-roll target (AC1) and must render beat.difficulty.
+describe("97-3 rework: BeatTile renders the server-authored DC", () => {
+  const TILE_DATA: ConfrontationData = {
+    type: "combat",
+    label: "Spaceport Firefight",
+    category: "combat",
+    actors: [
+      { name: "Vane", role: "combatant" },
+      { name: "Scrag", role: "combatant" },
+    ],
+    player_metric: { name: "momentum", current: 0, starting: 0, threshold: 7 },
+    opponent_metric: { name: "momentum", current: 0, starting: 0, threshold: 7 },
+    beats: [SHOOT_BEAT], // base 2 → dead formula says 14; server authored 17
+    secondary_stats: null,
+    genre_slug: "space_opera",
+    mood: "tense",
+  };
+
+  it("shows the server DC on the tile, not the client formula", () => {
+    render(<ConfrontationOverlay data={TILE_DATA} onBeatSelect={() => {}} />);
+    // The tile's mechanical row reads "KIND · STAT · DC {n}".
+    expect(screen.getByText(`DC ${SERVER_DC}`)).toBeInTheDocument();
+    expect(screen.queryByText(`DC ${CLIENT_FORMULA_DC}`)).toBeNull();
+  });
+
+  it("renders no DC chip for a beat without a server-authored difficulty", () => {
+    // A formula number here would resurrect the exact silent fallback the
+    // story killed — absence must render as absence, not as an invention.
+    render(
+      <ConfrontationOverlay
+        data={{ ...TILE_DATA, beats: [NAKED_BEAT] }}
+        onBeatSelect={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/DC \d+/)).toBeNull();
   });
 });
