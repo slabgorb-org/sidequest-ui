@@ -49,35 +49,3 @@ export function EmptyNarrationState() {
   );
 }
 
-export function NarratorConsidersInterstitial({
-  genre,
-  className,
-}: {
-  genre?: string | null;
-  className?: string;
-}) {
-  if (hasGenreLoader(genre)) {
-    return (
-      <div
-        data-testid="narrator-considers"
-        className={`flex flex-col items-center justify-center gap-2 text-muted-foreground/40 ${className ?? "py-2"}`}
-      >
-        <GenreLoader genre={genre as string} />
-        <span className="text-sm italic">The narrator considers...</span>
-      </div>
-    );
-  }
-  return (
-    <div
-      data-testid="narrator-considers"
-      className={`flex items-center justify-center gap-3 text-muted-foreground/30 ${className ?? "py-2"}`}
-    >
-      <span className="text-sm animate-pulse">◇</span>
-      <span className="text-sm animate-pulse [animation-delay:200ms]">◇</span>
-      <span className="text-sm animate-pulse [animation-delay:400ms]">◇</span>
-      <span className="text-sm italic text-muted-foreground/40">
-        The narrator considers...
-      </span>
-    </div>
-  );
-}

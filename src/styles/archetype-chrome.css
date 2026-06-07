@@ -397,26 +397,12 @@
 
 /* ── Narration Pane Typography ────────────────────────────────────────────
    Per-archetype overrides for narration body text, drop caps, player-action
-   treatments, and the streaming cursor block. Sourced from the Narration
+   treatments. Sourced from the Narration
    Pane design handoff (claude.ai/design — May 2026). The Tailwind size
    classes on the prose div (text-2xl / text-lg) provide the cross-archetype
    default; these rules tighten font-size, leading, and accent treatment per
    archetype so each genre family reads in its own voice.
    ──────────────────────────────────────────────────────────────────────── */
-
-/* Streaming cursor — shared blink animation. Color overridden per archetype. */
-@keyframes narration-cursor-blink {
-  50% { opacity: 0; }
-}
-.streaming-cursor {
-  display: inline-block;
-  width: 0.55ch;
-  height: 1.05em;
-  margin-left: 2px;
-  vertical-align: -0.18em;
-  background: var(--primary);
-  animation: narration-cursor-blink 1s steps(2, start) infinite;
-}
 
 /* Parchment narration — Garamond, 21px, 1.7 leading, gold drop cap. */
 [data-archetype="parchment"] .narr-text-current p {
@@ -500,10 +486,6 @@
   color: var(--primary);
   font-weight: 700;
   text-shadow: 0 0 16px var(--glow-primary);
-}
-[data-archetype="terminal"] .streaming-cursor {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--glow-accent);
 }
 /* Terminal player-action: prefix with `> ` and accent the line. */
 [data-archetype="terminal"] .player-action {
