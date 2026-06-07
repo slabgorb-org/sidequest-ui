@@ -101,11 +101,18 @@ describe("Wiring: App.tsx WebSocket OPEN-transition cleanup (playtest 2026-04-11
     );
   });
 
-  it("only sends SESSION_EVENT connect handshake when we have a saved session", async () => {
+  it("only sends SESSION_EVENT connect handshake when a session identity exists (URL slug, saved-session fallback)", async () => {
     const src = await readAppSrc();
-    // The re-handshake effect must loadSession() and guard on its result,
-    // otherwise we'd send connect payloads with empty fields on fresh visits.
-    expect(src).toMatch(/const\s+saved\s*=\s*loadSession\(\)[\s\S]*?if\s*\(\s*saved\s*\)/);
+    // Ping-pong 2026-06-07 ("reconnects but never re-binds"): the rebind keys
+    // off the URL slug FIRST — the error→clearSession effect wipes the saved
+    // session during the reconnect backoff window, so loadSession() alone
+    // silently disarmed the rebind after a server restart. The saved session
+    // remains the fallback for slugless mounts, and the guard on the combined
+    // identity preserves the original intent: never send a connect payload
+    // with an empty game_slug on a fresh visit.
+    expect(src).toMatch(
+      /const\s+gameSlug\s*=\s*slug\s*\?\?\s*loadSession\(\)\?\.gameSlug[\s\S]*?if\s*\(\s*!gameSlug\s*\)/,
+    );
   });
 });
 

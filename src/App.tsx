@@ -1999,6 +1999,18 @@ function AppInner() {
   // previously `connected` (i.e. this is a genuine mid-session reconnect,
   // not the first page-load handshake which is handled by the slug-connect
   // effect above). Uses game_slug — no legacy genre+world+player fallback.
+  //
+  // Ping-pong 2026-06-07 ("client auto-reconnects but never re-binds"): the
+  // rebind keys off the URL slug, NOT the sessionStorage row. A restarting
+  // server refuses the first backoff retry, firing onerror — and the
+  // `error → clearSession()` effect below wipes the saved session during
+  // that window. By the time the socket reopens, loadSession() is null and
+  // the old code fell through SILENTLY: an OPEN-but-unbound socket where
+  // every PLAYER_ACTION died with `session.message_rejected_unbound`. The
+  // URL slug is the authoritative session identity for the whole
+  // /solo|play/:slug mount (the slug-connect effect and a manual page
+  // reload both use it); the saved session is only a fallback for slugless
+  // mounts. No identity at all → fail loud, never silently skip the bind.
   useEffect(() => {
     const wasDisconnected = prevReadyState.current !== WebSocket.OPEN;
     prevReadyState.current = readyState;
@@ -2011,20 +2023,25 @@ function AppInner() {
         justConnectedRef.current = false;
         return;
       }
-      const saved = loadSession();
-      if (saved) {
-        send({
-          type: MessageType.SESSION_EVENT,
-          payload: {
-            event: "connect",
-            game_slug: saved.gameSlug,
-            player_name: displayName ?? undefined,
-          },
-          player_id: displayName ?? "",
-        });
+      const gameSlug = slug ?? loadSession()?.gameSlug;
+      if (!gameSlug) {
+        console.error(
+          "[reconnect] socket reopened but no game slug to re-bind — " +
+            "no URL slug and no saved session; the session stays unbound",
+        );
+        return;
       }
+      send({
+        type: MessageType.SESSION_EVENT,
+        payload: {
+          event: "connect",
+          game_slug: gameSlug,
+          player_name: displayName ?? undefined,
+        },
+        player_id: displayName ?? "",
+      });
     }
-  }, [readyState, connected, send]);
+  }, [readyState, connected, send, slug, displayName]);
 
   // If connection fails, clear saved session so we don't loop
   useEffect(() => {
