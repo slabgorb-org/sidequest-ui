@@ -310,6 +310,17 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
           data-testid="dice-target-banner"
           className="flex items-center justify-center gap-2 mb-2 px-3 py-2 rounded border border-border bg-muted/40"
         >
+          {/* Ping-pong 2026-06-07 (wrong-stat banner): a spectated PEER roll
+              must be ATTRIBUTED — an unlabeled peer banner reads as the local
+              player's own target ("why does my Reflex beat say INTELLECT?"). */}
+          {!isRollingPlayer && (
+            <span
+              data-testid="dice-roller-attribution"
+              className="text-[11px] font-semibold text-muted-foreground"
+            >
+              {diceRequest.character_name}&apos;s roll ·
+            </span>
+          )}
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
             Target
           </span>
@@ -386,7 +397,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
             linger beside the next set of beat buttons. Tabletop parity:
             the DM never erases the target mid-resolution, but the slate
             wipes clean before the next roll. */}
-        {diceResult && (
+        {diceResult && (diceRequest === null || diceResult.request_id === diceRequest.request_id) && (
           <div
             data-testid="dice-result"
             data-outcome={diceResult.outcome}
@@ -407,7 +418,11 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
               textShadow: "0 2px 8px rgba(0,0,0,0.8)",
             }}
           >
-            <span style={{ fontSize: 12, color: "#a8a29e" }}>Rolled</span>
+            {/* Ping-pong 2026-06-07: always attribute the readout — "Rolled 8
+                vs 10" with no name is unreadable in MP (whose 8?). */}
+            <span style={{ fontSize: 12, color: "#a8a29e" }}>
+              {diceResult.character_name} rolled
+            </span>
             <span
               style={{
                 fontSize: 28,
