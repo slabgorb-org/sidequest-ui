@@ -222,6 +222,10 @@ export interface GameBoardProps {
   companions?: CompanionSummary[];
   genreSlug?: string;
   worldSlug?: string;
+  /** Server-announced orbital capability (GameResponse.orbital — world ships
+   * orbits.yaml). Gates MapWidget's OrbitalChartView; replaces the per-world
+   * frontend allowlist (sq-playtest 2026-06-07 perseus orrery). */
+  worldOrbital?: boolean;
   /** Story 71-4: per-round persisted peer actions (firewall-filtered) — threaded to the narrative widget. */
   peerActionsByRound?: Map<number, ActionRevealEntry[]>;
   depletions?: ItemDepletion[];
@@ -286,6 +290,7 @@ export function GameBoard({
   companions = [],
   genreSlug,
   worldSlug,
+  worldOrbital = false,
   peerActionsByRound,
   navMode,
   depletions,
@@ -504,7 +509,7 @@ export function GameBoard({
         return (
           <MapWidget
             mapData={mapData ?? null}
-            worldSlug={worldSlug}
+            orbital={worldOrbital}
             lastOrbitalChart={lastOrbitalChart ?? null}
             sendOrbitalIntent={sendOrbitalIntent}
             sessionBoundEpoch={sessionBoundEpoch}
@@ -587,7 +592,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       currentLocation, knowledgeEntries, relationshipsData, questsData, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
-      peerActionsByRound,
+      worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
       sessionBoundEpoch,

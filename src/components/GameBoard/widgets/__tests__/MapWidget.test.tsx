@@ -157,13 +157,16 @@ describe("MapWidget", () => {
     });
   });
 
-  describe("orbital chart routing (worldSlug=coyote_star)", () => {
+  // Orbital routing is gated on the server-announced `orbital` prop
+  // (GameResponse.orbital — world ships orbits.yaml), not a per-world slug
+  // allowlist (sq-playtest 2026-06-07: perseus_cloud orrery unreachable).
+  describe("orbital chart routing (orbital prop)", () => {
     it("renders the loading state before any chart arrives", () => {
       const sendOrbitalIntent = vi.fn();
       const { getByTestId } = render(
         <MapWidget
           mapData={null}
-          worldSlug="coyote_star"
+          orbital
           lastOrbitalChart={null}
           sendOrbitalIntent={sendOrbitalIntent}
         />
@@ -190,7 +193,7 @@ describe("MapWidget", () => {
       const { getByTestId } = render(
         <MapWidget
           mapData={null}
-          worldSlug="coyote_star"
+          orbital
           lastOrbitalChart={chart}
           sendOrbitalIntent={sendOrbitalIntent}
         />
@@ -206,7 +209,7 @@ describe("MapWidget", () => {
       const { getByTestId } = render(
         <MapWidget
           mapData={null}
-          worldSlug="flickering_reach"
+          orbital={false}
           sendOrbitalIntent={sendOrbitalIntent}
         />
       );

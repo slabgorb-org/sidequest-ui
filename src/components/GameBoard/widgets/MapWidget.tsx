@@ -9,13 +9,15 @@ import type {
   OrbitalIntentResponse,
 } from "@/types/orbital-intent";
 
-/** Worlds that opt into the server-rendered orbital chart (orbits.yaml). */
-const ORBITAL_WORLD_SLUGS = new Set(["coyote_star"]);
-
 interface MapWidgetProps {
   mapData: MapState | null;
-  /** Active world slug — drives orbital chart routing for hierarchical worlds. */
-  worldSlug?: string;
+  /**
+   * Server-announced orbital capability (GameResponse.orbital — the world
+   * ships an orbits.yaml). Replaces the old per-world frontend allowlist
+   * (`ORBITAL_WORLD_SLUGS`), which silently left every newly-orbital world
+   * (perseus_cloud, sq-playtest 2026-06-07) without its orrery.
+   */
+  orbital?: boolean;
   /** Latest ORBITAL_CHART message from the server, or null. */
   lastOrbitalChart?: OrbitalIntentResponse | null;
   /** Send an OrbitalIntent over the WebSocket. */
@@ -55,12 +57,12 @@ interface MapWidgetProps {
  */
 export function MapWidget({
   mapData,
-  worldSlug,
+  orbital = false,
   lastOrbitalChart = null,
   sendOrbitalIntent,
   sessionBoundEpoch = 0,
 }: MapWidgetProps) {
-  const orbitalEnabled = worldSlug !== undefined && ORBITAL_WORLD_SLUGS.has(worldSlug);
+  const orbitalEnabled = orbital;
   const noopIntent = useMemo(() => () => {}, []);
 
   // Plot-a-course: bump a counter every time the server-side plotted_course
