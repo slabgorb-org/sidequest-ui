@@ -63,8 +63,18 @@ export function buildSegments(
   // out-of-order/late round therefore no longer shifts later peer blocks onto
   // the wrong turn. `emittedRounds` guards the trailing pass against double-emit.
   const emittedRounds = new Set<number>();
-  // Round of the most recent own PLAYER_ACTION — the turn currently being closed.
+  // Round of the turn currently being closed. Sourced from the own
+  // PLAYER_ACTION's round (71-10) and — ping-pong 2026-06-07 ("stale peer
+  // quote pinned at the bottom") — overridden by the round NARRATION_END now
+  // carries, which is the anchor that works for EVERY turn shape: dice-driven
+  // turns (combat beat commits ride DICE_THROW) have no own PLAYER_ACTION, so
+  // their rounds previously never anchored and fell to the trailing pass.
   let currentRound: number | undefined;
+  // Highest round that closed via a NARRATION_END above — the trailing pass
+  // only appends rounds NEWER than this (the legit "just-resolved,
+  // NARRATION_END not yet in messages" case). Stale older orphans are
+  // dropped, never pinned below the newest narration.
+  let maxAnchoredRound: number | undefined;
   // Emit a round's submitted peers (seq order) as is_peer player-action
   // segments. The accumulator already deduped per (player_id, round). No-op for
   // an unknown/undefined round or one already emitted.
@@ -88,10 +98,22 @@ export function buildSegments(
     const msg = messages[i];
     switch (msg.type) {
       case MessageType.NARRATION_END: {
+        // Ping-pong 2026-06-07: NARRATION_END carries the round it resolved
+        // (server stamps it pre-record_interaction). Prefer it over the own
+        // PLAYER_ACTION round — dice-driven turns have no own action, and a
+        // stale own-action round from a prior typed turn would mis-anchor.
+        const endRound = msg.payload?.round as number | undefined;
+        if (endRound !== undefined) currentRound = endRound;
         // Story 71-10: emit THIS turn's peers (matched by the round carried on
         // the turn's own PLAYER_ACTION) BEFORE the separator, so they anchor
         // AFTER the round's own action + narration. Exact-round, not positional.
         pushPeerRound(currentRound);
+        if (currentRound !== undefined) {
+          maxAnchoredRound =
+            maxAnchoredRound === undefined
+              ? currentRound
+              : Math.max(maxAnchoredRound, currentRound);
+        }
         if (segments.length > 0 && segments[segments.length - 1].kind !== "separator") {
           segments.push({ kind: "separator" });
         }
@@ -246,12 +268,21 @@ export function buildSegments(
   // Story 71-10: any captured rounds not anchored to a NARRATION_END above
   // append after all narration, in ascending round order — covers a
   // just-resolved turn whose NARRATION_END isn't (yet) in `messages`, a
-  // roundless legacy PLAYER_ACTION (round undefined never matches a key), and
-  // transcripts with no narration frames at all (the e2e wiring harness).
+  // roundless legacy transcript (no NARRATION_END round anywhere →
+  // maxAnchoredRound undefined, everything appends), and transcripts with no
+  // narration frames at all (the e2e wiring harness).
+  // Ping-pong 2026-06-07 ("stale peer quote pinned at the bottom"): only
+  // rounds NEWER than the last anchored round qualify — an orphaned OLDER
+  // round belongs to an already-rendered turn, and appending it here is
+  // exactly the bug (a negotiation-era quote below the latest combat card).
   // Still firewall-safe: source is exclusively the accumulator.
   if (peerActionsByRound) {
     const remaining = [...peerActionsByRound.keys()]
-      .filter((r) => !emittedRounds.has(r))
+      .filter(
+        (r) =>
+          !emittedRounds.has(r) &&
+          (maxAnchoredRound === undefined || r > maxAnchoredRound),
+      )
       .sort((a, b) => a - b);
     for (const roundKey of remaining) pushPeerRound(roundKey);
   }
