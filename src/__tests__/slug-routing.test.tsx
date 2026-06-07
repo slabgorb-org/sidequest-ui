@@ -931,3 +931,95 @@ describe('slug routing — MP session widget surfaces during chargen', () => {
     expect(waiting).toHaveTextContent(/potsie/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Storage-blocked browser — playtest 2026-06-07 flickering_reach blocking bug.
+// On a browser where localStorage throws (Safari private/Lockdown, site data
+// blocked for the tunnel domain), the old useDisplayName same-tab sync READ
+// the just-typed name back from storage and wiped it to null synchronously.
+// The slug-route connect effect then blocked forever: POST /api/games 201 but
+// no GET /api/games/:slug and no WebSocket — four zero-turn sessions from one
+// remote player. This wiring test mounts the real App at a slug route with
+// fully dead storage and proves NamePrompt confirm still reaches the metadata
+// fetch + WS connect.
+// ---------------------------------------------------------------------------
+
+describe('slug routing — storage-blocked browser still connects via NamePrompt', () => {
+  it('NamePrompt confirm fires GET /api/games/:slug and WS connect when localStorage throws', async () => {
+    // Dead storage: every access throws, the shape of "block all site data".
+    const deadStorage = {
+      getItem: vi.fn(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      }),
+      setItem: vi.fn(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      }),
+      removeItem: vi.fn(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      }),
+      clear: vi.fn(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      }),
+      length: 0,
+      key: vi.fn(() => null),
+    };
+    vi.stubGlobal('localStorage', deadStorage);
+
+    const slugForTest = '2026-06-07-flickering_reach';
+    let metaFetchCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url)) {
+          metaFetchCount += 1;
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                genre_slug: 'mutant_wasteland',
+                world_slug: 'flickering_reach',
+                mode: 'solo',
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (typeof url === 'string' && url.includes('/api/genres')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ mutant_wasteland: { name: 'Mutant Wasteland', worlds: [] } }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }),
+    );
+
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={[`/solo/${slugForTest}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // Dead storage means no cached identity — NamePrompt must render.
+    const input = await screen.findByRole('textbox', { name: /player name/i });
+
+    // Type a name and confirm. Under the old read-back sync this wiped the
+    // name to null in the same tick and the connect effect never fired.
+    const user = userEvent.setup();
+    await user.type(input, 'WastelandWanderer');
+    await user.click(screen.getByRole('button', { name: /begin/i }));
+
+    // The connect effect must now fetch metadata and open the WS.
+    await waitFor(() => expect(metaFetchCount).toBeGreaterThan(0));
+    await server.connected;
+    const msg = (await server.nextMessage) as { type: string; payload: Record<string, unknown> };
+    expect(msg.type).toBe('SESSION_EVENT');
+    expect(msg.payload.event).toBe('connect');
+    expect(msg.payload.game_slug).toBe(slugForTest);
+    expect(msg.payload.player_name).toBe('WastelandWanderer');
+  });
+});
