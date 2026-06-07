@@ -1566,10 +1566,20 @@ function AppInner() {
       // The server will receive beat_id + face + seed in one DiceThrow message.
       const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
       const modifier = Math.floor((statVal - 10) / 2);
-      // DC scales with `base` (BeatDef scalar magnitude). Defaults to the
-      // server-side default of 1 when absent. Replaces the legacy
-      // `metric_delta` field that was removed in the dual-track migration.
-      const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.base ?? 1) * 2));
+      // Story 97-3: the server is the ONLY DC author. The beat offer carries
+      // a server-computed `difficulty` (native: beat DC; SWN/hp_depletion:
+      // the target's armor class — a number this client cannot know). The
+      // old client formula (`clamp(10 + |base|*2, 10..30)`) silently diverged
+      // from the server's effective difficulty and made the TARGET banner
+      // lie; a beat offer without a server DC is malformed — refuse LOUDLY
+      // (No Silent Fallbacks), never resurrect the formula.
+      if (typeof beat.difficulty !== "number") {
+        console.error(
+          `[beat-dispatch] "${beatId}" refused: beat offer carries no server-authored difficulty — ` +
+            "the server must author the DC (Story 97-3); the client computes nothing.",
+        );
+        return;
+      }
       const charSheetName = characterSheet?.name;
       const charLooseName = character?.name;
       const charName: string =
@@ -1582,7 +1592,7 @@ function AppInner() {
         dice: [{ sides: 20, count: 1 }],
         modifier,
         stat: beat.stat_check,
-        difficulty: rawDc,
+        difficulty: beat.difficulty,
         context: `${beat.label} — ${beat.stat_check} check`,
       };
       pendingBeatIdRef.current = beatId;

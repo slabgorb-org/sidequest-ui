@@ -99,6 +99,9 @@ const SWING_BEAT: BeatOption = {
   kind: "press",
   base: 2,
   stat_check: "DEX",
+  // Story 97-3: beat offers carry a server-authored pre-roll DC; a beat
+  // without one is refused by handleBeatSelect (No Silent Fallbacks).
+  difficulty: 14,
 };
 
 function confrontation(): ConfrontationData {

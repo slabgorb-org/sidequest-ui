@@ -47,8 +47,16 @@ export interface BeatOption {
   label: string;
   /** Beat kind: closed enum from BeatKind (drives per-tier delta defaults). */
   kind?: string;
-  /** Scalar magnitude — drives DC scaling and risk color. Defaults to 1 server-side. */
+  /** Scalar magnitude — drives risk color. Defaults to 1 server-side. */
   base?: number;
+  /**
+   * Server-authored pre-roll target number (Story 97-3). The server is the
+   * ONLY DC author: native packs send the beat DC, SWN/hp_depletion packs
+   * send the target's armor class. The TARGET banner renders this value;
+   * the client computes nothing. A beat offer without it is malformed and
+   * the commit is refused loudly (No Silent Fallbacks).
+   */
+  difficulty?: number;
   stat_check: string;
   risk?: string;
   resolution?: boolean;
