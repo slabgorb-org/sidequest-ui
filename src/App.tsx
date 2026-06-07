@@ -294,6 +294,11 @@ function AppInner() {
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
   const [currentWorld, setCurrentWorld] = useState<string | null>(null);
+  // Server-announced orbital capability (GameResponse.orbital — the world
+  // ships an orbits.yaml). Gates MapWidget's OrbitalChartView; replaces the
+  // per-world frontend allowlist that left perseus_cloud's orrery
+  // unreachable (sq-playtest 2026-06-07).
+  const [worldOrbital, setWorldOrbital] = useState(false);
   // Slug-mode: metadata fetched from GET /api/games/:slug before WS connect fires.
   // gameMetaError surfaces in the alert region; retryCount re-runs the fetch when
   // the user clicks Retry after a transient failure.
@@ -1780,6 +1785,7 @@ function AppInner() {
     setGameMetaError(null);
     setCurrentGenre(null);
     setCurrentWorld(null);
+    setWorldOrbital(false);
     // Route off the slug — otherwise the slug-connect effect re-fires.
     // disconnect() above already flushed the SESSION_EVENT outbound.
     navigate("/");
@@ -1938,7 +1944,12 @@ function AppInner() {
     fetch(`/api/games/${encodeURIComponent(slug)}`)
       .then(async (resp) => {
         if (!resp.ok) throw new Error(`failed to load game: ${resp.status}`);
-        return resp.json() as Promise<{ genre_slug: string; world_slug: string; mode: string }>;
+        return resp.json() as Promise<{
+          genre_slug: string;
+          world_slug: string;
+          mode: string;
+          orbital?: boolean;
+        }>;
       })
       .then((body) => {
         if (cancelled) return;
@@ -1952,6 +1963,9 @@ function AppInner() {
         // depend on currentGenre being non-null on first game render.
         setCurrentGenre(body.genre_slug);
         setCurrentWorld(body.world_slug);
+        // Server-announced orbital capability (orbits.yaml on the world).
+        // Missing field (older server) reads as false — flat map only.
+        setWorldOrbital(body.orbital === true);
         // Record this slug in journey history so a page refresh on this
         // tab doesn't re-trigger the slug-mode NamePrompt. Player 1 already
         // appends history via ConnectScreen; this call covers Player 2's
@@ -2452,6 +2466,7 @@ function AppInner() {
                 companions={partyCompanions}
                 genreSlug={currentGenre ?? undefined}
                 worldSlug={currentWorld ?? undefined}
+                worldOrbital={worldOrbital}
                 peerActionsByRound={persistedPeerActions.byRound}
                 navMode={
                   genres[currentGenre ?? ""]?.worlds.find(

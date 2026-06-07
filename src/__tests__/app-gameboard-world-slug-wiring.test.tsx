@@ -36,11 +36,16 @@ import { AudioEngine } from "@/audio/AudioEngine";
 // this is the same indirection trick the existing wiring tests use to
 // avoid pulling in heavy widget trees.
 vi.mock("@/components/GameBoard/GameBoard", () => ({
-  GameBoard: (props: { genreSlug?: string; worldSlug?: string }) => (
+  GameBoard: (props: {
+    genreSlug?: string;
+    worldSlug?: string;
+    worldOrbital?: boolean;
+  }) => (
     <div
       data-testid="gameboard-stub"
       data-genre-slug={props.genreSlug ?? ""}
       data-world-slug={props.worldSlug ?? ""}
+      data-world-orbital={String(props.worldOrbital ?? false)}
     />
   ),
 }));
@@ -51,6 +56,10 @@ const COYOTE_STAR_META = {
   genre_slug: "space_opera",
   world_slug: "coyote_star",
   mode: "solo",
+  // Server-announced orbital capability (GameResponse.orbital) — the world
+  // ships an orbits.yaml. Gates MapWidget's orbital view; replaces the old
+  // per-world frontend allowlist (sq-playtest 2026-06-07 perseus orrery).
+  orbital: true,
 };
 
 function makeFetchMock() {
@@ -149,6 +158,9 @@ describe("App → GameBoard worldSlug wiring (Coyote Star)", () => {
     );
     expect(stub.getAttribute("data-genre-slug")).toBe("space_opera");
     expect(stub.getAttribute("data-world-slug")).toBe("coyote_star");
+    // Orbital capability rides the same metadata fetch — server-announced,
+    // no frontend allowlist.
+    expect(stub.getAttribute("data-world-orbital")).toBe("true");
   });
 
   it("never forwards an empty worldSlug — pre-fix regression guard", async () => {
