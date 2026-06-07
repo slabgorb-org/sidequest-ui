@@ -1578,6 +1578,12 @@ function AppInner() {
           `[beat-dispatch] "${beatId}" refused: beat offer carries no server-authored difficulty — ` +
             "the server must author the DC (Story 97-3); the client computes nothing.",
         );
+        // Rework round 1: loud means loud TO THE PLAYER (Alex clicks, nothing
+        // happens, and he will never open devtools). Same transient strip the
+        // session_unbound refusal uses — the click bounced, not the game.
+        setTransientError(
+          "That move arrived without its difficulty from the server — try re-selecting it, or report this if it persists.",
+        );
         return;
       }
       const charSheetName = characterSheet?.name;
