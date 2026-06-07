@@ -459,6 +459,16 @@ function AppInner() {
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
+  // Ping-pong 2026-06-07 ("die face ≠ readout ≠ server total"): synchronous
+  // mirror of the DISPLAYED dice request, read by the MP frame guard in
+  // handleMessage. The server broadcasts every roller's DICE_REQUEST /
+  // DICE_RESULT to the whole room; these slots are a single-die readout, so a
+  // PEER's frames must never clobber the LOCAL player's in-flight roll (the
+  // perseus screenshot: Groucho's banner flipped to Chico's INTELLECT/TARGET
+  // mid-roll) and a result must only render under ITS OWN banner. A ref —
+  // not state — because request and result can arrive in the same WS batch
+  // and the pairing decision must see the just-accepted request.
+  const displayedDiceRequestRef = useRef<DiceRequestPayload | null>(null);
 
   // Orbital chart state from ORBITAL_CHART messages (orbital map Task 15b).
   // The MapWidget's useOrbitalChart hook consumes this as `lastResponse`.
@@ -523,6 +533,7 @@ function AppInner() {
   //     branch of handleMessage (playtest-pingpong 2026-04-24).
   useEffect(() => {
     if (confrontationData) return;
+    displayedDiceRequestRef.current = null;
     setDiceRequest(null);
     setDiceResult(null);
   }, [confrontationData]);
@@ -697,6 +708,7 @@ function AppInner() {
         // "TARGET 18 · need 17" + "Rolled 4 vs 18 Fail" stays pinned
         // beside the next set of beat buttons, and players read it as
         // the DC for the next click (playtest-pingpong 2026-04-24).
+        displayedDiceRequestRef.current = null;
         setDiceRequest(null);
         setDiceResult(null);
         // Story 71-3 (AC-2): a completed turn round-trip clears the stale
@@ -1134,14 +1146,51 @@ function AppInner() {
       return;
     }
 
-    // Dice overlay — driven by DICE_REQUEST and DICE_RESULT (story 34-5)
+    // Dice overlay — driven by DICE_REQUEST and DICE_RESULT (story 34-5).
+    // Ping-pong 2026-06-07 MP frame guard ("die face ≠ readout ≠ server
+    // total"): own frames always win; a peer DICE_REQUEST never clobbers the
+    // local player's displayed roll; a peer DICE_RESULT only renders when it
+    // pairs with the displayed request (same request_id) — a result under a
+    // different banner was the exact mixed readout from the screenshot.
+    // Spectating is preserved: with the slot idle (or already showing a
+    // peer), a peer's request+result pair displays and replays normally.
     if (msg.type === MessageType.DICE_REQUEST) {
-      setDiceRequest(msg.payload as unknown as DiceRequestPayload);
+      const incomingReq = msg.payload as unknown as DiceRequestPayload;
+      const selfId = currentPlayerIdRef.current;
+      const reqIsOwn = !!selfId && incomingReq.rolling_player_id === selfId;
+      const displayed = displayedDiceRequestRef.current;
+      const displayedIsOwn =
+        !!selfId && displayed !== null && displayed.rolling_player_id === selfId;
+      if (!reqIsOwn && displayedIsOwn) {
+        // Peer frame while the local roll is displayed — drop, loudly.
+        console.warn(
+          `[dice-guard] peer DICE_REQUEST ${incomingReq.request_id} (${incomingReq.character_name}) ` +
+            `dropped — local roll ${displayed.request_id} is displayed`,
+        );
+        return;
+      }
+      displayedDiceRequestRef.current = incomingReq;
+      setDiceRequest(incomingReq);
       setDiceResult(null);
       return;
     }
     if (msg.type === MessageType.DICE_RESULT) {
-      setDiceResult(msg.payload as unknown as DiceResultPayload);
+      const incomingRes = msg.payload as unknown as DiceResultPayload;
+      const selfId = currentPlayerIdRef.current;
+      const resIsOwn = !!selfId && incomingRes.rolling_player_id === selfId;
+      const displayed = displayedDiceRequestRef.current;
+      const pairs = displayed !== null && displayed.request_id === incomingRes.request_id;
+      // Drop only on a true MISMATCH (a different roll's banner is up). An
+      // idle slot accepts a bare result — e.g. a reconnect that missed the
+      // request frame; the tray attributes it by character_name.
+      if (!resIsOwn && displayed !== null && !pairs) {
+        console.warn(
+          `[dice-guard] peer DICE_RESULT ${incomingRes.request_id} (${incomingRes.character_name}) ` +
+            `dropped — does not pair with displayed request ${displayed?.request_id ?? "none"}`,
+        );
+        return;
+      }
+      setDiceResult(incomingRes);
       return;
     }
 
@@ -1541,6 +1590,7 @@ function AppInner() {
       // to the DICE_THROW once physics settles. Trim defensively; empty
       // string is the well-defined "no action typed" case.
       pendingPlayerActionRef.current = (playerAction ?? "").trim();
+      displayedDiceRequestRef.current = localReq;
       setDiceResult(null);
       setDiceRequest(localReq);
     },
@@ -1581,6 +1631,7 @@ function AppInner() {
         setTransientError("Server reconnecting — please retry your roll in a moment.");
         pendingBeatIdRef.current = null;
         pendingPlayerActionRef.current = "";
+        displayedDiceRequestRef.current = null;
         setDiceResult(null);
         setDiceRequest(null);
         return;
@@ -1687,6 +1738,7 @@ function AppInner() {
     setCanType(true);
     setConfrontationData(null);
     setConfrontationOutcome(null);
+    displayedDiceRequestRef.current = null;
     setDiceRequest(null);
     setDiceResult(null);
     setPaused(false);
