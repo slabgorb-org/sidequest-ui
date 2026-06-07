@@ -25,7 +25,7 @@
 //   AC-2  a real yield submit (handleYield) round-tripping to NARRATION_END clears it
 //   AC-3  manual Dismiss still clears it (regression guard)
 //   AC-4  a failed/in-progress reconnect does NOT clear it
-//   AC-4  an unrelated streaming NARRATION frame (not a turn boundary) does NOT clear it
+//   AC-4  an unrelated mid-turn NARRATION frame (not a turn boundary) does NOT clear it
 //   AC-4  a NARRATION_END for a turn the local player did NOT submit into (MP cross-player) does NOT clear it
 //   AC-4  an error that arrives while connected-and-never-dropped is NOT cleared by the reconnect effect
 
@@ -309,7 +309,7 @@ describe("transient-error banner auto-clear wiring (71-3)", () => {
     expect(screen.queryByTestId("transient-error-banner")).toBeNull();
   });
 
-  it("AC-4: a streaming NARRATION frame (not a turn boundary) does NOT clear it", async () => {
+  it("AC-4: a mid-turn NARRATION frame (not a turn boundary) does NOT clear it", async () => {
     const server = new WS(wsUrl, { jsonProtocol: true });
     renderApp();
     await connectAndRaiseError(server);

@@ -704,7 +704,7 @@ function AppInner() {
         // (e.g. a session_unbound "please retry" notice) and the retry
         // succeeds, NARRATION_END is the success signal — drop the now-stale
         // error so it doesn't overlay the fresh narration. Two AC-4 guards:
-        //   1. Scoped to NARRATION_END (the turn boundary), NOT streaming
+        //   1. Scoped to NARRATION_END (the turn boundary), NOT mid-turn
         //      NARRATION frames.
         //   2. Gated on localTurnInFlightRef — only a NARRATION_END that
         //      resolves a turn THIS player submitted into clears the error,

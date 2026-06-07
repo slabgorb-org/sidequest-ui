@@ -101,12 +101,6 @@ export interface NarrationEndPayload {
   state_delta?: StateDelta;
 }
 
-export interface NarrationDeltaPayload {
-  turn_id: string;
-  chunk: string;
-  seq: number;
-}
-
 export interface SessionEventPayload {
   event: string;
   player_name?: string;
@@ -536,20 +530,6 @@ export interface RelationshipsMessage extends BaseMessage {
   payload: RelationshipsPayload;
 }
 
-/**
- * Streaming narration delta — intentionally outside TypedGameMessage union.
- *
- * Uses `kind` (not `type`) and carries no `player_id`. Broadcast to all
- * sockets as the narrator generates prose, then superseded by the canonical
- * NarrationMessage at end-of-stream.
- *
- * See sidequest-server NarrationDelta for full context.
- */
-export interface NarrationDelta {
-  kind: "narration.delta";
-  payload: NarrationDeltaPayload;
-}
-
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -662,16 +642,6 @@ export function isDiceResult(msg: TypedGameMessage): msg is DiceResultMessage {
 
 export function isScrapbookEntry(msg: TypedGameMessage): msg is ScrapbookEntryMessage {
   return msg.type === MessageType.SCRAPBOOK_ENTRY;
-}
-
-export function isNarrationDelta(msg: unknown): msg is NarrationDelta {
-  return (
-    typeof msg === "object" &&
-    msg !== null &&
-    "kind" in msg &&
-    msg.kind === "narration.delta" &&
-    "payload" in msg
-  );
 }
 
 // ---------------------------------------------------------------------------
