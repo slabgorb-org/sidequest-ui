@@ -530,6 +530,11 @@ export interface RelationshipsMessage extends BaseMessage {
   payload: RelationshipsPayload;
 }
 
+export interface CharacterIncapacitatedMessage extends BaseMessage {
+  type: typeof MessageType.CHARACTER_INCAPACITATED;
+  payload: CharacterIncapacitatedPayload;
+}
+
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -554,7 +559,8 @@ export type TypedGameMessage =
   | DiceThrowMessage
   | DiceResultMessage
   | ScrapbookEntryMessage
-  | RelationshipsMessage;
+  | RelationshipsMessage
+  | CharacterIncapacitatedMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -793,6 +799,18 @@ export interface RelationshipEntryPayload {
 
 export interface RelationshipsPayload {
   entries: RelationshipEntryPayload[];
+}
+
+// sq-playtest 2026-06-07 (barsoom-3, blocking): a PC the genre lethality policy
+// ruled dead kept full agency with no death surface. Field names mirror the
+// server pydantic model (CharacterIncapacitatedPayload in
+// sidequest-server/sidequest/protocol/messages.py) on the snake_case wire.
+export interface CharacterIncapacitatedPayload {
+  character_name: string;
+  verdict: string;
+  status_text: string;
+  headline: string;
+  can_reroll: boolean;
 }
 
 // Story 77-5 / ADR-137: player-facing quest spine snapshot. Field names mirror
