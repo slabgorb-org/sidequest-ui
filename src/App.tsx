@@ -41,7 +41,7 @@ import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry } from "@/types/payloads";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry, CharacterIncapacitatedPayload } from "@/types/payloads";
 import type { InputBarRevealCall } from "@/components/InputBar";
 import { usePeerReveals } from "@/hooks/usePeerReveals";
 import { usePersistedPeerActions } from "@/hooks/usePersistedPeerActions";
@@ -53,6 +53,7 @@ import type { GenresResponse } from "@/types/genres";
 import { MultiplayerSessionStatus, type SessionPlayerStatus } from "@/components/MultiplayerSessionStatus";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { PausedBanner } from "@/components/PausedBanner";
+import { DeathBanner } from "@/components/DeathBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { usePeerEventCache } from "@/hooks/usePeerEventCache";
@@ -391,6 +392,22 @@ function AppInner() {
   // the PausedBanner can name them.
   const [paused, setPaused] = useState(false);
   const [pauseWaitingFor, setPauseWaitingFor] = useState<string[]>([]);
+  // sq-playtest 2026-06-07 (barsoom-3, blocking): a PC the lethality policy
+  // ruled dead kept full agency for four rounds because the UI never surfaced
+  // the death or locked input. On CHARACTER_INCAPACITATED for THIS client's
+  // character we latch this; it locks the InputBar and shows a death banner /
+  // re-roll CTA until the player leaves for a fresh session. Peers are NOT
+  // locked (SOUL.md The Guitar Solo — the rest of the band plays on).
+  const [incapacitation, setIncapacitation] = useState<{
+    characterName: string;
+    headline: string;
+    verdict: string;
+    canReroll: boolean;
+  } | null>(null);
+  // Ref bridge: handleMessage (useCallback, declared above localCharacterName)
+  // matches the incapacitated character against the local PC. Synced by an
+  // effect once localCharacterName is computed.
+  const localCharacterNameRef = useRef<string | null>(null);
   // sq-playtest 2026-06-07 (silent blocked-paused drop): the last real
   // action this player submitted, held until the turn actually runs
   // (cleared at NARRATION_END). If GAME_PAUSED arrives while it's set, the
@@ -1136,6 +1153,27 @@ function AppInner() {
       return;
     }
 
+    // Character death / incapacitation (sq-playtest 2026-06-07 barsoom-3). The
+    // server is the authority — it refuses a downed PC's actions server-side —
+    // and this surfaces it: a death banner + input lock for the dead seat only.
+    // PC-scoped: lock only when the incapacitated character is OURS (a peer's
+    // death must not lock our seat). When we have no local character name yet
+    // (solo before the party roster lands), treat it as ours — solo has one PC.
+    if (msg.type === MessageType.CHARACTER_INCAPACITATED) {
+      const p = msg.payload as unknown as CharacterIncapacitatedPayload;
+      const localName = localCharacterNameRef.current;
+      if (!localName || p.character_name === localName) {
+        setIncapacitation({
+          characterName: p.character_name,
+          headline: p.headline,
+          verdict: p.verdict,
+          canReroll: p.can_reroll,
+        });
+        setThinking(false);
+      }
+      return;
+    }
+
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
@@ -1535,6 +1573,12 @@ function AppInner() {
     [partyMembers, currentPlayerId],
   );
 
+  // Keep the ref handleMessage reads in sync (the incapacitation gate matches
+  // the downed character against the local PC).
+  useEffect(() => {
+    localCharacterNameRef.current = localCharacterName;
+  }, [localCharacterName]);
+
   const handleReveal = useCallback(
     (call: InputBarRevealCall) => {
       sendRef.current?.({
@@ -1803,6 +1847,7 @@ function AppInner() {
     setDiceResult(null);
     setPaused(false);
     setPauseWaitingFor([]);
+    setIncapacitation(null);
     setSeatedPlayers({});
     setOffline(false);
     seenEventKeysRef.current.clear();
@@ -2417,6 +2462,7 @@ function AppInner() {
       <ReconnectBanner visible={isReconnecting} />
       <OfflineBanner offline={offline} />
       <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
+      <DeathBanner incapacitation={incapacitation} onReroll={handleLeave} />
       {transientError && (
         <div
           role="alert"
@@ -2476,7 +2522,7 @@ function AppInner() {
                 onSend={handleSend}
                 restoredDraft={restoredDraft}
                 onLeave={handleLeave}
-                disabled={readyState !== WebSocket.OPEN || !canType}
+                disabled={readyState !== WebSocket.OPEN || !canType || incapacitation !== null}
                 thinking={thinking}
                 characterSheet={characterSheet}
                 inventoryData={inventoryData}

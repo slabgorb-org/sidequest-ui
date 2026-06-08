@@ -91,6 +91,12 @@ export const MessageType = {
   // anchor added, stakes set), full-replace per message. UI consumer in 77-5
   // (QuestsPanel + state-mirror).
   QUESTS: "QUESTS",
+  // sq-playtest 2026-06-07 (barsoom-3, blocking): a PC the genre lethality
+  // policy ruled dead kept full agency for four rounds with no death surface.
+  // Emitted at the moment of death (and again if a downed seat tries to act).
+  // PC-scoped (payload.character_name); the UI locks that seat's input and
+  // shows a death banner / re-roll CTA. Server-side intake gate is authority.
+  CHARACTER_INCAPACITATED: "CHARACTER_INCAPACITATED",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
