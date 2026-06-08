@@ -21,7 +21,7 @@ import { VerbositySlider } from "@/components/VerbositySlider";
 import { VocabularySlider } from "@/components/VocabularySlider";
 import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
 import type { NarratorVerbosity, NarratorVocabulary } from "@/types/protocol";
-import { useStartGame } from "./lobby/useStartGame";
+import { useStartGame, type StartGameResult } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { getArchetypeForGenre } from "@/hooks/useChromeArchetype";
 import { getGenreArt } from "./lobby/genreArt";
@@ -118,6 +118,13 @@ export function ConnectScreen({
   const navigate = useNavigate();
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  // Silent-MP-resume masquerade (sq-playtest 2026-06-07): when Start lands
+  // on an existing same-day table under a NEW name, hold the result here
+  // and announce instead of navigating — see handleStart.
+  const [pendingResume, setPendingResume] = useState<{
+    result: StartGameResult;
+    trimmedName: string;
+  } | null>(null);
 
   // Scene Library — fixture metadata from GET /dev/scenes.
   const [scenes, setScenes] = useState<
@@ -360,22 +367,47 @@ export function ConnectScreen({
       setIsStarting(false);
     }
 
-    // Only write side-effects after start() succeeds — avoid phantom
-    // "Past journeys" entries for sessions that were never created.
+    // Silent-MP-resume masquerade (sq-playtest 2026-06-07): the server
+    // re-attached a NEW player name to today's existing session and the
+    // lobby presented it as a fresh creation — chargen started inside a
+    // parked mid-combat table with no explanation. When the response says
+    // resumed=true with an existing cast that does NOT include the typed
+    // name, STOP and announce the table; only proceed on explicit confirm.
+    // A rejoin under a name already at the table stays friction-free.
     const trimmedName = playerName.trim();
+    const joinsAsNewCharacter =
+      result.resumed &&
+      result.existingCharacters.length > 0 &&
+      !result.existingCharacters.some(
+        (n) => n.toLowerCase() === trimmedName.toLowerCase(),
+      );
+    if (joinsAsNewCharacter) {
+      setPendingResume({ result, trimmedName });
+      return;
+    }
+
+    proceedIntoSession(result, trimmedName);
+  };
+
+  /**
+   * Post-start side-effects + navigation, shared by the direct path and
+   * the resume-announcement confirm. Only runs after start() succeeded —
+   * avoids phantom "Past journeys" entries for sessions never created.
+   */
+  const proceedIntoSession = (result: StartGameResult, trimmedName: string) => {
     if (trimmedName) {
       // Writes localStorage and fires the same-tab custom event so
       // AppInner's useDisplayName instance picks up the name without a
       // remount before we navigate to the slug route.
       setDisplayName(trimmedName);
-      saveState(trimmedName, genreSlug, worldSlug);
+      saveState(trimmedName, genreSlug!, worldSlug!);
       // game_slug + mode let Past Journeys offer one-click resume
       // instead of starting a new game on every revisit (playtest
       // 2026-04-24 BLOCKING bug).
       appendHistory({
         player_name: trimmedName,
-        genre: genreSlug,
-        world: worldSlug,
+        genre: genreSlug!,
+        world: worldSlug!,
         game_slug: result.slug,
         mode: result.mode,
       });
@@ -669,6 +701,47 @@ export function ConnectScreen({
             </div>
           )}
         </section>
+
+        {/* Resume announcement — silent-MP-resume masquerade (sq-playtest
+            2026-06-07). Start landed on today's EXISTING table under a new
+            name: announce the cast and require explicit intent before the
+            new character walks into the parked session. */}
+        {pendingResume && (
+          <div
+            role="alertdialog"
+            aria-label="Resuming existing table"
+            className="mt-6 rounded border border-accent/40 bg-muted/30 p-4 text-center"
+          >
+            <p className="text-sm">
+              Resuming today&apos;s existing table —{" "}
+              <strong>{pendingResume.result.existingCharacters.join(", ")}</strong>.
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pendingResume.trimmedName || "You"} would join that session as a{" "}
+              <em>new character</em> — this is not a fresh game.
+            </p>
+            <div className="mt-3 flex justify-center gap-3">
+              <button
+                type="button"
+                className="rounded border border-accent/60 px-4 py-1.5 text-sm hover:bg-accent/10"
+                onClick={() => {
+                  const pending = pendingResume;
+                  setPendingResume(null);
+                  proceedIntoSession(pending.result, pending.trimmedName);
+                }}
+              >
+                Join this table
+              </button>
+              <button
+                type="button"
+                className="rounded border border-muted-foreground/30 px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted/40"
+                onClick={() => setPendingResume(null)}
+              >
+                Stay in the lobby
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Error — covers both the prop-passed connection error and start() failures.
             Both sources are joined so neither silently masks the other. */}
