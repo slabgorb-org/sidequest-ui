@@ -35,6 +35,19 @@ export type StartGameResult = {
   slug: string;
   /** Game mode echoed back from the server. */
   mode: 'solo' | 'multiplayer';
+  /**
+   * True when the server re-attached to an existing same-slug session
+   * instead of creating a fresh one (200 vs 201). Silent-MP-resume
+   * masquerade (sq-playtest 2026-06-07): the lobby must announce the
+   * resume instead of presenting it as a fresh creation.
+   */
+  resumed: boolean;
+  /**
+   * Names of the characters already in the resumed session (server #754
+   * `existing_characters`). Empty for fresh games and for resumed
+   * sessions with no persisted snapshot yet.
+   */
+  existingCharacters: string[];
 };
 
 export function useStartGame() {
@@ -58,7 +71,15 @@ export function useStartGame() {
     const body = await resp.json();
     const mode: 'solo' | 'multiplayer' = body.mode === 'multiplayer' ? 'multiplayer' : 'solo';
     const prefix = mode === 'solo' ? '/solo' : '/play';
-    return { url: `${prefix}/${body.slug}`, slug: body.slug, mode };
+    return {
+      url: `${prefix}/${body.slug}`,
+      slug: body.slug,
+      mode,
+      resumed: body.resumed === true,
+      existingCharacters: Array.isArray(body.existing_characters)
+        ? body.existing_characters.filter((n: unknown): n is string => typeof n === 'string')
+        : [],
+    };
   }, []);
   return { start };
 }
