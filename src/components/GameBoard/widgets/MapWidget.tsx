@@ -83,7 +83,11 @@ export function MapWidget({
 }: MapWidgetProps) {
   // Campaign ↔ local scale state (ADR-141). Only meaningful for cluster
   // worlds; single-system worlds are always at local scale (collapse).
-  const [drilledIn, setDrilledIn] = useState(false);
+  // Keyed by REGION, not a boolean: a drill is into a specific system, so
+  // when the party's current region changes the drill is stale by
+  // construction and the widget falls back to campaign scale (review
+  // round-trip 1 — no stale orrery after travel).
+  const [drilledRegionId, setDrilledRegionId] = useState<string | null>(null);
 
   // Cluster vs single-system is derivable from the cartography node count
   // (ADR-141: no new world-level flag) — >1 region node = cluster.
@@ -92,6 +96,7 @@ export function MapWidget({
     : 0;
   const isCluster = regionCount > 1;
   const currentRegionId = mapData?.current_location ?? "";
+  const drilledIn = drilledRegionId !== null && drilledRegionId === currentRegionId;
 
   const atLocalScale = !isCluster || drilledIn;
   const orbitalEnabled = orbital && atLocalScale;
@@ -134,7 +139,7 @@ export function MapWidget({
       <MapOverlay
         mapData={mapData}
         onNodeSelect={(regionId) => {
-          if (regionId === currentRegionId) setDrilledIn(true);
+          if (regionId === currentRegionId) setDrilledRegionId(regionId);
         }}
       />
     );
@@ -153,13 +158,13 @@ export function MapWidget({
         <div className="shrink-0 p-1">
           <button
             data-testid="map-drill-back"
-            onClick={() => setDrilledIn(false)}
+            onClick={() => setDrilledRegionId(null)}
             className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-[var(--primary)]"
           >
             ◂ Cluster map
           </button>
         </div>
-        {lastOrbitalError && !chart ? (
+        {lastOrbitalError ? (
           <div
             data-testid="map-panel-no-local-chart"
             className="p-4 text-sm text-muted-foreground/60 italic"

@@ -223,8 +223,10 @@ export interface GameBoardProps {
   genreSlug?: string;
   worldSlug?: string;
   /** Server-announced orbital capability (GameResponse.orbital — world ships
-   * orbits.yaml). Gates MapWidget's OrbitalChartView; replaces the per-world
-   * frontend allowlist (sq-playtest 2026-06-07 perseus orrery). */
+   * orbital content). Capability signal only since ADR-141 / 98-3 — MapWidget
+   * routes cluster worlds to the campaign graph and only collapses to
+   * orrery-as-Map for single-system worlds. Replaces the per-world frontend
+   * allowlist (sq-playtest 2026-06-07 perseus orrery). */
   worldOrbital?: boolean;
   /** Story 71-4: per-round persisted peer actions (firewall-filtered) — threaded to the narrative widget. */
   peerActionsByRound?: Map<number, ActionRevealEntry[]>;

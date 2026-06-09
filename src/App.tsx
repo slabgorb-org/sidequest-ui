@@ -1330,6 +1330,11 @@ function AppInner() {
       // state; this is a chart-panel concern, not a narrative banner.
       if (code === "orbital_unavailable") {
         setLastOrbitalError({ code, message: errorPayload.message });
+        // Symmetry with the ORBITAL_CHART handler (which clears the error):
+        // a rejection invalidates any cached chart, or a previously-visited
+        // system's orrery would render for the region that just failed
+        // (review round-trip 1, story 98-3).
+        setLastOrbitalChart(null);
         return;
       }
       if (isFatal) {
