@@ -9,6 +9,7 @@
 import { useParams } from "react-router-dom";
 import { ReferenceDocument } from "./ReferenceDocument";
 import { useReferenceProjection } from "./useReferenceProjection";
+import { useThemeTokens } from "./useThemeTokens";
 import type { LoreProjection } from "@/types/reference";
 
 export function ReferenceLorePage() {
@@ -16,6 +17,11 @@ export function ReferenceLorePage() {
   const { data, loading, error } = useReferenceProjection<LoreProjection>(
     `/reference/api/lore/${pack}/${world}`,
   );
+
+  // Session-free theme injection (C3): apply the projection's flat CSS-var
+  // token dict to :root. Fed from the REST projection JSON, not the in-game
+  // WebSocket theme_css channel — and cleaned up on unmount / pack switch.
+  useThemeTokens(data?.theme);
 
   return <ReferenceDocument loading={loading} error={error} sections={data?.sections} />;
 }
