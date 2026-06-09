@@ -1,0 +1,20 @@
+// Story 100-8 (Phase 2) — session-free rules reference route (AC1 C2 / AC2 / AC4).
+//
+// `/reference/rules/:pack` is the pack-tier rulebook — per-pack, NO :world. It
+// mounts with no game session / WebSocket / auth, fetches the public rules
+// projection over REST (`GET /reference/api/rules/{pack}`), and renders its
+// generic sections via the shared ReferenceDocument / NodeTree.
+
+import { useParams } from "react-router-dom";
+import { ReferenceDocument } from "./ReferenceDocument";
+import { useReferenceProjection } from "./useReferenceProjection";
+import type { RulesProjection } from "@/types/reference";
+
+export function ReferenceRulesPage() {
+  const { pack } = useParams<{ pack: string }>();
+  const { data, loading, error } = useReferenceProjection<RulesProjection>(
+    `/reference/api/rules/${pack}`,
+  );
+
+  return <ReferenceDocument loading={loading} error={error} sections={data?.sections} />;
+}
