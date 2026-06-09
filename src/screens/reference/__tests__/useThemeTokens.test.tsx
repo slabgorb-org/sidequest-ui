@@ -64,7 +64,9 @@ describe("useThemeTokens — session-free CSS-var injector (C3)", () => {
   it("requires NO WebSocket / game session — none is constructed while applying the theme (C3)", () => {
     let wsConstructed = false;
     const RealWebSocket = globalThis.WebSocket;
-    // @ts-expect-error — replace the constructor with a tripwire for the test.
+    // Replace the constructor with a tripwire for the test. The
+    // `as unknown as typeof WebSocket` cast already satisfies the type, so no
+    // ts-suppression directive is needed (an unused one fails tsc --build).
     globalThis.WebSocket = function () {
       wsConstructed = true;
     } as unknown as typeof WebSocket;
