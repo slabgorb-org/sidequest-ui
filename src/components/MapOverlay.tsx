@@ -99,9 +99,16 @@ export interface MapState {
 export interface MapOverlayProps {
   mapData: MapState;
   onClose?: () => void;
+  /**
+   * Drill-down hook (ADR-141 / story 98-3): forwarded to the shared
+   * CartographyMap so a region-node click can drill into that system's
+   * orrery. Omitted on surfaces with no drill (reference page, non-orbital
+   * worlds) — nodes render non-interactive.
+   */
+  onNodeSelect?: (regionId: string) => void;
 }
 
-export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
+export function MapOverlay({ mapData, onClose, onNodeSelect }: MapOverlayProps) {
   const explored = mapData.explored ?? [];
   const fogBounds = mapData.fog_bounds ?? { width: 10, height: 10 };
   const connections = getUniqueConnections(explored);
@@ -157,6 +164,7 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
               cartography={cartography}
               activeNodeId={currentRegionId}
               visitedNodeIds={visitedRegionIds}
+              onNodeSelect={onNodeSelect}
             />
           )}
 
