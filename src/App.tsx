@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ConnectScreen } from "@/screens/ConnectScreen";
+import { ReferenceLorePage } from "@/screens/reference/ReferenceLorePage";
+import { ReferenceRulesPage } from "@/screens/reference/ReferenceRulesPage";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
@@ -2649,6 +2651,15 @@ function AppRoutes() {
       <Route path="/" element={<LobbyRoot />} />
       <Route path="/solo/:slug" element={<LobbyRoot />} />
       <Route path="/play/:slug" element={<LobbyRoot />} />
+      {/*
+        Story 100-8 (ADR-135): the reference shell is a PUBLIC table tool —
+        session-free by construction. These routes are SIBLINGS of LobbyRoot,
+        never nested under it, so the session-owning tree (GameStateProvider →
+        AppInner → WebSocket handshake) never mounts on a `/reference/*` URL.
+        That sibling placement is the load-bearing no-session invariant (C2).
+      */}
+      <Route path="/reference/lore/:pack/:world" element={<ReferenceLorePage />} />
+      <Route path="/reference/rules/:pack" element={<ReferenceRulesPage />} />
     </Routes>
   );
 }
