@@ -8,6 +8,7 @@
 import { useParams } from "react-router-dom";
 import { ReferenceDocument } from "./ReferenceDocument";
 import { useReferenceProjection } from "./useReferenceProjection";
+import { useThemeTokens } from "./useThemeTokens";
 import type { RulesProjection } from "@/types/reference";
 
 export function ReferenceRulesPage() {
@@ -15,6 +16,12 @@ export function ReferenceRulesPage() {
   const { data, loading, error } = useReferenceProjection<RulesProjection>(
     `/reference/api/rules/${pack}`,
   );
+
+  // Session-free theme injection (C3, 100-9 deferred finding): apply the rules
+  // projection's flat CSS-var token dict to :root — same hook + unmount cleanup
+  // as ReferenceLorePage. Fed from the REST projection JSON, never the in-game
+  // WebSocket theme_css channel; /reference/rules/* must theme too.
+  useThemeTokens(data?.theme);
 
   return <ReferenceDocument loading={loading} error={error} sections={data?.sections} />;
 }
