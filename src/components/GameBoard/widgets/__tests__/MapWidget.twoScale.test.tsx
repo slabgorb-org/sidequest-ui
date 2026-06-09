@@ -31,7 +31,18 @@ import { fireEvent, render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MapWidget } from "../MapWidget";
 import type { MapState } from "@/components/MapOverlay";
-import type { OrbitalIntentResponse } from "@/types/orbital-intent";
+import type {
+  OrbitalIntentError,
+  OrbitalIntentResponse,
+} from "@/types/orbital-intent";
+
+/** Typed fixture for the AC5 error seam — the import binds the test to the
+ * production type so a rename/field change breaks here, not at runtime. */
+function errorFixture(
+  message = "No orbital system file authored for region 'yula' (systems/yula.yaml)"
+): OrbitalIntentError {
+  return { code: "orbital_unavailable", message };
+}
 
 /** perseus_cloud-shaped cluster: 3 region nodes, party at yula. */
 function clusterMapState(): MapState {
@@ -325,23 +336,21 @@ describe("two-scale MapWidget (ADR-141 / 98-3)", () => {
       );
       fireEvent.click(getByTestId("map-region-node-yula"));
       // Server 98-2 fail-loud: no systems/yula.yaml → ERROR, not a chart.
+      const error = errorFixture();
       rerender(
         <MapWidget
           mapData={clusterMapState()}
           orbital
           lastOrbitalChart={null}
-          lastOrbitalError={{
-            code: "orbital_unavailable",
-            message:
-              "No orbital system file authored for region 'yula' (systems/yula.yaml)",
-          }}
+          lastOrbitalError={error}
           sendOrbitalIntent={sendOrbitalIntent}
         />
       );
       const panel = getByTestId("map-panel-no-local-chart");
       expect(panel).toBeInTheDocument();
-      // Legible, not blank: the state must carry visible explanatory text.
-      expect(panel.textContent ?? "").not.toBe("");
+      // Legible means the server's message itself renders — not merely that
+      // the panel has some static prose (review finding, round-trip 1).
+      expect(panel.textContent).toContain(error.message);
       // The spinner must not survive the rejection.
       expect(
         queryByTestId("map-panel-orbital-loading")
@@ -365,10 +374,7 @@ describe("two-scale MapWidget (ADR-141 / 98-3)", () => {
           mapData={clusterMapState()}
           orbital
           lastOrbitalChart={null}
-          lastOrbitalError={{
-            code: "orbital_unavailable",
-            message: "No orbital system file authored for region 'yula'",
-          }}
+          lastOrbitalError={errorFixture()}
           sendOrbitalIntent={sendOrbitalIntent}
         />
       );
@@ -376,6 +382,78 @@ describe("two-scale MapWidget (ADR-141 / 98-3)", () => {
       expect(getByTestId("map-region-graph")).toBeInTheDocument();
       expect(
         queryByTestId("map-panel-no-local-chart")
+      ).not.toBeInTheDocument();
+    });
+
+    it("error supersedes a stale cached chart — the wrong system's orrery must never render (review HIGH, round-trip 1)", () => {
+      // Live failure path: drill yula (chart cached) → back → travel to an
+      // unauthored region → drill → server rejects. The cached chart from the
+      // PREVIOUS system must not suppress the no-local-chart state — at the
+      // widget gate, a present error wins over any chart.
+      const sendOrbitalIntent = vi.fn();
+      const { getByTestId, queryByTestId, rerender } = render(
+        <MapWidget
+          mapData={clusterMapState()}
+          orbital
+          lastOrbitalChart={null}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      fireEvent.click(getByTestId("map-region-node-yula"));
+      const error = errorFixture("No orbital system file authored for region 'forma'");
+      rerender(
+        <MapWidget
+          mapData={clusterMapState()}
+          orbital
+          lastOrbitalChart={chartFixture("yula")}
+          lastOrbitalError={error}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      const panel = getByTestId("map-panel-no-local-chart");
+      expect(panel.textContent).toContain(error.message);
+      expect(queryByTestId("map-panel-orbital")).not.toBeInTheDocument();
+      expect(getByTestId("map-drill-back")).toBeInTheDocument();
+    });
+  });
+
+  describe("region change while drilled (review MEDIUM, round-trip 1)", () => {
+    it("returns to campaign scale when the party's current region changes mid-drill", () => {
+      // The party can be moved any turn (narrative travel is live). A drill
+      // into yula must not keep showing yula's sky after the party arrives at
+      // forma — the widget resets to the campaign graph for the new region.
+      const sendOrbitalIntent = vi.fn();
+      const { getByTestId, queryByTestId, rerender } = render(
+        <MapWidget
+          mapData={clusterMapState()}
+          orbital
+          lastOrbitalChart={null}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      fireEvent.click(getByTestId("map-region-node-yula"));
+      expect(getByTestId("map-panel-orbital-loading")).toBeInTheDocument();
+
+      const movedState: MapState = {
+        ...clusterMapState(),
+        current_location: "forma",
+      };
+      rerender(
+        <MapWidget
+          mapData={movedState}
+          orbital
+          lastOrbitalChart={chartFixture("yula")}
+          sendOrbitalIntent={sendOrbitalIntent}
+        />
+      );
+      // Back at campaign scale, new region marked current; no stale orrery.
+      expect(getByTestId("map-region-graph")).toBeInTheDocument();
+      expect(
+        getByTestId("map-region-node-forma").getAttribute("data-current")
+      ).toBe("true");
+      expect(queryByTestId("map-panel-orbital")).not.toBeInTheDocument();
+      expect(
+        queryByTestId("map-panel-orbital-loading")
       ).not.toBeInTheDocument();
     });
   });
