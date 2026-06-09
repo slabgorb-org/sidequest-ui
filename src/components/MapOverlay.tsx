@@ -1,4 +1,4 @@
-import { computeCartographyLayout, NODE_R } from "@/lib/cartographyLayout";
+import { CartographyMap } from "@/components/map/CartographyMap";
 
 export interface RoomExitInfo {
   /** Target room ID this exit leads to. */
@@ -153,10 +153,10 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
           </div>
 
           {showRegionGraph && (
-            <RegionNodeGraph
+            <CartographyMap
               cartography={cartography}
-              currentRegionId={currentRegionId}
-              visitedRegionIds={visitedRegionIds}
+              activeNodeId={currentRegionId}
+              visitedNodeIds={visitedRegionIds}
             />
           )}
 
@@ -290,118 +290,6 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-interface RegionNodeGraphProps {
-  cartography: CartographyMetadata;
-  /** Region id the player currently occupies ("you are here"), or "". */
-  currentRegionId: string;
-  /** Region ids the player has entered (current always included). */
-  visitedRegionIds: Set<string>;
-}
-
-/**
- * The cartography region adjacency graph as a deterministic SVG node-link
- * diagram — the in-game counterpart to the lore reference page's Map section.
- *
- * Layout (`computeCartographyLayout`) is a verbatim TS port of the server
- * renderer (`reference_map.py`), so the same `cartography.yaml` yields the same
- * topology and node positions on both surfaces. Edges paint first, then nodes
- * paint over them. A runtime overlay distinguishes the current region ("you are
- * here") and visited regions from the base layer.
- */
-function RegionNodeGraph({
-  cartography,
-  currentRegionId,
-  visitedRegionIds,
-}: RegionNodeGraphProps) {
-  const layout = computeCartographyLayout(cartography);
-  const labelDx = NODE_R + 6;
-
-  // Render at natural pixel size inside a scroll container rather than scaling a
-  // long depth-chain into a fixed box. A near-linear 13-region world lays out
-  // ~2800px wide; `w-full` + a fixed height squished/clipped the deepest regions
-  // (DRIVER 2026-06-04). Natural size + overflow keeps labels readable at any
-  // chain length and lets the player scroll to the far edges.
-  return (
-    <div className="overflow-auto max-h-80 bg-[var(--surface)] rounded">
-    <svg
-      data-testid="map-region-graph"
-      viewBox={`0 0 ${layout.width} ${layout.height}`}
-      width={layout.width}
-      height={layout.height}
-      className="block max-w-none"
-      role="img"
-      aria-label="World region map"
-    >
-      <g>
-        {layout.edges.map(({ a, b }) => {
-          const na = layout.nodes.find((n) => n.id === a);
-          const nb = layout.nodes.find((n) => n.id === b);
-          if (!na || !nb) return null;
-          return (
-            <line
-              key={`${a}--${b}`}
-              data-testid={`map-region-edge-${a}--${b}`}
-              x1={na.x}
-              y1={na.y}
-              x2={nb.x}
-              y2={nb.y}
-              stroke="var(--accent, #888)"
-              strokeWidth={2}
-              strokeOpacity={0.5}
-            />
-          );
-        })}
-      </g>
-      <g>
-        {layout.nodes.map((node) => {
-          const isCurrent = node.id === currentRegionId;
-          const isVisited = visitedRegionIds.has(node.id);
-          return (
-            <g
-              key={node.id}
-              data-testid={`map-region-node-${node.id}`}
-              data-region-id={node.id}
-              data-current={isCurrent ? "true" : undefined}
-              data-visited={isVisited ? "true" : undefined}
-            >
-              <circle
-                cx={node.x}
-                cy={node.y}
-                r={isCurrent ? NODE_R + 3 : NODE_R}
-                fill={
-                  isCurrent
-                    ? "var(--accent, gold)"
-                    : isVisited
-                      ? "var(--primary, #ccc)"
-                      : "var(--surface, #333)"
-                }
-                stroke="var(--primary, #ccc)"
-                strokeWidth={isCurrent ? 2.5 : 1.5}
-                fillOpacity={isCurrent || isVisited ? 1 : 0.4}
-              />
-              <text
-                x={node.x + labelDx}
-                y={node.y + 4}
-                fontSize={13}
-                fill="var(--primary, white)"
-                fillOpacity={isVisited ? 1 : 0.55}
-                paintOrder="stroke"
-                stroke="var(--surface, #1a1a1a)"
-                strokeWidth={3}
-                strokeLinejoin="round"
-                strokeOpacity={isVisited ? 0.9 : 0.6}
-              >
-                {node.name}
-              </text>
-            </g>
-          );
-        })}
-      </g>
-    </svg>
     </div>
   );
 }

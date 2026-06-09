@@ -28,10 +28,13 @@ const SRC = resolve(HERE, "..", "..", "..");
 describe("legacy cartographyLayout module is deleted", () => {
   it("no longer resolves as an importable module", async () => {
     // Dynamic import so the missing module is a runtime rejection, not a
-    // collect-time error for this file.
-    await expect(
-      import(/* @vite-ignore */ "@/lib/cartographyLayout")
-    ).rejects.toThrow();
+    // collect-time error for this file. The specifier is built at runtime
+    // (not a string literal) so vite's `import-analysis` plugin does not try to
+    // statically resolve `@/lib/cartographyLayout` at transform time — which
+    // would fail the whole suite to collect instead of rejecting here. Vite's
+    // runtime resolver still maps the `@/` alias, so a deleted module rejects.
+    const spec = ["@", "lib", "cartographyLayout"].join("/");
+    await expect(import(/* @vite-ignore */ spec)).rejects.toThrow();
   });
 
   it("MapOverlay no longer imports from the legacy layout module", () => {
