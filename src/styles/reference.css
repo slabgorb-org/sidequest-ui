@@ -1,0 +1,318 @@
+/* Reference page stylesheet — genre-themed via tokens injected by useThemeTokens.
+ *
+ * All color/font vars here are the GENRE tokens (--text, --background, --primary,
+ * --font-body, etc.) emitted by build_theme_tokens on the server and applied to
+ * :root by useThemeTokens. These differ from the Tailwind/shadcn system vars
+ * (--foreground, --card, etc.) used elsewhere in the app — the reference pages
+ * are session-free and themed entirely by genre pack.
+ */
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
+
+.reference-document {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 3rem 4rem;
+  font-family: var(--font-body, 'Baskerville', Georgia, serif);
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--text, #1a1a1a);
+}
+
+.reference-document--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  font-style: italic;
+  color: var(--text, #1a1a1a);
+  opacity: 0.5;
+}
+
+.reference-document--error {
+  max-width: 600px;
+  margin: 4rem auto;
+  padding: 1.5rem;
+  border: 1px solid var(--primary, #8C3B2E);
+  border-radius: 4px;
+  color: var(--primary, #8C3B2E);
+  font-style: italic;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+
+.reference-section {
+  margin-bottom: 2rem;
+}
+
+.reference-section + .reference-section {
+  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 30%, transparent);
+  padding-top: 2rem;
+}
+
+.reference-section__label {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary, #8C3B2E);
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--primary, #8C3B2E) 40%, transparent);
+}
+
+/* ── NodeTree — generic lore sections ───────────────────────────────────── */
+
+/* The critical fix: scalars render as inline <span> by default, which collapses
+ * all lore text into one horizontal run. Make them block. */
+.reference-node--scalar {
+  display: block;
+  margin-bottom: 0.75rem;
+  line-height: 1.8;
+}
+
+.reference-node--list {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.reference-node__list-item {
+  margin-bottom: 0.3rem;
+  line-height: 1.65;
+}
+
+/* Dict: label + value pairs */
+.reference-node--dict {
+  margin: 0 0 0.75rem;
+}
+
+.reference-node__entry {
+  display: grid;
+  grid-template-columns: minmax(9rem, max-content) 1fr;
+  gap: 0.2rem 1rem;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.reference-node__label {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary, #B8893C);
+  padding-top: 0.1em;
+}
+
+.reference-node__value {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--text, #1a1a1a);
+}
+
+/* Nested nodes inside a dict value */
+.reference-node__value .reference-node--list {
+  margin-top: 0;
+}
+
+.reference-node__value .reference-node--scalar {
+  display: inline;
+  margin: 0;
+}
+
+/* ── POI section ─────────────────────────────────────────────────────────── */
+
+.reference-section--poi {
+  max-width: 100%;
+}
+
+.poi-section__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.poi-section__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--surface, #f8f0dc);
+  border: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 20%, transparent);
+  border-radius: 4px;
+  overflow: hidden;
+  padding-bottom: 0.75rem;
+}
+
+.poi-section__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+}
+
+.poi-section__name {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0 0.75rem;
+  color: var(--text, #1a1a1a);
+}
+
+.poi-section__region {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary, #B8893C);
+  margin: 0;
+  padding: 0 0.75rem;
+}
+
+.poi-section__description {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text, #1a1a1a);
+  margin: 0;
+  padding: 0 0.75rem;
+  opacity: 0.85;
+}
+
+/* ── Cast section ────────────────────────────────────────────────────────── */
+
+.cast-section__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+}
+
+.cast-section__member {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--surface, #f8f0dc);
+  border: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 20%, transparent);
+  border-radius: 4px;
+  overflow: hidden;
+  padding-bottom: 0.75rem;
+}
+
+.cast-section__portrait {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+
+.cast-section__name {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0 0.6rem;
+  color: var(--text, #1a1a1a);
+}
+
+.cast-section__role {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--secondary, #B8893C);
+  margin: 0;
+  padding: 0 0.6rem;
+}
+
+.cast-section__appearance {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--text, #1a1a1a);
+  margin: 0;
+  padding: 0 0.6rem;
+  opacity: 0.8;
+}
+
+/* ── Timeline section ────────────────────────────────────────────────────── */
+
+.timeline-section__preamble {
+  font-style: italic;
+  line-height: 1.75;
+  color: var(--text, #1a1a1a);
+  opacity: 0.75;
+  margin-bottom: 1.5rem;
+  border-left: 3px solid color-mix(in srgb, var(--accent, #4E7C6F) 50%, transparent);
+  padding-left: 1rem;
+}
+
+.timeline-section__entries {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.timeline-section__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--accent, #4E7C6F);
+}
+
+.timeline-section__temporal {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary, #B8893C);
+}
+
+.timeline-section__name {
+  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text, #1a1a1a);
+}
+
+.timeline-section__summary {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--text, #1a1a1a);
+  margin: 0.15rem 0 0;
+  opacity: 0.85;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .reference-document {
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .reference-node__entry {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .poi-section__list {
+    grid-template-columns: 1fr;
+  }
+
+  .cast-section__list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .timeline-section__summary {
+    margin-top: 0.4rem;
+  }
+}

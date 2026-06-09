@@ -15,6 +15,13 @@
 
 import { SectionDispatch } from "@/components/reference/sections/SectionDispatch";
 import type { ReferenceSection } from "@/types/reference";
+// The reference pages' entire rule sheet — every `reference-*` classname in
+// this shell and the section components is defined here, consuming the genre
+// tokens that useThemeTokens injects onto :root. This import is load-bearing:
+// the stylesheet was orphaned (never imported, never committed) when the
+// 100-12 cutover deleted the server-rendered HTML path, shipping unstyled
+// lore/rules pages (2026-06-09).
+import "@/styles/reference.css";
 
 export function ReferenceDocument({
   loading,
