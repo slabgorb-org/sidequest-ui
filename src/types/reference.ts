@@ -27,6 +27,72 @@ export interface GenericSection {
   node: ReferenceNode;
 }
 
+// Story 100-11 (Phase 3) — dedicated lore-section shapes, pinned verbatim from
+// the live server projection (reference_projection.py). These carry their own
+// typed payload (`entries` / `members`) instead of a generic `node`, and each is
+// routed to a purpose-built renderer by `SectionDispatch`.
+
+/** One Point of Interest. `image_url` is ALWAYS present — the server only
+ * projects a POI when its landscape art is on R2 (gallery exclusion model). */
+export interface PoiEntry {
+  slug: string;
+  name: string;
+  region: string | null;
+  description: string | null;
+  image_url: string;
+}
+
+/** The `poi` section (`build_poi_section`). */
+export interface PoiSectionData {
+  id: "poi";
+  label: string;
+  entries: PoiEntry[];
+}
+
+/** One cast member. `portrait_url` is nullable — the server resolves the R2 URL
+ * only when the portrait slug is on R2, else `null` (the member still ships). */
+export interface CastMember {
+  slug: string;
+  name: string;
+  role: string | null;
+  appearance: string | null;
+  portrait_url: string | null;
+}
+
+/** The `cast` section (`build_cast_section`). */
+export interface CastSectionData {
+  id: "cast";
+  label: string;
+  members: CastMember[];
+}
+
+/** One timeline (legend) entry. `temporal` is the era/year label, or `null`. */
+export interface TimelineEntry {
+  slug: string;
+  name: string;
+  summary: string;
+  temporal: string | null;
+}
+
+/** The `timeline` section (`build_timeline_section`). The server has ALREADY
+ * ordered `entries` (dated spine first, undated last) per `sort_mode`; the
+ * client renders the array verbatim and never re-sorts. */
+export interface TimelineSectionData {
+  id: "timeline";
+  label: string;
+  sort_mode: "sorted" | "authored_order";
+  preamble: string | null;
+  entries: TimelineEntry[];
+}
+
+/** Any section the reference document may carry — the generic node-tree section
+ * plus the Phase-3 dedicated section types. */
+export type ReferenceSection =
+  | GenericSection
+  | PoiSectionData
+  | CastSectionData
+  | TimelineSectionData;
+
 /** Flat CSS-variable token dict, e.g. `{ "--primary": "#c0392b" }`. */
 export type ReferenceTheme = Record<string, string>;
 
@@ -35,7 +101,7 @@ export interface LoreProjection {
   schema_version: number;
   pack: string;
   world: string;
-  sections: GenericSection[];
+  sections: ReferenceSection[];
   theme?: ReferenceTheme;
 }
 

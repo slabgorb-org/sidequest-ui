@@ -1,15 +1,20 @@
 // Story 100-8 (Phase 2) — shared presentational shell for the reference pages.
+// Story 100-11 (Phase 3) — widened to route every section through
+// `SectionDispatch` so the dedicated POI / Cast / Timeline renderers are
+// reachable from the production page, alongside the generic node-tree sections.
 //
 // Renders loading / error / content for a fetched projection. Loading exposes
 // an accessible `role="status"` node; error exposes `role="alert"` (AC4 — never
-// a white screen). Content maps each generic `{id, label, node}` section to a
-// labelled block rendered by the generic NodeTree.
+// a white screen). Content dispatches each section by id: poi/cast/timeline get
+// dedicated components, generic node-bearing sections fall back to NodeTree, and
+// a not-yet-wired node-less section degrades to nothing.
 //
-// Map/Cast/POI/Timeline sections are Phase 3 (100-10+) and OUT of scope here —
-// any section without a generic `node` is skipped rather than rendered.
+// The 100-8 `section.node`-only filter — which silently dropped poi/cast/
+// timeline (they carry `entries`/`members`, not a `node`) — is gone; the
+// dispatch owns that decision now.
 
-import { NodeTree } from "@/components/reference/NodeTree";
-import type { GenericSection } from "@/types/reference";
+import { SectionDispatch } from "@/components/reference/sections/SectionDispatch";
+import type { ReferenceSection } from "@/types/reference";
 
 export function ReferenceDocument({
   loading,
@@ -18,7 +23,7 @@ export function ReferenceDocument({
 }: {
   loading: boolean;
   error: string | null;
-  sections: GenericSection[] | undefined;
+  sections: ReferenceSection[] | undefined;
 }) {
   if (loading) {
     return (
@@ -38,15 +43,9 @@ export function ReferenceDocument({
 
   return (
     <div className="reference-document">
-      {(sections ?? [])
-        // Only generic node-bearing sections render in this phase.
-        .filter((section) => section && section.node)
-        .map((section) => (
-          <section key={section.id} className="reference-section">
-            <h2 className="reference-section__label">{section.label}</h2>
-            <NodeTree node={section.node} />
-          </section>
-        ))}
+      {(sections ?? []).map((section) => (
+        <SectionDispatch key={section.id} section={section} />
+      ))}
     </div>
   );
 }
