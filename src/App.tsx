@@ -49,6 +49,7 @@ import { usePeerReveals } from "@/hooks/usePeerReveals";
 import { usePersistedPeerActions } from "@/hooks/usePersistedPeerActions";
 import type {
   OrbitalIntent,
+  OrbitalIntentError,
   OrbitalIntentResponse,
 } from "@/types/orbital-intent";
 import type { GenresResponse } from "@/types/genres";
@@ -511,6 +512,10 @@ function AppInner() {
   // Orbital chart state from ORBITAL_CHART messages (orbital map Task 15b).
   // The MapWidget's useOrbitalChart hook consumes this as `lastResponse`.
   const [lastOrbitalChart, setLastOrbitalChart] = useState<OrbitalIntentResponse | null>(null);
+  // Latest ORBITAL_INTENT rejection (ERROR with an orbital code) — feeds
+  // MapWidget's "no local chart" state (ADR-141 / 98-3 AC5). Cleared when
+  // a fresh ORBITAL_CHART supersedes it.
+  const [lastOrbitalError, setLastOrbitalError] = useState<OrbitalIntentError | null>(null);
   // Bumps every time the server confirms session bind via
   // SESSION_EVENT{ready} or SESSION_EVENT{connected}. Drives the orbital
   // hook's re-fetch when its initial ORBITAL_INTENT was rejected at
@@ -1277,6 +1282,8 @@ function AppInner() {
     // Orbital chart — server response to ORBITAL_INTENT (orbital map Task 15b).
     if (msg.type === MessageType.ORBITAL_CHART) {
       setLastOrbitalChart(msg.payload as unknown as OrbitalIntentResponse);
+      // A successful chart supersedes any prior orbital rejection.
+      setLastOrbitalError(null);
       return;
     }
 
@@ -1316,6 +1323,20 @@ function AppInner() {
       const errorPayload = msg.payload as unknown as ErrorPayload;
       const code = errorPayload.code ?? null;
       const isFatal = code !== null && FATAL_ERROR_CODES.has(code);
+      // Orbital intent rejection (ADR-141 / 98-3 AC5): the world has no
+      // renderable chart for the requested scope (e.g. the party's current
+      // region has no authored systems/<region_id>.yaml — server fails
+      // loud per 98-2). Surface it to the Map widget's "no local chart"
+      // state; this is a chart-panel concern, not a narrative banner.
+      if (code === "orbital_unavailable") {
+        setLastOrbitalError({ code, message: errorPayload.message });
+        // Symmetry with the ORBITAL_CHART handler (which clears the error):
+        // a rejection invalidates any cached chart, or a previously-visited
+        // system's orrery would render for the region that just failed
+        // (review round-trip 1, story 98-3).
+        setLastOrbitalChart(null);
+        return;
+      }
       if (isFatal) {
         setFatalError({ message: errorPayload.message, code });
         disconnectRef.current?.();
@@ -2565,6 +2586,7 @@ function AppInner() {
                 layoutMode={layoutMode}
                 magicState={gameState.magicState ?? null}
                 lastOrbitalChart={lastOrbitalChart}
+                lastOrbitalError={lastOrbitalError}
                 sendOrbitalIntent={sendOrbitalIntent}
                 sessionBoundEpoch={sessionBoundEpoch}
                 peerReveals={mergedPeerReveals}

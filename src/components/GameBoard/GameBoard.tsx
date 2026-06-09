@@ -58,7 +58,7 @@ import { PeerRevealList } from "@/components/PeerRevealList";
 import { HpPipScale } from "@/components/HpPipScale";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 import type { MagicState } from "@/types/magic";
-import type { OrbitalIntent, OrbitalIntentResponse } from "@/types/orbital-intent";
+import type { OrbitalIntent, OrbitalIntentError, OrbitalIntentResponse } from "@/types/orbital-intent";
 
 import { WIDGET_REGISTRY, type WidgetId } from "./widgetRegistry";
 import { BackgroundCanvas } from "./BackgroundCanvas";
@@ -223,8 +223,10 @@ export interface GameBoardProps {
   genreSlug?: string;
   worldSlug?: string;
   /** Server-announced orbital capability (GameResponse.orbital — world ships
-   * orbits.yaml). Gates MapWidget's OrbitalChartView; replaces the per-world
-   * frontend allowlist (sq-playtest 2026-06-07 perseus orrery). */
+   * orbital content). Capability signal only since ADR-141 / 98-3 — MapWidget
+   * routes cluster worlds to the campaign graph and only collapses to
+   * orrery-as-Map for single-system worlds. Replaces the per-world frontend
+   * allowlist (sq-playtest 2026-06-07 perseus orrery). */
   worldOrbital?: boolean;
   /** Story 71-4: per-round persisted peer actions (firewall-filtered) — threaded to the narrative widget. */
   peerActionsByRound?: Map<number, ActionRevealEntry[]>;
@@ -234,6 +236,9 @@ export interface GameBoardProps {
   magicState?: MagicState | null;
   /** Latest ORBITAL_CHART response — feeds MapWidget's orbital chart panel. */
   lastOrbitalChart?: OrbitalIntentResponse | null;
+  /** Latest ORBITAL_INTENT rejection — feeds MapWidget's AC5 "no local
+   * chart" state (ADR-141 / 98-3). Cleared upstream on a fresh chart. */
+  lastOrbitalError?: OrbitalIntentError | null;
   /** Sends an OrbitalIntent over the WebSocket — feeds MapWidget. */
   sendOrbitalIntent?: (intent: OrbitalIntent) => void;
   /**
@@ -304,6 +309,7 @@ export function GameBoard({
   resourceAlerts,
   magicState,
   lastOrbitalChart,
+  lastOrbitalError,
   sendOrbitalIntent,
   sessionBoundEpoch = 0,
   peerReveals,
@@ -519,6 +525,7 @@ export function GameBoard({
             mapData={mapData ?? null}
             orbital={worldOrbital}
             lastOrbitalChart={lastOrbitalChart ?? null}
+            lastOrbitalError={lastOrbitalError ?? null}
             sendOrbitalIntent={sendOrbitalIntent}
             sessionBoundEpoch={sessionBoundEpoch}
           />
@@ -602,8 +609,8 @@ export function GameBoard({
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, sendOrbitalIntent,
-      sessionBoundEpoch,
+      activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, lastOrbitalError,
+      sendOrbitalIntent, sessionBoundEpoch,
       // Story 85-3: confrontation-mode panel inputs.
       confrontationData, confrontationOutcome, handleBeatTileSelect, onYield,
       diceRequest, diceResult, onDiceThrow, round]);

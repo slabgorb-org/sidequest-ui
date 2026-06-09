@@ -28,6 +28,17 @@ export interface PlottedCourseWire {
   source: "in_scope" | "recent_mention" | "quest_objective";
 }
 
+/**
+ * ERROR-payload subset surfaced when an ORBITAL_INTENT is rejected
+ * (ADR-141 / story 98-3 AC5). The server fails loud when the party's
+ * current region has no authored `systems/<region_id>.yaml`; the Map
+ * widget renders this as the "no local chart" state instead of a chart.
+ */
+export interface OrbitalIntentError {
+  code: string;
+  message: string;
+}
+
 export interface OrbitalIntentResponse {
   scope_center: string;
   svg: string;
