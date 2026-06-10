@@ -538,6 +538,11 @@ function AppInner() {
   // alongside pendingBeatIdRef and re-attached to DICE_THROW.player_action
   // when dice settle. Empty string when the player didn't type anything.
   const pendingPlayerActionRef = useRef<string>("");
+  // Story 102-2: the prepared spell chosen in the overlay's "Work a Spell"
+  // picker. Latched alongside pendingBeatIdRef and re-attached to
+  // DICE_THROW.spell_id when dice settle — consumed atomically with the
+  // beat so a stale spell can never leak into a later non-cast commit.
+  const pendingSpellIdRef = useRef<string | null>(null);
 
   // Ref bridge: peerReveals.apply is defined after handleMessage (useCallback).
   // Updated synchronously alongside sendRef so handleMessage always calls the
@@ -1662,7 +1667,7 @@ function AppInner() {
   // as a PLAYER_ACTION text string — violating: no keyword matching (Zork Problem,
   // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
-    (beatId: string, playerAction?: string) => {
+    (beatId: string, playerAction?: string, spellId?: string) => {
       // Story 67-8 (Layer 3): single gate for every beat-commit precondition —
       // thinking (duplicate), no active confrontation, unknown beat, and the
       // load-bearing one: session not bound (AwaitingConnect). A beat issued
@@ -1742,6 +1747,10 @@ function AppInner() {
       // to the DICE_THROW once physics settles. Trim defensively; empty
       // string is the well-defined "no action typed" case.
       pendingPlayerActionRef.current = (playerAction ?? "").trim();
+      // Story 102-2: stash the picker's chosen spell the same way — null on
+      // every non-cast beat, so the DICE_THROW key is attached iff a spell
+      // was actually chosen.
+      pendingSpellIdRef.current = spellId ?? null;
       displayedDiceRequestRef.current = localReq;
       setDiceResult(null);
       setDiceRequest(localReq);
@@ -1783,6 +1792,7 @@ function AppInner() {
         setTransientError("Server reconnecting — please retry your roll in a moment.");
         pendingBeatIdRef.current = null;
         pendingPlayerActionRef.current = "";
+        pendingSpellIdRef.current = null;
         displayedDiceRequestRef.current = null;
         setDiceResult(null);
         setDiceRequest(null);
@@ -1795,6 +1805,10 @@ function AppInner() {
       // can't accidentally inherit a prior beat's draft text.
       const playerAction = pendingPlayerActionRef.current;
       pendingPlayerActionRef.current = "";
+      // Story 102-2: consume the latched spell the same way — reset
+      // unconditionally so a later non-cast commit can never inherit it.
+      const spellId = pendingSpellIdRef.current;
+      pendingSpellIdRef.current = null;
       // REGRESSION fix (playtest 2026-06-04): in a confrontation the player's
       // typed action rides the beat-commit DICE_THROW, not a PLAYER_ACTION
       // frame, so the local transcript never grew a player-echo card — combat
@@ -1828,6 +1842,10 @@ function AppInner() {
           face,
           ...(beatId ? { beat_id: beatId } : {}),
           ...(beatId && playerAction ? { player_action: playerAction } : {}),
+          // Story 102-2: the chosen prepared spell rides the cast-beat commit
+          // so the server routes the WN cast spine. Key OMITTED on every
+          // non-cast throw — pre-102-2 wire shape unchanged.
+          ...(beatId && spellId ? { spell_id: spellId } : {}),
         },
         player_id: "",
       });

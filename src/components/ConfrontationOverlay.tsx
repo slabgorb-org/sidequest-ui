@@ -178,6 +178,23 @@ export interface ConfrontationData {
    * opponent hasn't acted — the overlay then renders only the player readout.
    */
   opponent_last_beat_impact?: BeatImpactView | null;
+  /**
+   * Story 102-2: the recipient's WN cast economy, projected by the server
+   * (build_confrontation_payload). Drives the "Work a Spell" prepared-spell
+   * picker: `prepared` is the spell-id list the picker offers,
+   * `casts_remaining` the player-visible spend math (the Sebastien/Jade
+   * lane). `null` for non-casters / non-WN packs — the server never
+   * fabricates an empty economy, and the picker gates on the value.
+   */
+  spellcasting?: ConfrontationSpellcasting | null;
+}
+
+/** Story 102-2: WN cast economy block on the CONFRONTATION payload. */
+export interface ConfrontationSpellcasting {
+  casts_remaining: number;
+  casts_per_day?: number;
+  /** Prepared spell IDs (e.g. "wracking_bolt") — labels humanized client-side. */
+  prepared: string[];
 }
 
 /**
@@ -224,7 +241,12 @@ interface ConfrontationOverlayProps {
    * confrontation. Empty/undefined in solo play → the strip collapses.
    */
   meanwhileActions?: MeanwhileAction[];
-  onBeatSelect?: (beatId: string) => void;
+  /**
+   * Beat commit. `spellId` is present only when the committed beat is the
+   * cast beat and the player chose a prepared spell in the picker (102-2);
+   * undefined on every other beat.
+   */
+  onBeatSelect?: (beatId: string, spellId?: string) => void;
   /** Dice state — rendered inline below beats when active. */
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -459,6 +481,86 @@ function StatusLine({ data }: { data: ConfrontationData }) {
         ) : (
           <EdgeBar metric={data.opponent_metric} side="opponent" />
         )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Story 102-2 — prepared-spell picker for the cast beat
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * The WN-family cast beat id. A literal contract shared with the server:
+ * dispatch routes `beat_id === "cast_spell"` + `spell_id` into the WN cast
+ * spine, and the overlay defers this tile's commit behind the picker.
+ */
+const CAST_SPELL_BEAT_ID = "cast_spell";
+
+/** "wracking_bolt" → "Wracking Bolt". Picker labels are humanized spell ids —
+ * the CONFRONTATION projection carries ids only (catalog names are a
+ * server-side follow-up; see story 102-2 delivery findings). */
+function humanizeSpellId(id: string): string {
+  return id
+    .split("_")
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+function SpellPicker({
+  spellcasting,
+  onChoose,
+  onCancel,
+}: {
+  spellcasting: ConfrontationSpellcasting;
+  onChoose: (spellId: string) => void;
+  onCancel: () => void;
+}) {
+  const { casts_remaining, casts_per_day, prepared } = spellcasting;
+  // Player-visible spend math (Sebastien/Jade lane): "2/2" when the day
+  // ceiling is known, bare count otherwise.
+  const castsLabel =
+    typeof casts_per_day === "number"
+      ? `${casts_remaining}/${casts_per_day}`
+      : String(casts_remaining);
+  return (
+    <div
+      data-testid="spell-picker"
+      data-casts-remaining={String(casts_remaining)}
+      role="group"
+      aria-label="Choose a prepared spell"
+      className="mt-2 rounded-md border border-border/60 bg-card/80 p-2"
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span
+          className="text-xs uppercase tracking-wide"
+          style={{ color: "var(--muted-foreground)" }}
+        >
+          Work a Spell — casts {castsLabel}
+        </span>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Cancel spell selection"
+          className="text-xs px-1.5 py-0.5 rounded cursor-pointer hover:bg-muted/40"
+          style={{ color: "var(--muted-foreground)" }}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex flex-col gap-1">
+        {prepared.map((spellId) => (
+          <button
+            key={spellId}
+            type="button"
+            data-spell-id={spellId}
+            onClick={() => onChoose(spellId)}
+            className="text-left text-sm rounded px-2 py-1 cursor-pointer border border-border/40 hover:border-[var(--accent-finisher)] transition-colors motion-reduce:transition-none"
+            style={{ color: "var(--card-foreground)" }}
+          >
+            {humanizeSpellId(spellId)}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -956,14 +1058,46 @@ export function ConfrontationOverlay({
   // — beat → roll → result is one spatial unit. Declared before the early
   // return to keep hook order stable (rules of hooks).
   const [committedBeatId, setCommittedBeatId] = useState<string | null>(null);
+  // Story 102-2: the "Work a Spell" tile defers its commit behind the
+  // prepared-spell picker — a cast must name WHICH spell so the server can
+  // route the WN cast spine instead of a generic stat throw.
+  const [spellPickerOpen, setSpellPickerOpen] = useState(false);
+  const spellcasting = data?.spellcasting ?? null;
   // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
   // this handler is handed to every beat button; a stable identity avoids
   // re-rendering the whole grid each frame (matches GameBoard's own wrapping).
   // Declared with useState above the early return to keep hook order stable.
   const handleBeatSelect = useCallback(
     (id: string) => {
+      if (id === CAST_SPELL_BEAT_ID) {
+        // 102-2: never commit a bare cast. Without the economy block there is
+        // nothing to pick from — committing anyway would resurrect the exact
+        // generic-INT-throw bug this story kills (No Silent Fallbacks). The
+        // server's class_filter should never offer the tile to a non-caster,
+        // so landing here means a stale/missing projection — refuse loudly.
+        if (!spellcasting || spellcasting.prepared.length === 0) {
+          console.warn(
+            "[cast-spell] commit refused: no spellcasting projection on the " +
+              "CONFRONTATION payload (or no prepared spells) — the picker has " +
+              "nothing to offer, and a bare cast_spell commit is the pre-102-2 bug",
+          );
+          return;
+        }
+        setSpellPickerOpen(true);
+        return;
+      }
+      setSpellPickerOpen(false);
       setCommittedBeatId(id);
       onBeatSelect?.(id);
+    },
+    [onBeatSelect, spellcasting],
+  );
+  // 102-2: picker selection — the only path that commits the cast beat.
+  const handleSpellChoose = useCallback(
+    (spellId: string) => {
+      setSpellPickerOpen(false);
+      setCommittedBeatId(CAST_SPELL_BEAT_ID);
+      onBeatSelect?.(CAST_SPELL_BEAT_ID, spellId);
     },
     [onBeatSelect],
   );
@@ -1048,6 +1182,18 @@ export function ConfrontationOverlay({
           )}
 
           <BeatGrid beats={data.beats ?? []} onSelect={handleBeatSelect} />
+
+          {/* Story 102-2: prepared-spell picker — opened by the cast tile,
+              commits onBeatSelect(cast_spell, spellId) on choice. Renders
+              directly under the grid so beat → spell → roll reads as one
+              spatial unit (same logic as the stacked die tray below). */}
+          {spellPickerOpen && spellcasting && (
+            <SpellPicker
+              spellcasting={spellcasting}
+              onChoose={handleSpellChoose}
+              onCancel={() => setSpellPickerOpen(false)}
+            />
+          )}
 
           {/* Yield — only when the player has spent edge to refund. */}
           {onYield !== undefined &&
