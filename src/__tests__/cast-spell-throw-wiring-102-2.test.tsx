@@ -25,7 +25,6 @@
  */
 import { render, screen, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { WS } from "jest-websocket-mock";
 import {

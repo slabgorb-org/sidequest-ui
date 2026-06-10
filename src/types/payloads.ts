@@ -400,6 +400,15 @@ export interface DiceThrowPayload {
    * whitespace-only values are equivalent to omitting the field.
    */
   player_action?: string;
+  /**
+   * Story 102-2: the prepared spell chosen in the overlay's "Work a Spell"
+   * picker. Only present on a WN-family `cast_spell` beat commit — it lets
+   * the server route the WN cast spine (`wwn.spell.cast` + cast-economy
+   * spend) instead of resolving a generic stat throw. The key is OMITTED
+   * (never `undefined`-serialized) on every non-cast beat, keeping the
+   * pre-102-2 wire shape byte-for-byte.
+   */
+  spell_id?: string;
 }
 
 /** Server -> all clients: resolved dice roll outcome. */

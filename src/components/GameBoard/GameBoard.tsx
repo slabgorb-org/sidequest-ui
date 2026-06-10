@@ -196,8 +196,14 @@ export interface GameBoardProps {
    * draft via an imperative ref and forwards it here; App attaches it
    * to the DICE_THROW so the narrator runs with both the mechanical
    * outcome AND the player's invention.
+   *
+   * `spellId` (story 102-2): the prepared spell chosen in the overlay's
+   * "Work a Spell" picker — present only on a cast-beat commit. Rides
+   * ALONGSIDE the typed draft (the picker augments typed text, never
+   * replaces it — Zork Problem guardrail); App attaches it to the
+   * DICE_THROW as `spell_id` so the server routes the WN cast spine.
    */
-  onBeatSelect?: (beatId: string, playerAction?: string) => void;
+  onBeatSelect?: (beatId: string, playerAction?: string, spellId?: string) => void;
   onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -485,9 +491,9 @@ export function GameBoard({
   // (Story 85-3) because the confrontation dockview panel renders through it.
   const inputBarRef = useRef<InputBarHandle | null>(null);
   const handleBeatTileSelect = useCallback(
-    (beatId: string) => {
+    (beatId: string, spellId?: string) => {
       const draft = inputBarRef.current?.consumeDraft() ?? "";
-      onBeatSelect?.(beatId, draft);
+      onBeatSelect?.(beatId, draft, spellId);
     },
     [onBeatSelect],
   );
