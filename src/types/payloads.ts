@@ -23,6 +23,21 @@ export interface FootnoteData {
   is_new?: boolean;
 }
 
+/** A durable per-scene chargen answer carried on the character sheet (story
+ *  93-2). The History section (story 93-3) renders one row per entry: the
+ *  prompt the player saw and the answer they gave. For `choice` kinds `value`
+ *  holds the chosen option LABEL; for `freeform` it holds the player's verbatim
+ *  text — the UI renders `value` either way. `archetype_inferred` marks scenes
+ *  whose freeform fed the 93-1 archetype inference (server defaults it false).
+ *  Mirrors sidequest-server protocol `CreationAnswer`. */
+export interface CreationAnswer {
+  scene_id: string;
+  prompt: string;
+  kind: "choice" | "freeform";
+  value: string;
+  archetype_inferred?: boolean;
+}
+
 export type ActionRevealStatus = "composing" | "submitted" | "cleared";
 
 export interface ActionRevealEntry {

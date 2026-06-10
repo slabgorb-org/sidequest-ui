@@ -1,3 +1,5 @@
+import type { CreationAnswer } from "@/types/payloads";
+
 export type AbilitySource = "Race" | "Class" | "Item" | "Play";
 
 export interface AbilityDefinition {
@@ -85,6 +87,10 @@ export interface CharacterSheetData {
   rig_composure_max?: number;
   /** Crash-related injury statuses (e.g. 'injury', 'dismounted'). */
   injury_tags?: string[];
+  /** Durable per-scene chargen answers (story 93-2). The History section
+   *  (story 93-3) renders one Origin row per entry. Absent/empty on legacy
+   *  saves ⇒ no History section. */
+  creation_answers?: CreationAnswer[];
 }
 
 export interface CharacterSheetProps {
@@ -238,6 +244,35 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <h3 className="text-sm font-semibold mb-1">Backstory</h3>
         <p className="text-sm font-[var(--font-narrative)]">{data.backstory}</p>
       </div>
+
+      {/* History — story 93-3. Reads the durable chargen provenance
+          (creation_answers) and lists, per scene, the prompt the player saw and
+          the answer they gave. Structured as the future home for player-linked
+          lore (93-4), but renders ONLY the Origin block now — no lore stubs.
+          Renders nothing on legacy saves where creation_answers is absent/empty. */}
+      {data.creation_answers && data.creation_answers.length > 0 && (
+        <div data-testid="character-history">
+          <h3 className="text-sm font-semibold mb-1">History</h3>
+          <div data-testid="character-origin" className="space-y-2">
+            {data.creation_answers.map((answer) => (
+              <div key={answer.scene_id} className="text-sm">
+                <p className="text-muted-foreground">{answer.prompt}</p>
+                <p className="font-[var(--font-narrative)]">
+                  {answer.value}
+                  {answer.archetype_inferred && (
+                    <span
+                      data-testid="origin-inferred-badge"
+                      className="ml-2 text-xs px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--accent)]"
+                    >
+                      inferred from your words
+                    </span>
+                  )}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
