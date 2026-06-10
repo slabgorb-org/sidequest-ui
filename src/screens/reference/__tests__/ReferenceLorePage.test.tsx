@@ -170,4 +170,35 @@ describe("ReferenceLorePage — session-free lore route (AC1/AC2/AC4)", () => {
     expect(await screen.findByText("Public legend text.")).toBeInTheDocument();
     expect(screen.queryByText("KEEPER_LEAK_betrayal_arc")).not.toBeInTheDocument();
   });
+
+  it("orders sections for display regardless of server build order (lore layout)", async () => {
+    // The server emits sections in build order; the lore page imposes the display
+    // sequence (Map, World, Lore, POI, NPC, Timeline, History, Legends, then any
+    // unnamed section trailing in server order). Feed a scrambled payload with an
+    // unnamed "cultures" section and assert the rendered section headings come out
+    // in the configured order, cultures last.
+    const node = (v: string) => ({
+      type: "dict" as const,
+      entries: [{ key: "k", label: "K", node: { type: "scalar" as const, value: v } }],
+    });
+    const scrambled: LoreProjection = {
+      schema_version: 1,
+      pack: PACK,
+      world: WORLD,
+      sections: [
+        { id: "history", label: "History", node: node("h") },
+        { id: "legends", label: "Legends", node: node("g") },
+        { id: "cultures", label: "Cultures", node: node("c") },
+        { id: "world", label: "World", node: node("w") },
+        { id: "lore", label: "Lore", node: node("o") },
+      ],
+    };
+    fetchMock.mockResolvedValue(makeJsonResponse(scrambled));
+    const { container } = renderLoreRoute();
+    await screen.findByText("World");
+    const labels = Array.from(
+      container.querySelectorAll(".reference-section__label"),
+    ).map((el) => el.textContent);
+    expect(labels).toEqual(["World", "Lore", "History", "Legends", "Cultures"]);
+  });
 });
