@@ -1,4 +1,4 @@
-import type { CreationAnswer } from "@/types/payloads";
+import type { CreationAnswer, LinkedLoreFragment } from "@/types/payloads";
 
 export type AbilitySource = "Race" | "Class" | "Item" | "Play";
 
@@ -91,6 +91,10 @@ export interface CharacterSheetData {
    *  (story 93-3) renders one Origin row per entry. Absent/empty on legacy
    *  saves ⇒ no History section. */
   creation_answers?: CreationAnswer[];
+  /** Player-linked creation-seed lore fragments (story 93-4). Rendered as a
+   *  "Lore" subsection beneath the origin block inside the History section.
+   *  Absent/empty ⇒ no Lore subsection. */
+  lore_fragments?: LinkedLoreFragment[];
 }
 
 export interface CharacterSheetProps {
@@ -271,6 +275,39 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
               </div>
             ))}
           </div>
+          {/* Lore — story 93-4. The character's own creation-seed lore
+              fragments (server: members[].sheet.lore_fragments), shown
+              beneath the origin block. Each row shows the fragment's title +
+              summary; when the server provides a lore_route the title links
+              to that page, otherwise it renders as plain text (No Silent
+              Fallbacks — never a fabricated href). Renders nothing when there
+              are no linked fragments. */}
+          {data.lore_fragments && data.lore_fragments.length > 0 && (
+            <div data-testid="history-lore" className="mt-3 space-y-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Lore
+              </h4>
+              {data.lore_fragments.map((fragment) => (
+                <div
+                  key={fragment.fragment_id}
+                  data-testid="history-lore-item"
+                  className="text-sm"
+                >
+                  {fragment.lore_route ? (
+                    <a
+                      href={fragment.lore_route}
+                      className="font-[var(--font-narrative)] text-[var(--accent)] underline"
+                    >
+                      {fragment.title}
+                    </a>
+                  ) : (
+                    <p className="font-[var(--font-narrative)]">{fragment.title}</p>
+                  )}
+                  <p className="text-muted-foreground">{fragment.summary}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

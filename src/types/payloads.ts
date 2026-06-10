@@ -38,6 +38,21 @@ export interface CreationAnswer {
   archetype_inferred?: boolean;
 }
 
+/** A creation-seed lore fragment linked to a character's History (story
+ *  93-4). Surfaced by the server on `members[].sheet.lore_fragments` — the
+ *  character's own chosen chargen options, projected from the ADR-048 lore
+ *  store. The History section renders these as a "Lore" subsection beneath
+ *  the origin block. `lore_route` links the title to a lore page when one
+ *  exists; when null the title renders as plain text (never a fabricated
+ *  href). Mirrors sidequest-server protocol `LinkedLoreFragment`. */
+export interface LinkedLoreFragment {
+  fragment_id: string;
+  title: string;
+  summary: string;
+  source: string;
+  lore_route?: string | null;
+}
+
 export type ActionRevealStatus = "composing" | "submitted" | "cleared";
 
 export interface ActionRevealEntry {
