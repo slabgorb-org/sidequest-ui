@@ -348,6 +348,18 @@ export interface DieGroupResult {
 }
 
 /** Server -> all clients: request a dice roll during the reveal phase. */
+/**
+ * Which roll in a multi-roll beat turn a dice frame is.
+ * - `check` (default): the PRIMARY beat/skill roll the player committed —
+ *   its value+tier are authoritative and own the d20 overlay.
+ * - `damage`: the strike's follow-on weapon-damage roll (ADR-114 §2). It shares
+ *   the rolling player's id, so without this tag the dice-guard rendered it as
+ *   the primary roll (2d6 total on the d20 with a bogus "need 2" banner —
+ *   playtest 2026-06-10). The overlay must keep the check roll and not let a
+ *   damage frame replace it.
+ */
+export type DiceRollRole = "check" | "damage";
+
 export interface DiceRequestPayload {
   request_id: string;
   rolling_player_id: string;
@@ -357,6 +369,8 @@ export interface DiceRequestPayload {
   stat: string;
   difficulty: number;
   context: string;
+  /** Defaults to `check` when absent (older server frames). */
+  roll_role?: DiceRollRole;
 }
 
 /** Client -> server: rolling player submits throw after local physics settles.
@@ -400,6 +414,8 @@ export interface DiceResultPayload {
   outcome: RollOutcome;
   seed: number;
   throw_params: DiceThrowParams;
+  /** See DiceRequestPayload.roll_role. Defaults to `check` when absent. */
+  roll_role?: DiceRollRole;
 }
 
 // ---------------------------------------------------------------------------

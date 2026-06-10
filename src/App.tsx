@@ -1241,6 +1241,21 @@ function AppInner() {
     // peer), a peer's request+result pair displays and replays normally.
     if (msg.type === MessageType.DICE_REQUEST) {
       const incomingReq = msg.payload as unknown as DiceRequestPayload;
+      // Damage follow-on roll (ADR-114 §2). It carries the rolling player's own
+      // id, so the local-vs-peer guard below would treat it as "own" and let it
+      // CLOBBER the primary check overlay — the d20 tray would show a 2d6 damage
+      // total against a bogus "need 2 on d20" banner instead of the committed
+      // attack roll's value+tier (playtest 2026-06-10 dice-overlay regression,
+      // #759/#760 second-broadcast). The damage is surfaced via the HP bar and
+      // the opponent_hp_removed forensics; it is not the primary roll, so it
+      // must never occupy the check overlay.
+      if (incomingReq.roll_role === "damage") {
+        console.debug(
+          `[dice-guard] damage DICE_REQUEST ${incomingReq.request_id} (${incomingReq.character_name}) ` +
+            `routed away from the primary check overlay`,
+        );
+        return;
+      }
       const selfId = currentPlayerIdRef.current;
       const reqIsOwn = !!selfId && incomingReq.rolling_player_id === selfId;
       const displayed = displayedDiceRequestRef.current;
@@ -1261,6 +1276,16 @@ function AppInner() {
     }
     if (msg.type === MessageType.DICE_RESULT) {
       const incomingRes = msg.payload as unknown as DiceResultPayload;
+      // Damage follow-on result — see the DICE_REQUEST handler above. Dropping
+      // it keeps the authoritative check result (attack roll value+tier) on the
+      // overlay instead of overwriting it with the weapon-damage total.
+      if (incomingRes.roll_role === "damage") {
+        console.debug(
+          `[dice-guard] damage DICE_RESULT ${incomingRes.request_id} (${incomingRes.character_name}) ` +
+            `routed away from the primary check overlay`,
+        );
+        return;
+      }
       const selfId = currentPlayerIdRef.current;
       const resIsOwn = !!selfId && incomingRes.rolling_player_id === selfId;
       const displayed = displayedDiceRequestRef.current;
