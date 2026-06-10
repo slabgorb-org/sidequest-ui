@@ -146,6 +146,69 @@ function peerResult(): DiceResultPayload {
   };
 }
 
+// playtest 2026-06-10 dice-overlay regression: a HIT broadcasts the player's
+// own check roll AND a follow-on damage roll (same rolling_player_id). The
+// damage frame must not replace the authoritative check overlay.
+function ownCheckRequest(): DiceRequestPayload {
+  return {
+    request_id: "req-carl-attack",
+    rolling_player_id: "carl-pid",
+    character_name: "Carl",
+    dice: [{ sides: 20, count: 1 }],
+    modifier: 2,
+    stat: "STR",
+    difficulty: 12,
+    context: "Committed Blow — STR check",
+    roll_role: "check",
+  };
+}
+
+function ownCheckResult(): DiceResultPayload {
+  return {
+    request_id: "req-carl-attack",
+    rolling_player_id: "carl-pid",
+    character_name: "Carl",
+    rolls: [{ spec: { sides: 20, count: 1 }, faces: [18] }],
+    modifier: 2,
+    total: 20,
+    difficulty: 12,
+    outcome: "CritSuccess",
+    seed: 7,
+    throw_params: { velocity: [1, 2, 3], angular: [4, 5, 6], position: [0.5, 0.5] },
+    roll_role: "check",
+  };
+}
+
+function ownDamageRequest(): DiceRequestPayload {
+  return {
+    request_id: "req-carl-damage",
+    rolling_player_id: "carl-pid",
+    character_name: "Carl",
+    dice: [{ sides: 6, count: 2 }],
+    modifier: 0,
+    stat: "DAMAGE",
+    difficulty: 1,
+    context: "weapon damage",
+    roll_role: "damage",
+  };
+}
+
+function ownDamageResult(): DiceResultPayload {
+  return {
+    request_id: "req-carl-damage",
+    rolling_player_id: "carl-pid",
+    character_name: "Carl",
+    rolls: [{ spec: { sides: 6, count: 2 }, faces: [3, 4] }],
+    modifier: 0,
+    total: 7,
+    difficulty: 1,
+    outcome: "Success",
+    seed: 9,
+    throw_params: { velocity: [1, 2, 3], angular: [4, 5, 6], position: [0.5, 0.5] },
+    roll_role: "damage",
+  };
+}
+
 const META = {
   genre_slug: "caverns_and_claudes",
   world_slug: "sunden",
@@ -291,6 +354,35 @@ describe("MP dice frame guard — peer frames never clobber the local roll", () 
     await waitFor(() => {
       expect(readDiceRequest()?.request_id).toBe("req-bob-peer");
       expect(readDiceResult()?.total).toBe(8);
+    });
+  });
+
+  it("keeps the OWN check roll when a same-player DAMAGE follow-on arrives (the 2026-06-10 overlay regression)", async () => {
+    const server = await bootInGameAsCarl();
+
+    // Player commits a Committed Blow: the attack roll resolves CritSuccess vs DC 12.
+    server.send({ type: "DICE_REQUEST", payload: ownCheckRequest() });
+    server.send({ type: "DICE_RESULT", payload: ownCheckResult() });
+    await waitFor(() => {
+      expect(readDiceRequest()?.request_id).toBe("req-carl-attack");
+      expect(readDiceResult()?.total).toBe(20);
+    });
+
+    // The follow-on damage roll (same player) must NOT replace the attack
+    // overlay — pre-fix it painted "rolled 7 vs DC 1 — Success / need 2 on d20".
+    server.send({ type: "DICE_REQUEST", payload: ownDamageRequest() });
+    server.send({ type: "DICE_RESULT", payload: ownDamageResult() });
+
+    await waitFor(() => {
+      const req = readDiceRequest();
+      const res = readDiceResult();
+      // Authoritative beat roll stays displayed: STR vs 12, CritSuccess, total 20.
+      expect(req?.request_id).toBe("req-carl-attack");
+      expect(req?.stat).toBe("STR");
+      expect(req?.difficulty).toBe(12);
+      expect(res?.request_id).toBe("req-carl-attack");
+      expect(res?.total).toBe(20);
+      expect(res?.outcome).toBe("CritSuccess");
     });
   });
 
