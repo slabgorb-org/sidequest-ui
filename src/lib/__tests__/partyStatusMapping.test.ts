@@ -11,6 +11,7 @@ import {
   toCharacterSummary,
   toCharacterSheetData,
 } from "../partyStatusMapping";
+import type { CreationAnswer } from "@/types/payloads";
 
 // A representative PARTY_STATUS member (the raw wire object App.tsx maps).
 function wireMember(
@@ -100,5 +101,96 @@ describe("toCharacterSheetData — local-player sheet assembly (story 67-6)", ()
     expect(built.hp).toBe(24);
     expect(built.hp_max).toBe(30);
     expect(built.backstory).toBe("Born in the Ashwood.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 93-3: creation_answers provenance carried wire → sheet.
+//
+// 93-2 puts the durable per-scene chargen answers on the sheet facet
+// (CharacterSheetDetails.creation_answers). The 93-3 History section reads
+// CharacterSheetData.creation_answers — so toCharacterSheetData must thread
+// sheetFacet.creation_answers through. These are the ONLY tests that prove the
+// wire field survives the production wire→sheet map (the component tests feed
+// fixtures that bypass App.tsx). Per sidequest-ui/CLAUDE.md "Every Test Suite
+// Needs a Wiring Test."
+// ---------------------------------------------------------------------------
+
+const WIRE_CREATION_ANSWERS: CreationAnswer[] = [
+  {
+    scene_id: "origin_scene",
+    prompt: "Where do you hail from?",
+    kind: "freeform",
+    value: "I crawled out of a suspension pod beneath the salt flats.",
+    archetype_inferred: true,
+  },
+  {
+    scene_id: "calling_scene",
+    prompt: "What is your calling?",
+    kind: "choice",
+    value: "Wasteland Mechanic",
+    archetype_inferred: false,
+  },
+];
+
+describe("toCharacterSheetData — creation_answers provenance (story 93-3)", () => {
+  it("carries creation_answers from the sheet facet into CharacterSheetData", () => {
+    const raw = wireMember({
+      sheet: {
+        race: "Wood Elf",
+        stats: {},
+        abilities: [],
+        class_moves: [],
+        backstory: "Born in the Ashwood.",
+        creation_answers: WIRE_CREATION_ANSWERS,
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.creation_answers).toEqual(WIRE_CREATION_ANSWERS);
+  });
+
+  it("preserves the archetype_inferred flag per entry through the map (badge survives the boundary)", () => {
+    const raw = wireMember({
+      sheet: {
+        stats: {},
+        abilities: [],
+        class_moves: [],
+        backstory: "x",
+        creation_answers: WIRE_CREATION_ANSWERS,
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.creation_answers?.[0]?.archetype_inferred).toBe(true);
+    expect(built.creation_answers?.[1]?.archetype_inferred).toBe(false);
+  });
+
+  it("carries creation_answers in single-player too — provenance is NOT identity-gated", () => {
+    // Regression guard: creation_answers must not be suppressed behind the
+    // isMultiplayer flag the way player_id / player_identity are. A solo
+    // player's own chargen history is theirs to see.
+    const raw = wireMember({
+      sheet: {
+        stats: {},
+        abilities: [],
+        class_moves: [],
+        backstory: "x",
+        creation_answers: WIRE_CREATION_ANSWERS,
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, /* isMultiplayer */ false);
+    expect(built.creation_answers).toHaveLength(2);
+  });
+
+  it("yields an empty (falsy) creation_answers when the facet omits it — graceful legacy save, no fabrication", () => {
+    // The legacy sheet facet (wireMember default) has no creation_answers; the
+    // map must not invent any. AC-4 graceful path: the component then renders
+    // no History section.
+    const raw = wireMember();
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.creation_answers ?? []).toEqual([]);
   });
 });
