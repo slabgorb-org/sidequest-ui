@@ -182,26 +182,29 @@ describe('lobby → slug navigation — Leave + Start fresh game (playtest 2026-
     );
     localStorage.setItem('sq:display-name', 'Keith');
     // Seed journey history with FIRST_SLUG so the slug-connect trust gate
-    // (App.tsx, slug-mode "is this slug known?" check — added 2026-04-26 in
-    // commit 7750347 to block stale-name silent rebinds) recognizes us as
-    // the client that created this game. In the real playtest flow this
-    // history entry is written by ConnectScreen.handleStart before it
-    // navigates to /solo/<slug>; the test mounts directly at /solo/<slug>
-    // and so must seed it here.
+    // (App.tsx, slug-mode "is this slug known?" check) recognizes us as the
+    // client that created this game. As of the 2026-06-05 [BAR-1] tightening
+    // the gate requires BOTH a matching slug AND a matching player_name, so
+    // the seeded entry's player_name MUST equal the `sq:display-name` this
+    // mount runs under ('Keith'). A non-matching name (the historical 'Tarn'
+    // seed) fails the gate, the slug-connect effect returns early, the
+    // NamePrompt stays up, no WebSocket is ever built, and the first
+    // `await firstServer.connected` hangs to the 5s timeout.
     //
-    // Use a DIFFERENT player_name on the historical entry so the matching-
-    // journey resume short-circuit in ConnectScreen.handleStart (added in
-    // commit 1436ebd, playtest 2026-04-25 fix — typed name that DOES match
-    // a past journey resumes that slug instead of POSTing) does not fire on
-    // the second click. Real playtest narrative: "the previous Greyhawk
-    // session belonged to a different character; on this new Start the
-    // typed name does not match any past journey, so the lobby POSTs for a
-    // fresh slug" — exactly the scenario this test was written to cover.
+    // In the real playtest flow this history entry is written by
+    // ConnectScreen.handleStart before it navigates to /solo/<slug>; the test
+    // mounts directly at /solo/<slug> and so must seed it here.
+    //
+    // The matching-journey resume short-circuit in ConnectScreen.handleStart
+    // (typed name that matches a past journey resumes that slug instead of
+    // POSTing) is NOT a concern for the second Start click: history is wiped
+    // via removeItem('sidequest-history') below, so no entry can match and the
+    // lobby POSTs for a fresh slug — exactly the scenario this test covers.
     localStorage.setItem(
       'sidequest-history',
       JSON.stringify([
         {
-          player_name: 'Tarn',
+          player_name: 'Keith',
           genre: 'low_fantasy',
           world: 'greyhawk',
           game_slug: FIRST_SLUG,
@@ -252,7 +255,7 @@ describe('lobby → slug navigation — Leave + Start fresh game (playtest 2026-
     // commit 1436ebd) would then re-navigate to FIRST_SLUG instead of
     // POSTing for a new one, which neuters the regression coverage. Wiping
     // history mirrors the realistic "user decides to start fresh, not
-    // resume" path; the seeded Tarn entry was only needed for the
+    // resume" path; the seeded Keith entry was only needed for the
     // first-mount trust gate.
     localStorage.removeItem('sidequest-history');
 
