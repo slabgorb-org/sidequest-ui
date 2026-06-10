@@ -212,15 +212,17 @@ async function openCombat(server: WS): Promise<void> {
   await waitFor(() => expect(board.currentPlayerId).toBe("vesska-pid"));
 }
 
-function sentThrows(server: WS): Array<{
+type SentThrow = {
   beat_id?: string;
   spell_id?: string;
   player_action?: string;
   face: number[];
-}> {
+};
+
+function sentThrows(server: WS): SentThrow[] {
   return server.messages
     .filter((m) => (m as { type?: string }).type === MessageType.DICE_THROW)
-    .map((m) => (m as { payload: never }).payload);
+    .map((m) => (m as { payload: SentThrow }).payload);
 }
 
 beforeEach(() => {

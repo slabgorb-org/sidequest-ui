@@ -141,7 +141,12 @@ describe("102-2: cast_spell tile opens the prepared-spell picker", () => {
     fireEvent.click(option!);
 
     expect(onBeatSelect).toHaveBeenCalledTimes(1);
-    const [beatId, spellId] = onBeatSelect.mock.calls[0] as [string, string];
+    // The prop signature is (beatId: string, spellId?: string) — the tuple
+    // type keeps the undefined honest; the .toBe below is the real catch.
+    const [beatId, spellId] = onBeatSelect.mock.calls[0] as [
+      string,
+      string | undefined,
+    ];
     expect(beatId).toBe("cast_spell");
     expect(spellId).toBe("wracking_bolt");
   });
