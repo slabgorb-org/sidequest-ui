@@ -297,11 +297,6 @@ export function buildSegments(
   return segments;
 }
 
-/** @deprecated Images now route to gallery widget; portrait grouping is a no-op passthrough. */
-export function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[] {
-  return segments;
-}
-
 /**
  * Group segments into turn pages for Focus-mode pagination.
  *

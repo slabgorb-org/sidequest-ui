@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef, useCallback } from "react";
-import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
+import { buildSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import type { ActionRevealEntry } from "@/types/payloads";
 import { renderSegment } from "./narrativeRenderers";
@@ -16,7 +16,7 @@ export interface NarrationScrollProps {
 
 export function NarrationScroll({ messages, thinking, genreSlug, peerActionsByRound }: NarrationScrollProps) {
   const segments = useMemo(
-    () => groupPortraitSegments(buildSegments(messages, peerActionsByRound)),
+    () => buildSegments(messages, peerActionsByRound),
     [messages, peerActionsByRound],
   );
 
