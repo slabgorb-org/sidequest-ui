@@ -5,7 +5,7 @@ import type { AbilityDefinition, CharacterSheetData, ClassMove } from '../Charac
 // Story 93-3 AC-4: the chargen-provenance entry type is canonical in payloads.ts
 // (the wire-types home). If Dev defines it elsewhere this import breaks tsc — the
 // build gate enforces the "typed in payloads.ts" AC. CharacterSheetData re-uses it.
-import type { CreationAnswer } from '@/types/payloads';
+import type { CreationAnswer, LinkedLoreFragment } from '@/types/payloads';
 
 const makeAbility = (name: string): AbilityDefinition => ({
   name,
@@ -541,5 +541,127 @@ describe('CharacterSheet — Story 93-3: History section (origin block)', () => 
     expect(within(history).getByTestId('character-origin')).toBeInTheDocument();
     expect(within(history).getByText(/Where do you hail from\?/)).toBeInTheDocument();
     expect(within(history).queryAllByTestId('origin-inferred-badge')).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 93-4: History "Lore" subsection — player-linked lore fragments
+//
+// Attaches the character's creation-seed lore fragments (surfaced by the
+// server on members[].sheet.lore_fragments) as a "Lore" subsection BENEATH
+// the origin block inside the existing History section (story 93-3 left the
+// `history-lore` testid as the anchor for exactly this — see this file's
+// 93-3 AC-5 guard). Each fragment shows its title + summary; when the server
+// provides a `lore_route` the title links to the lore page, otherwise it
+// renders as plain text (No Silent Fallbacks — never fabricate a dead href).
+//
+// AC-2 (UI): render the linked fragments as a Lore subsection under History,
+//            linking to the lore page where a route exists.
+// Graceful: no Lore subsection when lore_fragments is absent/empty (the 93-3
+//            AC-5 guard already proves the empty-state shows no "lore" text).
+//
+// Implementation anchors (consistent with 93-3's testids):
+//   - data-testid="history-lore"       — the Lore subsection within History
+//   - data-testid="history-lore-item"  — one row per linked fragment
+// ---------------------------------------------------------------------------
+
+describe('CharacterSheet — Story 93-4: History Lore subsection', () => {
+  // History only renders when creation_answers is present (93-3); lore lives
+  // beneath the origin block, so the fixture carries both.
+  const HISTORY_ANSWERS: CreationAnswer[] = [
+    {
+      scene_id: 'the_calling',
+      prompt: 'What is your calling?',
+      kind: 'choice',
+      value: 'Wasteland Mechanic',
+      archetype_inferred: false,
+    },
+  ];
+
+  // Two fragments: one WITH a lore page route (renders a link) and one
+  // WITHOUT (renders plain text — no fabricated href).
+  const LORE_FRAGMENTS: LinkedLoreFragment[] = [
+    {
+      fragment_id: 'lore_char_creation_the_calling_2',
+      title: 'Wasteland Mechanic',
+      summary: 'Keeps the convoy running on scavenged parts.',
+      source: 'character_creation',
+      lore_route: '/lore/lore_char_creation_the_calling_2',
+    },
+    {
+      fragment_id: 'lore_char_creation_the_origin_0',
+      title: 'Salt-Flat Pod',
+      summary: 'Emerged from a suspension pod beneath the salt flats.',
+      source: 'character_creation',
+      lore_route: null,
+    },
+  ];
+
+  const DATA_WITH_LORE: CharacterSheetData = {
+    ...BASE_DATA,
+    creation_answers: HISTORY_ANSWERS,
+    lore_fragments: LORE_FRAGMENTS,
+  };
+
+  // --- AC-2: Lore subsection renders under History ---
+
+  it('AC-2: renders a Lore subsection inside the History section', () => {
+    render(<CharacterSheet data={DATA_WITH_LORE} />);
+    const history = screen.getByTestId('character-history');
+    const lore = within(history).getByTestId('history-lore');
+    expect(lore).toBeInTheDocument();
+    // It sits BENEATH the origin block (origin still present).
+    expect(within(history).getByTestId('character-origin')).toBeInTheDocument();
+  });
+
+  it('AC-2: lists each linked fragment\'s title and summary', () => {
+    render(<CharacterSheet data={DATA_WITH_LORE} />);
+    const lore = screen.getByTestId('history-lore');
+    expect(within(lore).getAllByTestId('history-lore-item')).toHaveLength(2);
+    expect(within(lore).getByText('Wasteland Mechanic')).toBeInTheDocument();
+    expect(
+      within(lore).getByText(/Keeps the convoy running on scavenged parts\./),
+    ).toBeInTheDocument();
+    expect(within(lore).getByText('Salt-Flat Pod')).toBeInTheDocument();
+    expect(
+      within(lore).getByText(/Emerged from a suspension pod beneath the salt flats\./),
+    ).toBeInTheDocument();
+  });
+
+  // --- AC-2: linking to the lore page where a route exists ---
+
+  it('AC-2: a fragment with a lore_route renders a link to that page', () => {
+    render(<CharacterSheet data={DATA_WITH_LORE} />);
+    const lore = screen.getByTestId('history-lore');
+    const link = within(lore).getByRole('link', { name: /Wasteland Mechanic/ });
+    expect(link).toHaveAttribute('href', '/lore/lore_char_creation_the_calling_2');
+  });
+
+  it('AC-2: a fragment WITHOUT a lore_route renders plain text, never a fabricated link', () => {
+    render(<CharacterSheet data={DATA_WITH_LORE} />);
+    const lore = screen.getByTestId('history-lore');
+    // The routeless fragment's title is present...
+    expect(within(lore).getByText('Salt-Flat Pod')).toBeInTheDocument();
+    // ...but NOT as a link (No Silent Fallbacks — no dead/invented href).
+    expect(within(lore).queryByRole('link', { name: /Salt-Flat Pod/ })).toBeNull();
+  });
+
+  // --- Graceful absence/empty ---
+
+  it('renders no Lore subsection when lore_fragments is absent', () => {
+    // History present (creation_answers) but no lore_fragments at all.
+    render(<CharacterSheet data={{ ...BASE_DATA, creation_answers: HISTORY_ANSWERS }} />);
+    const history = screen.getByTestId('character-history');
+    expect(within(history).queryByTestId('history-lore')).toBeNull();
+  });
+
+  it('renders no Lore subsection when lore_fragments is an empty array', () => {
+    render(
+      <CharacterSheet
+        data={{ ...BASE_DATA, creation_answers: HISTORY_ANSWERS, lore_fragments: [] }}
+      />,
+    );
+    const history = screen.getByTestId('character-history');
+    expect(within(history).queryByTestId('history-lore')).toBeNull();
   });
 });
