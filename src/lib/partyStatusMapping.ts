@@ -6,6 +6,7 @@
 // Wiring Test."
 
 import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
+import type { CreationAnswer } from "@/types/payloads";
 import type { CharacterSummary } from "@/types/party";
 
 /**
@@ -86,5 +87,12 @@ export function toCharacterSheetData(
     rig_composure_current: typeof rawLocal.rig_composure_current === "number" ? rawLocal.rig_composure_current as number : undefined,
     rig_composure_max: typeof rawLocal.rig_composure_max === "number" ? rawLocal.rig_composure_max as number : undefined,
     injury_tags: Array.isArray(rawLocal.injury_tags) ? rawLocal.injury_tags as string[] : undefined,
+    // Story 93-3: durable chargen provenance for the History section. NOT
+    // identity-gated — a solo player's own chargen history is theirs to see, so
+    // this is threaded regardless of isMultiplayer (unlike player_id). Absent
+    // facet ⇒ undefined (no fabrication; the component then renders no History).
+    creation_answers: Array.isArray(sheetFacet.creation_answers)
+      ? (sheetFacet.creation_answers as CreationAnswer[])
+      : undefined,
   };
 }
