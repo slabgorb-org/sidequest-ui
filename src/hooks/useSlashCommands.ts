@@ -2,9 +2,6 @@ import { useCallback } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import type { WidgetId } from '@/components/GameBoard/widgetRegistry';
 
-/** @deprecated Use WidgetId instead */
-export type OverlayType = WidgetId | null;
-
 export interface SlashCommandResult {
   handled: boolean;
   messages: GameMessage[];

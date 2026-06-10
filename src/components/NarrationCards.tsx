@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
+import { buildSegments } from "@/lib/narrativeSegments";
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import type { ActionRevealEntry } from "@/types/payloads";
@@ -58,7 +58,7 @@ function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
 
 export function NarrationCards({ messages, thinking, genreSlug, peerActionsByRound }: NarrationCardsProps) {
   const segments = useMemo(
-    () => groupPortraitSegments(buildSegments(messages, peerActionsByRound)).filter((s) => s.kind !== "separator"),
+    () => buildSegments(messages, peerActionsByRound).filter((s) => s.kind !== "separator"),
     [messages, peerActionsByRound],
   );
 
