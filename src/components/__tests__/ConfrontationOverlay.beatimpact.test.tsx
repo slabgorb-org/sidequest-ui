@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { ConfrontationOverlay } from '../ConfrontationOverlay';
-import type { ConfrontationData } from '../ConfrontationOverlay';
+import type { BeatImpactView, ConfrontationData } from '../ConfrontationOverlay';
 
 // ═══════════════════════════════════════════════════════════
 // Story 73-4 — beat-kind impact legibility (player UI).
@@ -46,7 +46,7 @@ const RESOLUTION_IMPACT = {
   own: 0,
   opponent: 0,
   summary: 'Clean Exit — resolves the confrontation (no dial change by design)',
-};
+} satisfies BeatImpactView;
 
 describe('Story 73-4: beat-kind impact legibility', () => {
   it('renders an impact panel for a no-dial-move CritSuccess (push resolution)', () => {
@@ -82,7 +82,7 @@ describe('Story 73-4: beat-kind impact legibility', () => {
       own: 2,
       opponent: 0,
       summary: 'Sharp Barb lands — +2 to your edge (Opening)',
-    };
+    } satisfies BeatImpactView;
     const data: ConfrontationData = { ...BASE, last_beat_impact: advance };
     render(<ConfrontationOverlay data={data} />);
     // The dials are NOT replaced by the impact panel — both render.
@@ -101,7 +101,7 @@ describe('Story 73-4: beat-kind impact legibility', () => {
       own: 0,
       opponent: 0,
       summary: 'The barb misses — nothing lands.',
-    };
+    } satisfies BeatImpactView;
     const { rerender } = render(
       <ConfrontationOverlay data={{ ...BASE, last_beat_impact: RESOLUTION_IMPACT }} />,
     );
