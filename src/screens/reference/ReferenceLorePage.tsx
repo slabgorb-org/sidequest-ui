@@ -59,5 +59,13 @@ export function ReferenceLorePage() {
 
   const sections = useMemo(() => orderLoreSections(data?.sections), [data?.sections]);
 
-  return <ReferenceDocument loading={loading} error={error} sections={sections} />;
+  return (
+    <ReferenceDocument
+      docType="lore"
+      loading={loading}
+      error={error}
+      sections={sections}
+      meta={data?.meta}
+    />
+  );
 }

@@ -23,5 +23,13 @@ export function ReferenceRulesPage() {
   // WebSocket theme_css channel; /reference/rules/* must theme too.
   useThemeTokens(data?.theme);
 
-  return <ReferenceDocument loading={loading} error={error} sections={data?.sections} />;
+  return (
+    <ReferenceDocument
+      docType="rules"
+      loading={loading}
+      error={error}
+      sections={data?.sections}
+      meta={data?.meta}
+    />
+  );
 }

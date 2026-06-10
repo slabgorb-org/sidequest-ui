@@ -1,23 +1,478 @@
-/* Reference page stylesheet — genre-themed via tokens injected by useThemeTokens.
+/* Reference page stylesheet — 2026-06-09 redesign (design bundle
+ * "lore-and-rules-migration", PORTING.md: drop-in successor to the 100-8
+ * sheet). Same token vocabulary: the GENRE tokens (--text, --background,
+ * --primary, --secondary, --accent, --surface, --border, --muted-foreground,
+ * --font-body, --font-display, --dinkus-light) injected onto :root by
+ * useThemeTokens. Every color is token-derived via color-mix; the only fixed
+ * hexes are the Folio constants used for image placeholders (Folio is
+ * genre-independent by design).
  *
- * All color/font vars here are the GENRE tokens (--text, --background, --primary,
- * --font-body, etc.) emitted by build_theme_tokens on the server and applied to
- * :root by useThemeTokens. These differ from the Tailwind/shadcn system vars
- * (--foreground, --card, etc.) used elsewhere in the app — the reference pages
- * are session-free and themed entirely by genre pack.
+ * Class inventory:
+ *   .reference-page / .reference-masthead / .reference-layout / .reference-toc
+ *   .reference-document / .reference-section / .reference-subsection
+ *   .reference-runin / .reference-prose / .reference-node--list / .reference-dl
+ *   .reference-cardgrid / .reference-card
+ *   .poi-section__* / .cast-section__* / .timeline-section__* (polished)
+ *   .ref-placeholder (Folio art placeholder)
  */
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */
 
-.reference-document {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 2rem 3rem 4rem;
-  font-family: var(--font-body, 'Baskerville', Georgia, serif);
-  font-size: 1rem;
-  line-height: 1.75;
-  color: var(--text, #1a1a1a);
+/* Smooth anchor scrolling, scoped: this sheet loads app-wide once a reference
+ * page has mounted, so the bare `html` rule would leak into the game UI. */
+html:has(.reference-page) {
+  scroll-behavior: smooth;
 }
+
+.reference-page {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 2.5rem 3rem 5rem;
+  font-family: var(--font-body, 'Baskerville', Georgia, serif);
+  color: var(--text, #1a1a1a);
+  line-height: 1.75;
+  position: relative;
+  z-index: 1;
+}
+
+.reference-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 3.5rem;
+  align-items: start;
+}
+
+/* ── Masthead ───────────────────────────────────────────────────────────── */
+
+.reference-masthead {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.75rem;
+  border-bottom: 1px solid var(--accent, #C9A96E);
+}
+
+.reference-masthead__eyebrow {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 70%, var(--text, #1a1a1a));
+  margin: 0 0 0.9rem;
+}
+
+.reference-masthead__eyebrow .sep {
+  opacity: 0.45;
+  margin: 0 0.5em;
+}
+
+.reference-masthead__title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  color: var(--text, #1a1a1a);
+  margin: 0 0 0.5rem;
+  text-wrap: balance;
+}
+
+.reference-masthead__dateline {
+  font-style: italic;
+  font-size: 1.05rem;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 72%, transparent);
+  margin: 0;
+  max-width: 60ch;
+}
+
+.reference-masthead__dinkus {
+  display: block;
+  margin-top: 1.4rem;
+  color: var(--accent, #C9A96E);
+  letter-spacing: 0.55em;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  user-select: none;
+}
+
+/* The glyph itself rides the pack's theme token set (build_theme_tokens →
+ * --dinkus-light), so the masthead never hardcodes a genre's ornament. */
+.reference-masthead__dinkus::after {
+  content: var(--dinkus-light, '· · ·');
+}
+
+/* ── Table of contents ──────────────────────────────────────────────────── */
+
+.reference-toc {
+  position: sticky;
+  top: 2rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  /* Long documents: the rail scrolls within the viewport instead of growing past it */
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary, #8C3B2E) 30%, transparent) transparent;
+  padding-right: 0.5rem;
+}
+
+.reference-toc__heading {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 75%, var(--text, #1a1a1a));
+  margin: 0 0 0.9rem;
+}
+
+.reference-toc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 25%, transparent);
+}
+
+.reference-toc__item {
+  margin: 0;
+}
+
+.reference-toc__link {
+  display: block;
+  padding: 0.28rem 0 0.28rem 0.9rem;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 78%, transparent);
+  text-decoration: none;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.reference-toc__link--sub {
+  padding-left: 1.9rem;
+  font-size: 0.86em;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 60%, transparent);
+}
+
+.reference-toc__link:hover {
+  color: var(--primary, #8C3B2E);
+}
+
+.reference-toc__link[data-active="true"] {
+  border-left-color: var(--primary, #8C3B2E);
+  color: var(--primary, #8C3B2E);
+  font-weight: 600;
+}
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+
+.reference-section {
+  margin-bottom: 3.25rem;
+}
+
+.reference-section__label {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary, #8C3B2E);
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--primary, #8C3B2E) 35%, transparent);
+  scroll-margin-top: 1.5rem;
+}
+
+/* ── Subsections (depth-0 dict keys promoted to headings) ──────────────── */
+
+.reference-subsection {
+  margin-bottom: 1.9rem;
+}
+
+.reference-subsection__heading {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text, #1a1a1a);
+  margin: 0 0 0.6rem;
+  scroll-margin-top: 1.5rem;
+}
+
+.reference-subsection__anchor {
+  margin-left: 0.45em;
+  font-size: 0.8em;
+  color: var(--accent, #C9A96E);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.reference-subsection__heading:hover .reference-subsection__anchor,
+.reference-subsection__anchor:focus-visible {
+  opacity: 0.85;
+}
+
+/* Depth-1 keys with structured values get a minor heading */
+.reference-minor-heading {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 70%, var(--text, #1a1a1a));
+  margin: 1.25rem 0 0.5rem;
+}
+
+.reference-minor-heading:first-child {
+  margin-top: 0;
+}
+
+/* ── Prose & run-in entries ─────────────────────────────────────────────── */
+
+.reference-prose {
+  margin: 0 0 0.9rem;
+  line-height: 1.8;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+.reference-prose:last-child {
+  margin-bottom: 0;
+}
+
+/* Depth-1 scalar: label runs into the prose line */
+.reference-runin {
+  margin: 0 0 0.75rem;
+  line-height: 1.8;
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+.reference-runin__label {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.78em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 70%, var(--text, #1a1a1a));
+  margin-right: 0.7em;
+  white-space: nowrap;
+}
+
+/* ── Lists ──────────────────────────────────────────────────────────────── */
+
+.reference-node--list {
+  list-style: none;
+  padding-left: 1.25rem;
+  margin: 0.3rem 0 1rem;
+  max-width: 68ch;
+}
+
+.reference-node__list-item {
+  margin-bottom: 0.4rem;
+  line-height: 1.7;
+  text-indent: -1.05rem;
+}
+
+.reference-node__list-item::before {
+  content: '◇';
+  display: inline-block;
+  width: 1.05rem;
+  text-indent: 0;
+  font-size: 0.74em;
+  color: color-mix(in srgb, var(--accent, #C9A96E) 80%, var(--text, #1a1a1a));
+}
+
+/* ── Inline runs & stat pairs ────────────────────────────────────────────── */
+
+/* Word-lists (intent_verbs, allowed_classes) — one line, lozenge-separated.
+ * Flex so the run can wrap between items (adjacent spans have no whitespace
+ * text nodes, so plain inline flow would be one unbreakable "word"). */
+.reference-inline-run {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2em 0;
+}
+
+.reference-inline-run__item {
+  white-space: nowrap;
+}
+
+.reference-inline-run__item + .reference-inline-run__item::before {
+  content: '·';
+  margin: 0 0.55em;
+  color: var(--accent, #C9A96E);
+}
+
+/* Stat dicts (axis_snapshot, opponent_default_stats) — label/value pairs */
+.reference-pairs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+}
+
+.reference-pairs__pair {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+  gap: 0.5em;
+}
+
+.reference-pairs__label {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.72em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 70%, var(--text, #1a1a1a));
+  margin-right: 0.45em;
+}
+
+.reference-pairs__value {
+  font-variant-numeric: tabular-nums oldstyle-nums;
+}
+
+.reference-pairline {
+  margin: 0 0 0.75rem;
+  line-height: 1.8;
+}
+
+/* ── Item blocks (lists of dicts: resources, confrontations, beats) ───── */
+
+.reference-itemblocks {
+  margin: 0.25rem 0 1rem;
+}
+
+.reference-item {
+  padding: 1rem 0 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 16%, transparent);
+}
+
+.reference-item:first-child {
+  border-top: none;
+  padding-top: 0.25rem;
+}
+
+.reference-item__title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text, #1a1a1a);
+  margin: 0 0 0.55rem;
+}
+
+/* Nested item lists (beats inside a confrontation) — quieter, inset */
+.reference-item--nested {
+  margin-left: 1.1rem;
+  padding: 0.7rem 0 0.8rem;
+  border-top-color: color-mix(in srgb, var(--accent, #C9A96E) 30%, transparent);
+}
+
+.reference-item--nested .reference-item__title {
+  font-size: 0.92rem;
+  margin-bottom: 0.35rem;
+}
+
+.reference-item--nested .reference-runin,
+.reference-item--nested .reference-prose,
+.reference-item--nested .reference-pairline {
+  font-size: 0.94rem;
+  margin-bottom: 0.45rem;
+}
+
+.reference-item--nested .reference-minor-heading {
+  font-size: 0.7rem;
+  margin: 0.7rem 0 0.3rem;
+}
+
+/* ── Ledger (definition grid) ───────────────────────────────────────────── */
+
+.reference-dl {
+  margin: 0 0 1rem;
+  max-width: 72ch;
+}
+
+.reference-dl__entry {
+  display: grid;
+  grid-template-columns: minmax(9rem, max-content) 1fr;
+  gap: 0.2rem 1.4rem;
+  align-items: baseline;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 14%, transparent);
+}
+
+.reference-dl__entry:last-child {
+  border-bottom: none;
+}
+
+.reference-dl__label {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 70%, var(--text, #1a1a1a));
+  padding-top: 0.15em;
+}
+
+.reference-dl__value {
+  margin: 0;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums oldstyle-nums;
+}
+
+/* The "spec box" — depth-0 compact config keys grouped into one quiet grid */
+.reference-dl--spec {
+  margin: 0 0 1.9rem;
+  padding: 0.35rem 1.1rem;
+  background: color-mix(in srgb, var(--surface, #f8f0dc) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #C9A96E) 35%, transparent);
+  border-radius: var(--border-radius, 2px);
+  max-width: none;
+}
+
+.reference-dl--spec .reference-dl__entry {
+  grid-template-columns: minmax(11rem, max-content) 1fr;
+  border-bottom-color: color-mix(in srgb, var(--accent, #C9A96E) 22%, transparent);
+}
+
+.reference-dl__value .reference-prose,
+.reference-dl__value .reference-runin {
+  margin-bottom: 0.4rem;
+}
+
+/* ── Cards (depth-0 entries as panels) ──────────────────────────────────── */
+
+.reference-cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.reference-card {
+  background: color-mix(in srgb, var(--surface, #f8f0dc) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 22%, transparent);
+  border-radius: var(--border-radius, 2px);
+  padding: 1.1rem 1.25rem 1.2rem;
+  scroll-margin-top: 1.5rem;
+}
+
+.reference-card .reference-subsection__heading {
+  font-size: 1.08rem;
+  padding-bottom: 0.45rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #C9A96E) 45%, transparent);
+}
+
+.reference-card .reference-prose,
+.reference-card .reference-runin {
+  font-size: 0.95rem;
+}
+
+/* ── Loading / error (unchanged contract) ───────────────────────────────── */
 
 .reference-document--loading {
   display: flex;
@@ -34,272 +489,248 @@
   margin: 4rem auto;
   padding: 1.5rem;
   border: 1px solid var(--primary, #8C3B2E);
-  border-radius: 4px;
+  border-radius: var(--border-radius, 4px);
   color: var(--primary, #8C3B2E);
   font-style: italic;
 }
 
-/* ── Sections ────────────────────────────────────────────────────────────── */
+/* ── Folio art placeholder (unresolved runtime art) ─────────────────────── */
 
-.reference-section {
-  margin-bottom: 2rem;
+.ref-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(212, 169, 69, 0.12) 0%, transparent 65%),
+    #1a140d;
+  color: #d4a945;
+  font-family: 'Pirata One', var(--font-display, Georgia, serif);
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+  user-select: none;
 }
 
-.reference-section + .reference-section {
-  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 30%, transparent);
-  padding-top: 2rem;
-}
-
-.reference-section__label {
-  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--primary, #8C3B2E);
-  margin: 0 0 1.25rem;
-  padding-bottom: 0.4rem;
-  border-bottom: 2px solid color-mix(in srgb, var(--primary, #8C3B2E) 40%, transparent);
-}
-
-/* ── NodeTree — generic lore sections ───────────────────────────────────── */
-
-/* The critical fix: scalars render as inline <span> by default, which collapses
- * all lore text into one horizontal run. Make them block. */
-.reference-node--scalar {
-  display: block;
-  margin-bottom: 0.75rem;
-  line-height: 1.8;
-}
-
-.reference-node--list {
-  list-style: disc;
-  padding-left: 1.5rem;
-  margin: 0.25rem 0 1rem;
-}
-
-.reference-node__list-item {
-  margin-bottom: 0.3rem;
-  line-height: 1.65;
-}
-
-/* Dict: label + value pairs */
-.reference-node--dict {
-  margin: 0 0 0.75rem;
-}
-
-.reference-node__entry {
-  display: grid;
-  grid-template-columns: minmax(9rem, max-content) 1fr;
-  gap: 0.2rem 1rem;
-  align-items: baseline;
-  margin-bottom: 0.5rem;
-}
-
-.reference-node__label {
-  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--secondary, #B8893C);
-  padding-top: 0.1em;
-}
-
-.reference-node__value {
-  margin: 0;
-  line-height: 1.65;
-  color: var(--text, #1a1a1a);
-}
-
-/* Nested nodes inside a dict value */
-.reference-node__value .reference-node--list {
-  margin-top: 0;
-}
-
-.reference-node__value .reference-node--scalar {
-  display: inline;
-  margin: 0;
-}
-
-/* ── POI section ─────────────────────────────────────────────────────────── */
-
-.reference-section--poi {
-  max-width: 100%;
-}
+/* ── POI section ────────────────────────────────────────────────────────── */
 
 .poi-section__list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
 }
 
 .poi-section__entry {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  background: var(--surface, #f8f0dc);
+  gap: 0.45rem;
+  background: color-mix(in srgb, var(--surface, #f8f0dc) 85%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 20%, transparent);
-  border-radius: 4px;
+  border-radius: var(--border-radius, 2px);
   overflow: hidden;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.9rem;
 }
 
-.poi-section__image {
+.poi-section__image,
+.poi-section__entry .ref-placeholder {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  display: block;
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #C9A96E) 35%, transparent);
 }
 
 .poi-section__name {
-  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
-  font-size: 1rem;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.02rem;
   font-weight: 700;
-  margin: 0;
-  padding: 0 0.75rem;
+  margin: 0.25rem 0 0;
+  padding: 0 0.85rem;
   color: var(--text, #1a1a1a);
 }
 
 .poi-section__region {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--secondary, #B8893C);
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 75%, var(--text, #1a1a1a));
   margin: 0;
-  padding: 0 0.75rem;
+  padding: 0 0.85rem;
 }
 
 .poi-section__description {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   line-height: 1.6;
-  color: var(--text, #1a1a1a);
-  margin: 0;
-  padding: 0 0.75rem;
-  opacity: 0.85;
+  margin: 0.1rem 0 0;
+  padding: 0 0.85rem;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 82%, transparent);
 }
 
-/* ── Cast section ────────────────────────────────────────────────────────── */
+/* ── Cast section ───────────────────────────────────────────────────────── */
 
 .cast-section__list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1.4rem;
 }
 
 .cast-section__member {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  background: var(--surface, #f8f0dc);
+  gap: 0.35rem;
+  background: color-mix(in srgb, var(--surface, #f8f0dc) 85%, transparent);
   border: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 20%, transparent);
-  border-radius: 4px;
+  border-radius: var(--border-radius, 2px);
   overflow: hidden;
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.8rem;
 }
 
-.cast-section__portrait {
+.cast-section__portrait,
+.cast-section__member .ref-placeholder {
   width: 100%;
   aspect-ratio: 2 / 3;
   object-fit: cover;
   object-position: top;
-  display: block;
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #C9A96E) 35%, transparent);
 }
 
 .cast-section__name {
-  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
-  font-size: 0.95rem;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 0.98rem;
   font-weight: 700;
-  margin: 0;
-  padding: 0 0.6rem;
+  margin: 0.3rem 0 0;
+  padding: 0 0.7rem;
   color: var(--text, #1a1a1a);
 }
 
 .cast-section__role {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-style: italic;
-  color: var(--secondary, #B8893C);
+  color: color-mix(in srgb, var(--secondary, #B8893C) 80%, var(--text, #1a1a1a));
   margin: 0;
-  padding: 0 0.6rem;
+  padding: 0 0.7rem;
+  line-height: 1.45;
 }
 
 .cast-section__appearance {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   line-height: 1.55;
-  color: var(--text, #1a1a1a);
-  margin: 0;
-  padding: 0 0.6rem;
-  opacity: 0.8;
+  margin: 0.1rem 0 0;
+  padding: 0 0.7rem;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 75%, transparent);
 }
 
-/* ── Timeline section ────────────────────────────────────────────────────── */
+/* ── Timeline section ───────────────────────────────────────────────────── */
 
 .timeline-section__preamble {
   font-style: italic;
   line-height: 1.75;
-  color: var(--text, #1a1a1a);
-  opacity: 0.75;
-  margin-bottom: 1.5rem;
-  border-left: 3px solid color-mix(in srgb, var(--accent, #4E7C6F) 50%, transparent);
-  padding-left: 1rem;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 70%, transparent);
+  margin: 0 0 1.75rem;
+  max-width: 62ch;
 }
 
 .timeline-section__entries {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  border-left: 1px solid color-mix(in srgb, var(--accent, #4E7C6F) 45%, transparent);
 }
 
 .timeline-section__entry {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding-left: 1rem;
-  border-left: 2px solid var(--accent, #4E7C6F);
+  gap: 0.15rem;
+  padding: 0 0 1.5rem 1.6rem;
+}
+
+.timeline-section__entry:last-child {
+  padding-bottom: 0;
 }
 
 .timeline-section__temporal {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--secondary, #B8893C);
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 75%, var(--text, #1a1a1a));
+}
+
+.timeline-section__temporal::before {
+  content: '◇';
+  display: inline-block;
+  width: 1.6rem;
+  margin-left: -1.85rem;
+  padding-left: 0.25rem;
+  font-size: 0.85em;
+  letter-spacing: 0;
+  color: var(--accent, #4E7C6F);
 }
 
 .timeline-section__name {
-  font-family: var(--font-display, 'Playfair Display', Georgia, serif);
-  font-size: 1rem;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.02rem;
   font-weight: 700;
   margin: 0;
   color: var(--text, #1a1a1a);
 }
 
 .timeline-section__summary {
-  font-size: 0.875rem;
+  font-size: 0.92rem;
   line-height: 1.65;
-  color: var(--text, #1a1a1a);
   margin: 0.15rem 0 0;
-  opacity: 0.85;
+  max-width: 62ch;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 82%, transparent);
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
+/* ── Responsive (existing 640px collapse, extended for the TOC rail) ────── */
 
-@media (max-width: 640px) {
-  .reference-document {
-    padding: 1.25rem 1rem 2rem;
+@media (max-width: 900px) {
+  .reference-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
   }
 
-  .reference-node__entry {
+  .reference-toc {
+    position: static;
+    max-height: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 20%, transparent);
+    padding-bottom: 1.25rem;
+  }
+
+  .reference-toc__list {
+    border-left: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1rem 1.25rem;
+  }
+
+  .reference-toc__link {
+    border-left: none;
+    padding: 0.2rem 0;
+  }
+
+  .reference-toc__link--sub {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .reference-page {
+    padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .reference-masthead__title {
+    font-size: 1.9rem;
+  }
+
+  .reference-dl__entry {
     grid-template-columns: 1fr;
     gap: 0;
   }
@@ -310,9 +741,5 @@
 
   .cast-section__list {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .timeline-section__summary {
-    margin-top: 0.4rem;
   }
 }
