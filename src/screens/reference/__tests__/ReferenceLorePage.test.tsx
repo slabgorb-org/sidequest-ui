@@ -195,7 +195,9 @@ describe("ReferenceLorePage — session-free lore route (AC1/AC2/AC4)", () => {
     };
     fetchMock.mockResolvedValue(makeJsonResponse(scrambled));
     const { container } = renderLoreRoute();
-    await screen.findByText("World");
+    // Section labels also appear as TOC links since the redesign — query the
+    // heading role to disambiguate.
+    await screen.findByRole("heading", { name: "World" });
     const labels = Array.from(
       container.querySelectorAll(".reference-section__label"),
     ).map((el) => el.textContent);

@@ -108,3 +108,21 @@ describe("CastSection — dedicated Cast renderer (100-11)", () => {
     expect(screen.queryByText("null")).not.toBeInTheDocument();
   });
 });
+
+describe("CastSection — Folio placeholder (2026-06-09 redesign)", () => {
+  it("renders the Folio initials placeholder for a portrait-less member", () => {
+    const { container } = render(<CastSection section={fixture} />);
+    // The Grey Cantor has portrait_url: null → a .ref-placeholder with the
+    // member's initials keeps the card grid shape (aria-hidden; the name is
+    // adjacent text).
+    const placeholders = container.querySelectorAll(".ref-placeholder");
+    expect(placeholders).toHaveLength(1);
+    expect(placeholders[0]).toHaveTextContent("GC");
+    expect(placeholders[0]).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("anchors the section for TOC deep links", () => {
+    render(<CastSection section={fixture} />);
+    expect(document.getElementById("section-cast")).not.toBeNull();
+  });
+});

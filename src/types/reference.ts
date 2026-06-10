@@ -96,6 +96,17 @@ export type ReferenceSection =
 /** Flat CSS-variable token dict, e.g. `{ "--primary": "#c0392b" }`. */
 export type ReferenceTheme = Record<string, string>;
 
+/** Masthead chrome (2026-06-09 reference redesign), attached at the route
+ * layer like `theme` (`build_reference_meta`). `dateline` is omitted when the
+ * pack has no blurb chrome (the server fires a `meta_missing` ERROR span);
+ * `world_name` rides only the lore tier. The dinkus glyph is NOT here — it
+ * arrives in the theme token set as `--dinkus-light`. */
+export interface ReferenceMeta {
+  pack_label: string;
+  dateline?: string;
+  world_name?: string;
+}
+
 /** Lore projection — world-tier (`GET /reference/api/lore/{pack}/{world}`). */
 export interface LoreProjection {
   schema_version: number;
@@ -103,6 +114,7 @@ export interface LoreProjection {
   world: string;
   sections: ReferenceSection[];
   theme?: ReferenceTheme;
+  meta?: ReferenceMeta;
 }
 
 /** Rules projection — pack-tier (`GET /reference/api/rules/{pack}`), no world. */
@@ -111,4 +123,5 @@ export interface RulesProjection {
   pack: string;
   sections: GenericSection[];
   theme?: ReferenceTheme;
+  meta?: ReferenceMeta;
 }

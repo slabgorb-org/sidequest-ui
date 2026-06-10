@@ -7,11 +7,15 @@
 //
 // a11y: every landscape image carries alt text naming the POI.
 
+import { slugify } from "@/components/reference/nodeShape";
 import type { PoiSectionData } from "@/types/reference";
 
 export function PoiSection({ section }: { section: PoiSectionData }) {
   return (
-    <section className="reference-section reference-section--poi">
+    <section
+      className="reference-section reference-section--poi"
+      id={`section-${slugify(section.id)}`}
+    >
       <h2 className="reference-section__label">{section.label}</h2>
       <ul className="poi-section__list">
         {section.entries.map((entry) => (

@@ -124,3 +124,31 @@ describe("TimelineSection — dedicated Timeline renderer (100-11)", () => {
     expect(precedes(elder, younger)).toBe(true);
   });
 });
+
+describe("TimelineSection — era label (2026-06-09 redesign)", () => {
+  it("renders 'Within living memory' for a null temporal (never an empty spine slot)", () => {
+    const undated: TimelineSectionData = {
+      id: "timeline",
+      label: "Timeline",
+      sort_mode: "sorted",
+      preamble: null,
+      entries: [
+        { slug: "the-long-silence", name: "The Long Silence", summary: "No one remembers when.", temporal: null },
+      ],
+    };
+    render(<TimelineSection section={undated} />);
+    expect(screen.getByText("Within living memory")).toBeInTheDocument();
+  });
+
+  it("anchors the section for TOC deep links", () => {
+    const empty: TimelineSectionData = {
+      id: "timeline",
+      label: "Timeline",
+      sort_mode: "sorted",
+      preamble: null,
+      entries: [],
+    };
+    render(<TimelineSection section={empty} />);
+    expect(document.getElementById("section-timeline")).not.toBeNull();
+  });
+});

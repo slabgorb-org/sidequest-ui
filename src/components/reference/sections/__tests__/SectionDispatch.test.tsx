@@ -128,7 +128,15 @@ describe("ReferenceDocument WIRING — dispatch reaches the production shell (10
       castSection,
       genericSection,
     ];
-    render(<ReferenceDocument loading={false} error={null} sections={sections} />);
+    render(
+      <ReferenceDocument
+        docType="lore"
+        loading={false}
+        error={null}
+        sections={sections}
+        meta={undefined}
+      />,
+    );
 
     // Dedicated renderers fired (images are produced only by the dedicated path).
     expect(screen.getByRole("img", { name: /Long Foundry/i })).toBeInTheDocument();
@@ -143,7 +151,13 @@ describe("ReferenceDocument WIRING — dispatch reaches the production shell (10
     // The 100-8 ReferenceDocument filtered to `section.node` only, silently
     // dropping cast/poi/timeline. After 100-11 they must render.
     render(
-      <ReferenceDocument loading={false} error={null} sections={[castSection]} />,
+      <ReferenceDocument
+        docType="lore"
+        loading={false}
+        error={null}
+        sections={[castSection]}
+        meta={undefined}
+      />,
     );
     expect(screen.getByText("Marshal Vex")).toBeInTheDocument();
   });
