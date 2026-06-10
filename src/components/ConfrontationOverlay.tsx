@@ -187,6 +187,16 @@ export interface ConfrontationData {
    * fabricates an empty economy, and the picker gates on the value.
    */
   spellcasting?: ConfrontationSpellcasting | null;
+  /**
+   * Story 102-4: the WN sealed-round commit ledger — player-side actor
+   * names whose Main Action is sealed this round (wire mirror of
+   * build_confrontation_payload()["committed_actors"]). Drives the
+   * committed-vs-waiting indicators so the table can see who the round is
+   * waiting on (ADR-036 submit-and-wait; collaborative visibility, never a
+   * rush cue). Absent on legacy/dial payloads and between WN rounds — the
+   * overlay renders no indicators then.
+   */
+  committed_actors?: string[] | null;
 }
 
 /** Story 102-2: WN cast economy block on the CONFRONTATION payload. */
@@ -444,6 +454,14 @@ function StatusLine({ data }: { data: ConfrontationData }) {
   // EdgeBar per-side when a side's HP is absent (no backing CreatureCore) or
   // for any non-hp_depletion (dial) confrontation — keeps dial packs unchanged.
   const isHpDepletion = data.win_condition === "hp_depletion";
+  // Story 102-4: WN sealed-round commitment state. Indicators render only
+  // when the server sent the ledger (WN round in progress) and only for
+  // PLAYER-side actors — the opponent doesn't submit, and implying a closed
+  // "enemy is waiting" state would be a lie. Legacy payloads (key absent)
+  // render no indicators, keeping native packs byte-for-byte.
+  const committedActors = Array.isArray(data.committed_actors)
+    ? new Set(data.committed_actors)
+    : null;
   return (
     <div
       data-testid="dial-scoreboard"
@@ -460,6 +478,20 @@ function StatusLine({ data }: { data: ConfrontationData }) {
               <span className="text-[10px] text-muted-foreground/60">vs</span>
             )}
             <ActorChip actor={a} />
+            {committedActors !== null && a.side === "player" && (
+              <span
+                data-testid={`commitment-${a.name}`}
+                data-committed={committedActors.has(a.name) ? "true" : "false"}
+                className="text-[9px] uppercase tracking-wide flex-shrink-0"
+                style={{
+                  color: committedActors.has(a.name)
+                    ? "var(--encounter-player)"
+                    : "var(--muted-foreground)",
+                }}
+              >
+                {committedActors.has(a.name) ? "Committed" : "Waiting"}
+              </span>
+            )}
           </span>
         ))}
       </div>
