@@ -182,6 +182,14 @@ export interface CharacterCreationPayload {
   stock_options?: StockOptionPayload[];
   /** Roll the Bones (103-3): rerolls left; present when input_type is "roll_the_bones". */
   reroll_budget_remaining?: number;
+  /** Portrait picker step (66): whether this world ships any available portraits. */
+  portraits_available?: boolean;
+  /** Portrait picker step (66): in-progress build archetype, for UI soft-suggest. */
+  suggest_archetype?: string;
+  /** Portrait picker step (66): in-progress build culture hint, for UI soft-suggest. */
+  suggest_culture?: string;
+  /** Portrait picker step (66): selected portrait ref (client → server on portrait_confirm). */
+  selected_portrait_ref?: string | null;
 }
 
 export interface TurnStatusPayload {
