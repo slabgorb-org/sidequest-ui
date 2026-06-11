@@ -9,7 +9,7 @@ export interface PortraitOption {
   role: string;
 }
 
-interface PortraitPanelProps {
+export interface PortraitPanelProps {
   portraits: PortraitOption[];
   suggestArchetype: string | null;
   onConfirm: (slug: string) => void;
@@ -76,7 +76,7 @@ export function PortraitPanel({
             >
               <img
                 src={portrait.portrait_url}
-                alt={`${portrait.role} — ${portrait.culture}`}
+                alt={`${portrait.role} — ${portrait.culture} (${portrait.slug})`}
                 className="w-full h-full object-cover"
               />
             </button>
@@ -94,9 +94,7 @@ export function PortraitPanel({
         </button>
         <button
           data-testid="portrait-confirm"
-          onClick={() => {
-            if (selectedSlug) onConfirm(selectedSlug);
-          }}
+          onClick={() => onConfirm(selectedSlug!)}
           disabled={selectedSlug === null}
           className="text-sm px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
