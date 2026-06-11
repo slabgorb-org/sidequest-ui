@@ -1924,6 +1924,10 @@ function AppInner() {
     setTransientError(null);
     setCharacter(null);
     setCreationScene(null);
+    // Story 66: drop the fetched portrait pickers too — without this a
+    // same-session world switch briefly shows the previous world's
+    // portraits before the new pick_portrait fetch resolves.
+    setCreationPortraits([]);
     setThinking(false);
     setCharacterSheet(null);
     setInventoryData(null);

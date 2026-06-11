@@ -162,7 +162,7 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
 
   if (scene.input_type === "pick_portrait") {
     return (
-      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+      <div className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
         <PortraitPanel
           portraits={portraits ?? []}
           suggestArchetype={scene.suggest_archetype ?? null}
