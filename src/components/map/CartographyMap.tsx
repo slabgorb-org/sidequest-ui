@@ -13,6 +13,13 @@
  *
  * Edges paint first, then nodes paint over them. Labels carry a stroke halo
  * (`paint-order="stroke"`) so edges don't cut through the text.
+ *
+ * Story 104-3 (M-C): region nodes carrying NPC portrait pins draw each resolved
+ * portrait as a round image above the node (the "fancy node thing"). The pin is
+ * an HTML <img> embedded via <foreignObject> so it lives INSIDE the graph SVG,
+ * carries real `src`/`alt` (accessible by the NPC's name), and both surfaces —
+ * the lore Map section and the in-game map — inherit it from this one renderer. A
+ * pin whose `portrait_url` is null draws nothing (no broken/empty-src image).
  */
 
 import {
@@ -20,6 +27,9 @@ import {
   NODE_R,
 } from "@/components/map/cartographyDagLayout";
 import type { CartographyMetadata } from "@/components/MapOverlay";
+
+/** Rendered size (px) of a square portrait pin. */
+const PIN_SIZE = 28;
 
 export interface CartographyMapProps {
   /** The region adjacency graph to draw. */
@@ -124,6 +134,32 @@ export function CartographyMap({
                 >
                   {node.name}
                 </text>
+                {node.pins
+                  .filter((pin) => pin.portrait_url !== null)
+                  .map((pin, i) => (
+                    <foreignObject
+                      key={pin.slug}
+                      data-testid={`map-pin-${pin.slug}`}
+                      x={node.x - NODE_R + i * (PIN_SIZE + 2)}
+                      y={node.y - NODE_R - PIN_SIZE - 2}
+                      width={PIN_SIZE}
+                      height={PIN_SIZE}
+                    >
+                      <img
+                        src={pin.portrait_url ?? undefined}
+                        alt={pin.label}
+                        width={PIN_SIZE}
+                        height={PIN_SIZE}
+                        style={{
+                          width: PIN_SIZE,
+                          height: PIN_SIZE,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          border: "1.5px solid var(--primary, #ccc)",
+                        }}
+                      />
+                    </foreignObject>
+                  ))}
               </g>
             );
           })}

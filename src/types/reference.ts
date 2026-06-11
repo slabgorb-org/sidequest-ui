@@ -85,13 +85,52 @@ export interface TimelineSectionData {
   entries: TimelineEntry[];
 }
 
+// Story 104-3 (M-C) — the lore-page `map` section, pinned verbatim from the live
+// server projection (reference_projection.py::build_lore_map_section). It carries
+// graph TOPOLOGY only — regions (a list, each with embedded NPC pins), edges, and
+// dropped (dangling) adjacencies — and is adapted by `MapSection` into the shared
+// `CartographyMap`'s `CartographyMetadata`. Completes story 100-12's dropped seam.
+
+/** One NPC portrait pin on a region. `portrait_url` is nullable — the server
+ * resolves the R2 URL only when the portrait slug is on R2, else `null` (the pin
+ * still ships, but renders no portrait image — parity with the Cast section). */
+export interface MapPin {
+  slug: string;
+  label: string;
+  portrait_url: string | null;
+}
+
+/** One region in the `map` section. Unlike the in-game `CartographyMetadata`
+ * (a Record), the projection emits regions as a LIST with embedded `pins`. */
+export interface MapRegion {
+  id: string;
+  name: string;
+  adjacent: string[];
+  pins: MapPin[];
+}
+
+/** The `map` section (`build_lore_map_section`). `is_cluster` (Story 104-1 / M-A)
+ * rides the section so the Map surface can branch single-system vs cluster off the
+ * same authoritative server flag as the in-game map. `edges`/`dangling` are
+ * sorted-endpoint pairs the server already de-duped. */
+export interface MapSectionData {
+  id: "map";
+  label: string;
+  starting_region: string;
+  is_cluster: boolean;
+  regions: MapRegion[];
+  edges: [string, string][];
+  dangling: [string, string][];
+}
+
 /** Any section the reference document may carry — the generic node-tree section
- * plus the Phase-3 dedicated section types. */
+ * plus the Phase-3 dedicated section types and the Story 104-3 map section. */
 export type ReferenceSection =
   | GenericSection
   | PoiSectionData
   | CastSectionData
-  | TimelineSectionData;
+  | TimelineSectionData
+  | MapSectionData;
 
 /** Flat CSS-variable token dict, e.g. `{ "--primary": "#c0392b" }`. */
 export type ReferenceTheme = Record<string, string>;

@@ -5,11 +5,12 @@
 //   - "poi"      → PoiSection
 //   - "cast"     → CastSection
 //   - "timeline" → TimelineSection
+//   - "map"      → MapSection (wired by Story 104-3 / M-C — completes 100-12's
+//                  dropped seam; the section carries `regions`/`edges`/`pins`)
 //   - everything else WITH a `node` → NodeTree (generic fallback, the 100-8 path)
-//   - an unknown section WITHOUT a `node` (e.g. the not-yet-wired "map" section)
-//     → rendered as nothing, never a crash / white screen (No Silent Fallbacks
-//     means fail loud on config, but an as-yet-unimplemented section type must
-//     degrade gracefully, not throw — its own story wires it later).
+//   - an unknown section WITHOUT a `node` → rendered as nothing, never a crash /
+//     white screen (an as-yet-unimplemented section type degrades gracefully,
+//     not throw — its own story wires it later).
 //
 // This file pins BOTH:
 //   (1) the dispatch unit — SectionDispatch routes by id; and
@@ -32,6 +33,7 @@ import { ReferenceDocument } from "@/screens/reference/ReferenceDocument";
 import type {
   CastSectionData,
   GenericSection,
+  MapSectionData,
   PoiSectionData,
   ReferenceSection,
   TimelineSectionData,
@@ -75,6 +77,16 @@ const timelineSection: TimelineSectionData = {
   ],
 };
 
+const mapSection: MapSectionData = {
+  id: "map",
+  label: "Map",
+  starting_region: "turning_hub",
+  is_cluster: false,
+  regions: [{ id: "turning_hub", name: "Turning Hub", adjacent: [], pins: [] }],
+  edges: [],
+  dangling: [],
+};
+
 const genericSection: GenericSection = {
   id: "factions",
   label: "Factions",
@@ -112,11 +124,19 @@ describe("SectionDispatch — routes a section to its renderer by id (100-11)", 
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("renders nothing (no crash) for an unknown section without a node", () => {
-    // A not-yet-wired section type (e.g. "map") — graceful degrade, never throw.
-    const unknown = { id: "map", label: "Map" } as unknown as ReferenceSection;
+  it("routes a 'map' section to MapSection — the graph renders (104-3 completes the 100-12 seam)", () => {
+    // BEFORE 104-3 the map section fell through to nothing (it carries
+    // regions/edges/pins, not a `node`). After M-C it routes to MapSection,
+    // which renders the shared CartographyMap graph.
+    render(<SectionDispatch section={mapSection} />);
+    expect(screen.getByTestId("map-region-graph")).toBeInTheDocument();
+  });
+
+  it("still renders nothing (no crash) for an unknown section without a node", () => {
+    // A genuinely unknown, node-less section type — graceful degrade, never throw.
+    const unknown = { id: "ledger", label: "Ledger" } as unknown as ReferenceSection;
     expect(() => render(<SectionDispatch section={unknown} />)).not.toThrow();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("map-region-graph")).not.toBeInTheDocument();
   });
 });
 
