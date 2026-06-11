@@ -48,6 +48,8 @@ export interface CreationScene {
   previous_input?: string;
   // --- the stock step (input_type "stock", story 103-2) ---
   stock_options?: StockOption[];
+  // --- Roll the Bones (input_type "roll_the_bones", story 103-3) ---
+  reroll_budget_remaining?: number;
   // --- the_arrangement (stat_arrange input_type) ---
   pool?: number[];
   assignment?: Record<string, number | null>;
@@ -274,6 +276,54 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
           onAutogen={() => onRespond({ phase: "story_autogen" })}
           onConfirm={(payload) => onRespond({ phase: "story_confirm", ...payload })}
         />
+      </div>
+    );
+  }
+
+  if (scene.input_type === "roll_the_bones") {
+    // Story 103-3: 3d6-in-order, the dice stand. Every value is visible
+    // (mechanics-first legibility); rerolls are explicit per-stat buttons
+    // bounded by the server-enforced budget; nothing auto-commits — the
+    // confirm button is the only way forward (no time pressure).
+    const rolled = scene.rolled_stats ?? [];
+    const budget = scene.reroll_budget_remaining ?? 0;
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">
+          {scene.prompt}
+        </p>
+        <div className="flex flex-col gap-2 w-full max-w-prose">
+          {rolled.map((stat) => (
+            <div
+              key={stat.name}
+              data-testid={`bones-stat-${stat.name}`}
+              className="flex items-center justify-between rounded-lg border border-border/40 bg-card/50 px-4 py-2"
+            >
+              <span className="font-medium">{stat.name}</span>
+              <span className="flex items-center gap-4">
+                <span className="tabular-nums text-lg font-semibold">{stat.value}</span>
+                <button
+                  aria-label={`Reroll ${stat.name}`}
+                  disabled={budget <= 0}
+                  onClick={() => onRespond({ phase: "bones_reroll", stat: stat.name })}
+                  className="inline-flex items-center justify-center rounded-md text-xs font-medium h-8 px-3 border border-border/60 hover:bg-card/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Reroll {stat.name}
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+        <p data-testid="bones-budget" className="text-sm text-muted-foreground">
+          Rerolls remaining: <span className="tabular-nums font-medium">{budget}</span>
+        </p>
+        <button
+          data-testid="bones-confirm"
+          onClick={() => onRespond({ phase: "bones_confirm" })}
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          Keep These Bones
+        </button>
       </div>
     );
   }
