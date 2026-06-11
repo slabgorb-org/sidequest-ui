@@ -14,6 +14,23 @@ interface RolledStat {
   value: number;
 }
 
+/** Mechanical deltas of one stock — shown BEFORE confirmation (103-2). */
+export interface StockDeltas {
+  attr_mods?: Record<string, number>;
+  move?: number | null;
+  ac?: number | null;
+  trauma_target_mod?: number;
+  /** Granted mutation DISPLAY NAMES (never catalog ids). */
+  granted_mutations?: string[];
+}
+
+export interface StockOption {
+  id: string;
+  label: string;
+  description?: string;
+  deltas: StockDeltas;
+}
+
 export interface CreationScene {
   phase: string;
   scene_index?: number;
@@ -29,6 +46,8 @@ export interface CreationScene {
   rolled_stats?: RolledStat[];
   previous_choice?: number;
   previous_input?: string;
+  // --- the stock step (input_type "stock", story 103-2) ---
+  stock_options?: StockOption[];
   // --- the_arrangement (stat_arrange input_type) ---
   pool?: number[];
   assignment?: Record<string, number | null>;
@@ -255,6 +274,122 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
           onAutogen={() => onRespond({ phase: "story_autogen" })}
           onConfirm={(payload) => onRespond({ phase: "story_confirm", ...payload })}
         />
+      </div>
+    );
+  }
+
+  if (scene.input_type === "stock") {
+    const stocks = scene.stock_options ?? [];
+    const selected = selectedIndex != null ? stocks[selectedIndex] : null;
+    const deltas = selected?.deltas ?? {};
+    const attrEntries = Object.entries(deltas.attr_mods ?? {});
+    const granted = deltas.granted_mutations ?? [];
+    const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+    const hasDeltas =
+      attrEntries.length > 0 ||
+      deltas.move != null ||
+      deltas.ac != null ||
+      (deltas.trauma_target_mod ?? 0) !== 0 ||
+      granted.length > 0;
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">
+          {scene.prompt}
+        </p>
+        <div className="flex flex-col gap-3 w-full max-w-prose">
+          {stocks.map((stock, i) => (
+            <div
+              key={stock.id}
+              role="button"
+              tabIndex={0}
+              data-testid={`stock-option-${stock.id}`}
+              aria-selected={selectedIndex === i}
+              data-selected={selectedIndex === i}
+              onClick={() => setSelectedIndex(i)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedIndex(i); }}
+              className={`cursor-pointer rounded-lg border px-4 py-3
+                         focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                         transition-all duration-150 ${
+                           selectedIndex === i
+                             ? "border-primary bg-primary/10 text-foreground ring-2 ring-primary/50 scale-[0.98]"
+                             : "border-border/40 bg-card/50 text-foreground/70 hover:text-foreground hover:border-border hover:bg-card/80"
+                         }`}
+            >
+              <span className="font-medium text-lg">{stock.label}</span>
+              {stock.description && (
+                <span className="block text-sm text-muted-foreground mt-0.5">{stock.description}</span>
+              )}
+            </div>
+          ))}
+        </div>
+        {selected && (
+          <div
+            data-testid="stock-deltas"
+            className="w-full max-w-prose rounded-lg border border-border/40 bg-card/50 px-4 py-3"
+          >
+            <span className="block text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60 mb-2">
+              {selected.label} — what changes
+            </span>
+            {hasDeltas ? (
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                {attrEntries.map(([attr, mod]) => (
+                  <div key={attr} className="flex justify-between">
+                    <dt className="text-muted-foreground">{attr}</dt>
+                    <dd className={`tabular-nums font-medium ${mod >= 0 ? "text-primary" : "text-destructive"}`}>
+                      {signed(mod)}
+                    </dd>
+                  </div>
+                ))}
+                {deltas.ac != null && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">AC</dt>
+                    <dd className="tabular-nums font-medium">{deltas.ac}</dd>
+                  </div>
+                )}
+                {deltas.move != null && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Move</dt>
+                    <dd className="tabular-nums font-medium">{deltas.move}m</dd>
+                  </div>
+                )}
+                {(deltas.trauma_target_mod ?? 0) !== 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Trauma Target</dt>
+                    <dd className="tabular-nums font-medium">{signed(deltas.trauma_target_mod ?? 0)}</dd>
+                  </div>
+                )}
+                {granted.length > 0 && (
+                  <div className="col-span-2 flex flex-wrap gap-2 mt-1">
+                    {granted.map((name) => (
+                      <span
+                        key={name}
+                        className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No mechanical changes — this path is what you make of it.
+              </p>
+            )}
+          </div>
+        )}
+        <button
+          data-testid="stock-confirm"
+          disabled={selectedIndex == null}
+          onClick={() => {
+            if (selectedIndex != null) {
+              onRespond({ phase: "scene", choice: String(selectedIndex + 1) });
+            }
+          }}
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Choose
+        </button>
       </div>
     );
   }

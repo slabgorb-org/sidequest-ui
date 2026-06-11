@@ -145,6 +145,24 @@ export interface SessionEventPayload {
   css?: string;
 }
 
+/** Mechanical deltas of one stock option (103-2) — rendered pre-confirmation. */
+export interface StockDeltasPayload {
+  attr_mods?: Record<string, number>;
+  move?: number | null;
+  ac?: number | null;
+  trauma_target_mod?: number;
+  /** Granted mutation DISPLAY NAMES (never catalog ids). */
+  granted_mutations?: string[];
+}
+
+/** One stock on the chargen stock step (input_type "stock", 103-2). */
+export interface StockOptionPayload {
+  id: string;
+  label: string;
+  description?: string;
+  deltas: StockDeltasPayload;
+}
+
 export interface CharacterCreationPayload {
   phase: string;
   scene_index?: number;
@@ -160,6 +178,8 @@ export interface CharacterCreationPayload {
   rolled_stats?: RolledStat[];
   choice?: string;
   character?: Record<string, unknown>;
+  /** Stock step (103-2): present only when input_type is "stock". */
+  stock_options?: StockOptionPayload[];
 }
 
 export interface TurnStatusPayload {
