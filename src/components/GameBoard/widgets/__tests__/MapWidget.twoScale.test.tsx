@@ -62,8 +62,12 @@ function clusterMapState(): MapState {
         ceron: { name: "Ceron", adjacent: ["yula"] },
       },
       routes: [],
+      // 104-2 / M-A: real multi-system cluster — server flags it true. (Carried
+      // so these tests pin the new flag-driven contract, not the retired
+      // regionCount>1 heuristic.)
+      is_cluster: true,
     },
-  };
+  } as MapState;
 }
 
 /** coyote_star-shaped single system: one region node. */
@@ -87,8 +91,10 @@ function singleSystemMapState(): MapState {
       starting_region: "coyote",
       regions: { coyote: { name: "Coyote", adjacent: [] } },
       routes: [],
+      // 104-2 / M-A: single system — server flags it false.
+      is_cluster: false,
     },
-  };
+  } as MapState;
 }
 
 function chartFixture(scopeCenter = "yula"): OrbitalIntentResponse {
@@ -305,6 +311,8 @@ describe("two-scale MapWidget (ADR-141 / 98-3)", () => {
           starting_region: "",
           regions: {},
           routes: [],
+          // 104-2 / M-A: empty regions + single system → orrery-as-Map.
+          is_cluster: false,
         },
       };
       const { getByTestId } = render(
