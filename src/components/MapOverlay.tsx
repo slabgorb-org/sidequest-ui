@@ -86,6 +86,17 @@ export interface CartographyMetadata {
   starting_region: string;
   regions: Record<string, CartographyRegion>;
   routes: CartographyRoute[];
+  /**
+   * Single-vs-cluster flag set by the server (Story 104-1 / M-A): true iff the
+   * world declares more than one system. Rides on every MAP_UPDATE cartography
+   * payload (session_helpers.py — always a concrete bool on the wire) and on
+   * the reference projection's map section. Supersedes the retired client-side
+   * `regionCount > 1` heuristic, which mis-flagged multi-region single-system
+   * worlds (e.g. coyote_star's 8 orrery bodies) as clusters. Optional on the
+   * type only because a non-orbital/room-graph world ships no cartography at
+   * all; when cartography is present the server always sets it.
+   */
+  is_cluster?: boolean;
 }
 
 export interface MapState {
