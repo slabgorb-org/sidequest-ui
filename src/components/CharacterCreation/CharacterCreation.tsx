@@ -3,6 +3,7 @@ import { toRoman } from "@/lib/utils";
 import { parseStatLine } from "./parseStatLine";
 import { StatArrangePanel } from "./StatArrangePanel";
 import { StoryPanel } from "./StoryPanel";
+import { PortraitPanel, type PortraitOption } from "./PortraitPanel";
 
 interface CreationChoice {
   label: string;
@@ -63,15 +64,20 @@ export interface CreationScene {
   description_optional?: boolean;
   autogen_available?: boolean;
   autogen_result?: { background: string; description: string };
+  // --- portrait picker (pick_portrait input_type, story 66) ---
+  portraits_available?: boolean;
+  suggest_archetype?: string | null;
+  suggest_culture?: string | null;
 }
 
 export interface CharacterCreationProps {
   scene: CreationScene | null;
   loading: boolean;
   onRespond: (payload: Record<string, unknown>) => void;
+  portraits?: PortraitOption[];
 }
 
-export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
+export function CharacterCreation({ scene, loading, onRespond, portraits }: CharacterCreationProps) {
   // React idiom: reset state during render when the identifying prop changes,
   // instead of useEffect → setState (which forces an extra render). When
   // `scene_index` or `phase` change, snap the local input/selection back to
@@ -153,6 +159,19 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
     if (scene.input_type === "name") handleName();
     else handleFreeform();
   };
+
+  if (scene.input_type === "pick_portrait") {
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <PortraitPanel
+          portraits={portraits ?? []}
+          suggestArchetype={scene.suggest_archetype ?? null}
+          onConfirm={(slug) => onRespond({ phase: "portrait_confirm", selected_portrait_ref: slug })}
+          onSkip={() => onRespond({ phase: "portrait_confirm", selected_portrait_ref: null })}
+        />
+      </div>
+    );
+  }
 
   if (scene.phase === "confirmation") {
     const previewEntries = scene.character_preview

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { CharacterCreation } from "../CharacterCreation";
+import type { PortraitOption } from "../PortraitPanel";
 
 /**
  * Tasks 6.3 + 6.4 from docs/superpowers/plans/2026-05-09-cnc-chargen-big-improvements.md:
@@ -179,5 +180,89 @@ describe("CharacterCreation: Pencil removal", () => {
     );
     expect(screen.queryByTestId("review-edit-Race")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-edit-Class")).not.toBeInTheDocument();
+  });
+});
+
+describe("CharacterCreation: pick_portrait branch", () => {
+  const samplePortraits: PortraitOption[] = [
+    {
+      slug: "p1",
+      portrait_url: "https://example.com/p1.jpg",
+      culture: "human",
+      archetype: "warrior",
+      sex: "m",
+      role: "Fighter",
+    },
+    {
+      slug: "p2",
+      portrait_url: "https://example.com/p2.jpg",
+      culture: "elf",
+      archetype: "rogue",
+      sex: "f",
+      role: "Scout",
+    },
+  ];
+
+  it("renders portrait tiles when input_type is pick_portrait", () => {
+    render(
+      <CharacterCreation
+        scene={{
+          phase: "scene",
+          input_type: "pick_portrait",
+          suggest_archetype: "warrior",
+          suggest_culture: "human",
+        }}
+        loading={false}
+        onRespond={vi.fn()}
+        portraits={samplePortraits}
+      />,
+    );
+    expect(screen.getByTestId("portrait-tile-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("portrait-tile-p2")).toBeInTheDocument();
+  });
+
+  it("tile click + confirm calls onRespond with portrait_confirm and selected slug", () => {
+    const onRespond = vi.fn();
+    render(
+      <CharacterCreation
+        scene={{
+          phase: "scene",
+          input_type: "pick_portrait",
+          suggest_archetype: null,
+          suggest_culture: null,
+        }}
+        loading={false}
+        onRespond={onRespond}
+        portraits={samplePortraits}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("portrait-tile-p1"));
+    fireEvent.click(screen.getByTestId("portrait-confirm"));
+    expect(onRespond).toHaveBeenCalledWith({
+      phase: "portrait_confirm",
+      selected_portrait_ref: "p1",
+    });
+  });
+
+  it("empty portraits + skip calls onRespond with portrait_confirm and null", () => {
+    const onRespond = vi.fn();
+    render(
+      <CharacterCreation
+        scene={{
+          phase: "scene",
+          input_type: "pick_portrait",
+          suggest_archetype: null,
+          suggest_culture: null,
+        }}
+        loading={false}
+        onRespond={onRespond}
+        portraits={[]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("portrait-skip"));
+    expect(onRespond).toHaveBeenCalledWith({
+      phase: "portrait_confirm",
+      selected_portrait_ref: null,
+    });
   });
 });
