@@ -180,6 +180,8 @@ export interface CharacterCreationPayload {
   character?: Record<string, unknown>;
   /** Stock step (103-2): present only when input_type is "stock". */
   stock_options?: StockOptionPayload[];
+  /** Roll the Bones (103-3): rerolls left; present when input_type is "roll_the_bones". */
+  reroll_budget_remaining?: number;
 }
 
 export interface TurnStatusPayload {
