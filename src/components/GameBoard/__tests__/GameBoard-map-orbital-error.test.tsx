@@ -37,6 +37,9 @@ const CLUSTER_MAP: MapState = {
       forma: { name: "Forma", adjacent: ["yula"] },
     },
     routes: [],
+    // 104-2 / M-A: real multi-system cluster — server flags it true so the
+    // campaign graph + drill path engages (the test's whole subject).
+    is_cluster: true,
   },
 };
 

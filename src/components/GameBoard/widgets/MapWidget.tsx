@@ -16,9 +16,10 @@ interface MapWidgetProps {
    * Server-announced orbital capability (GameResponse.orbital — the world
    * ships orbital content). Since ADR-141 / story 98-3 this is a
    * *capability* signal only, no longer a whole-Map router: a cluster
-   * world (multi-region cartography) defaults to the campaign graph and
-   * drills into the orrery; only a single-system world (≤1 region node —
-   * the two scales collapse) renders orrery-as-Map directly (#748).
+   * world (server `cartography.is_cluster === true`, 104-2 / M-B) defaults
+   * to the campaign graph and drills into the orrery; only a single-system
+   * world (`is_cluster === false` — the two scales collapse) renders
+   * orrery-as-Map directly (#748).
    */
   orbital?: boolean;
   /** Latest ORBITAL_CHART message from the server, or null. */
@@ -46,15 +47,16 @@ interface MapWidgetProps {
  * Map tab renderer — two-scale per ADR-141 (story 98-3).
  *
  * Routing (highest priority first):
- * - Orbital **cluster** world (multi-region cartography, e.g.
- *   perseus_cloud) → campaign scale by default: the shared d3-dag
+ * - Orbital **cluster** world (server `cartography.is_cluster === true`,
+ *   e.g. perseus_cloud) → campaign scale by default: the shared d3-dag
  *   cartography graph (100-10's CartographyMap via MapOverlay). Clicking
  *   the node the party occupies drills into that system's orrery (local
  *   scale); a back affordance returns to the campaign graph. Drill-down
  *   is occupied-node-only — the server resolves the system file by the
  *   party's current region (98-2).
- * - Orbital **single-system** world (≤1 region node, e.g. coyote_star) →
- *   the two scales collapse: server-rendered OrbitalChartView is the Map
+ * - Orbital **single-system** world (`is_cluster === false`, e.g.
+ *   coyote_star — even with many region nodes, all bodies of one orrery)
+ *   → the two scales collapse: server-rendered OrbitalChartView is the Map
  *   (#748 behavior, preserved). Pan/zoom is client-side; drill-in/out
  *   round-trips a fresh SVG.
  * - Empty / no data → "no map yet" empty state.
@@ -89,12 +91,15 @@ export function MapWidget({
   // round-trip 1 — no stale orrery after travel).
   const [drilledRegionId, setDrilledRegionId] = useState<string | null>(null);
 
-  // Cluster vs single-system is derivable from the cartography node count
-  // (ADR-141: no new world-level flag) — >1 region node = cluster.
-  const regionCount = mapData?.cartography
-    ? Object.keys(mapData.cartography.regions ?? {}).length
-    : 0;
-  const isCluster = regionCount > 1;
+  // Cluster vs single-system is the server's call (Story 104-1 / M-A): the
+  // cartography payload carries an explicit `is_cluster` flag derived from the
+  // world's system COUNT (>1 system = cluster). This supersedes the retired
+  // `regionCount > 1` heuristic, which mis-flagged multi-region single-system
+  // worlds — coyote_star authors 8 regions that are bodies in ONE orrery, not
+  // 8 systems. Absent cartography (room-graph / non-orbital worlds) is never a
+  // cluster. No regionCount fallback (No Silent Fallbacks; M-A AC4: the flag is
+  // authoritative).
+  const isCluster = mapData?.cartography?.is_cluster ?? false;
   const currentRegionId = mapData?.current_location ?? "";
   const drilledIn = drilledRegionId !== null && drilledRegionId === currentRegionId;
 
