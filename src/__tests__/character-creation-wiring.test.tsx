@@ -955,3 +955,123 @@ describe("edge cases", () => {
     expect(screen.getByText(/moment of silence/i)).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 103-2: stock step wiring — server-driven stock scene over WebSocket
+// ---------------------------------------------------------------------------
+describe("103-2: stock step wiring", () => {
+  /** Build a CHARACTER_CREATION stock scene (input_type "stock") — the
+   *  seaboard_of_saints shape. Built locally because sceneMessage's override
+   *  type predates the stock_options payload field. */
+  function stockSceneMessage(): GameMessage {
+    return {
+      type: MessageType.CHARACTER_CREATION,
+      payload: {
+        phase: "scene",
+        scene_index: 1,
+        total_scenes: 6,
+        prompt: "Six roads into the world. Choose what you are.",
+        input_type: "stock",
+        stock_options: [
+          {
+            id: "sleeper",
+            label: "Sleeper",
+            description: "Woke from the long cold racks.",
+            deltas: {},
+          },
+          {
+            id: "harbor_seal",
+            label: "Harbor Seal Uplift",
+            description: "An Animal stock of the Whalecoast.",
+            deltas: {
+              attr_mods: { STR: 1 },
+              move: 12,
+              ac: 14,
+              granted_mutations: ["Crushing Jaws"],
+            },
+          },
+        ],
+      },
+      player_id: "test-player",
+    } as GameMessage;
+  }
+
+  it("renders the stock step and sends the choice response on confirm", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderApp();
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    await connectPlayer(user);
+
+    await act(async () => {
+      latestSocket().simulateMessage(sessionConnectedMessage());
+    });
+    await act(async () => {
+      latestSocket().simulateMessage(stockSceneMessage());
+    });
+
+    // The stock step renders both options.
+    expect(screen.getByTestId("stock-option-sleeper")).toBeInTheDocument();
+    expect(screen.getByTestId("stock-option-harbor_seal")).toBeInTheDocument();
+
+    // Select Sleeper: deltas preview, no response yet.
+    await user.click(screen.getByTestId("stock-option-sleeper"));
+    expect(screen.getByTestId("stock-deltas")).toBeInTheDocument();
+    const ws = latestSocket();
+    expect(
+      ws.sent.filter((m) => m.type === MessageType.CHARACTER_CREATION),
+    ).toHaveLength(0);
+
+    // Confirm: the standard scene-choice response goes over the wire.
+    await user.click(screen.getByTestId("stock-confirm"));
+    const choiceMsg = ws.sent.find(
+      (m) =>
+        m.type === MessageType.CHARACTER_CREATION &&
+        (m.payload as Record<string, unknown>).choice === "1",
+    );
+    expect(choiceMsg).toBeDefined();
+    expect((choiceMsg!.payload as Record<string, unknown>).phase).toBe("scene");
+  });
+
+  it("renders the server-branched follow-up scene after a stock pick", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderApp();
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    await connectPlayer(user);
+
+    await act(async () => {
+      latestSocket().simulateMessage(sessionConnectedMessage());
+    });
+    await act(async () => {
+      latestSocket().simulateMessage(stockSceneMessage());
+    });
+
+    await user.click(screen.getByTestId("stock-option-sleeper"));
+    await user.click(screen.getByTestId("stock-confirm"));
+
+    // Server branches the mutation step per stock: the Sleeper gets the
+    // implant-choice scene. The client must render it as an ordinary
+    // choice scene — branching is entirely server-driven (ADR-027).
+    await act(async () => {
+      latestSocket().simulateMessage(
+        sceneMessage({
+          scene_index: 2,
+          prompt: "Your implants hum awake in the cold rack.",
+          input_type: "choice",
+          choices: [
+            { label: "Cortex Booster", description: "Thought, faster." },
+            { label: "Subdermal Weave", description: "Skin like cable." },
+          ],
+        }),
+      );
+    });
+
+    expect(screen.getByText(/implants hum awake/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cortex booster/i })).toBeInTheDocument();
+    // The stock step is gone — no lingering stock UI on the branch scene.
+    expect(screen.queryByTestId("stock-option-sleeper")).not.toBeInTheDocument();
+  });
+});
