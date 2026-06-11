@@ -320,13 +320,13 @@ function ActorChip({ actor }: { actor: EncounterActor }) {
     <div
       data-testid="actor-portrait"
       data-has-portrait={hasPortrait ? "true" : "false"}
-      title={`${actor.name} — ${actor.role}`}
+      title={`${humanizeActorName(actor.name)} — ${actor.role}`}
       className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0 overflow-hidden"
     >
       {hasPortrait ? (
         <img
           src={actor.portrait_url}
-          alt={actor.name}
+          alt={humanizeActorName(actor.name)}
           loading="lazy"
           className="w-full h-full object-cover"
         />
@@ -534,6 +534,21 @@ const CAST_SPELL_BEAT_ID = "cast_spell";
  * server-side follow-up; see story 102-2 delivery findings). */
 function humanizeSpellId(id: string): string {
   return id
+    .split("_")
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/** "unknown_dark_contact" → "Unknown Dark Contact" (sq-playtest 2026-06-10 UX).
+ * A runtime-seated opponent with no known name carries a slug as its
+ * `actor.name`, and that field is a load-bearing entity id (tag targets /
+ * last_beat_impacts keys reference it) — so we humanize for DISPLAY only and
+ * never rewrite the id. De-underscore + capitalize the first letter of each
+ * segment; the rest of each segment is left untouched, so an already-humanized
+ * real name ("Kanga Moana-Teru") passes through unchanged rather than being
+ * lower-cased and mangled. Same transform the spell-id picker uses. */
+function humanizeActorName(name: string): string {
+  return name
     .split("_")
     .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
     .join(" ");
@@ -1014,7 +1029,9 @@ function ThemPanel({ data }: { data: ConfrontationData }) {
         Them
       </span>
       <ActorChip actor={opponent} />
-      <span className="font-semibold text-[13px] text-foreground">{opponent.name}</span>
+      <span className="font-semibold text-[13px] text-foreground">
+        {humanizeActorName(opponent.name)}
+      </span>
       {opponent.role && (
         <span className="text-[11px] text-muted-foreground">{opponent.role}</span>
       )}

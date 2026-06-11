@@ -37,8 +37,14 @@ export function markdownToHtml(text: string): string {
     .replace(/^---+$/gm, "<hr>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "</p><p>")
+    // A blank line is a paragraph break; a lone newline is a soft wrap that
+    // folds to a space (Markdown/prose convention). sq-playtest 2026-06-10:
+    // openings.yaml prose authored with YAML `|` literal blocks carries the
+    // source soft-wrap line breaks as single `\n`s mid-sentence — treating
+    // those as `</p><p>` split a sentence across two paragraphs. Safe for the
+    // live narrator: it separates paragraphs with `\n\n`, never a lone `\n`.
+    .replace(/\n{2,}/g, "</p><p>")
+    .replace(/\n/g, " ")
     .replace(/\[\^?(\d+)\]/g, '<sup><a href="#footnote-$1">$1</a></sup>');
   return `<p>${result}</p>`;
 }
