@@ -184,10 +184,10 @@ export interface CharacterCreationPayload {
   reroll_budget_remaining?: number;
   /** Portrait picker step (66): whether this world ships any available portraits. */
   portraits_available?: boolean;
-  /** Portrait picker step (66): in-progress build archetype, for UI soft-suggest. */
-  suggest_archetype?: string;
-  /** Portrait picker step (66): in-progress build culture hint, for UI soft-suggest. */
-  suggest_culture?: string;
+  /** Portrait picker step (66): in-progress build archetype, for UI soft-suggest. Server sends explicit null when no hint accumulated. */
+  suggest_archetype?: string | null;
+  /** Portrait picker step (66): in-progress build culture hint, for UI soft-suggest. Server sends explicit null when no hint accumulated. */
+  suggest_culture?: string | null;
   /** Portrait picker step (66): selected portrait ref (client → server on portrait_confirm). */
   selected_portrait_ref?: string | null;
 }
