@@ -4,6 +4,7 @@ import { ConnectScreen } from "@/screens/ConnectScreen";
 import { ReferenceLorePage } from "@/screens/reference/ReferenceLorePage";
 import { ReferenceRulesPage } from "@/screens/reference/ReferenceRulesPage";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
+import type { PortraitOption } from "@/components/CharacterCreation/PortraitPanel";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
@@ -293,6 +294,7 @@ function AppInner() {
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>(initialPhase);
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
+  const [creationPortraits, setCreationPortraits] = useState<PortraitOption[]>([]);
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
@@ -865,6 +867,31 @@ function AppInner() {
       if (phase === "scene" || phase === "confirmation") {
         setCreationScene(msg.payload as unknown as CreationScene);
         setCreationLoading(false);
+        // Portrait picker: when the server sends a pick_portrait step,
+        // fetch the world's available portraits from the REST endpoint.
+        // On failure we degrade to an empty list — the PortraitPanel
+        // shows a calm empty/skip state, so chargen is never blocked.
+        // The console.error keeps it diagnosable (not a silent fallback).
+        if ((msg.payload as Record<string, unknown>).input_type === "pick_portrait") {
+          const genre = currentGenre;
+          const world = currentWorld;
+          if (genre && world) {
+            fetch(`/api/chargen/portraits/${encodeURIComponent(genre)}/${encodeURIComponent(world)}`)
+              .then((res) => {
+                if (!res.ok) throw new Error(`portraits fetch ${res.status}`);
+                return res.json() as Promise<{ portraits: PortraitOption[] }>;
+              })
+              .then((body) => {
+                setCreationPortraits(body.portraits);
+              })
+              .catch((err) => {
+                console.error("Failed to fetch chargen portraits:", err);
+                setCreationPortraits([]);
+              });
+          } else {
+            setCreationPortraits([]);
+          }
+        }
       } else if (phase === "complete") {
         const charData = msg.payload.character as Record<string, unknown>;
         setCharacter(charData);
@@ -1897,6 +1924,10 @@ function AppInner() {
     setTransientError(null);
     setCharacter(null);
     setCreationScene(null);
+    // Story 66: drop the fetched portrait pickers too — without this a
+    // same-session world switch briefly shows the previous world's
+    // portraits before the new pick_portrait fetch resolves.
+    setCreationPortraits([]);
     setThinking(false);
     setCharacterSheet(null);
     setInventoryData(null);
@@ -2570,6 +2601,7 @@ function AppInner() {
               scene={creationScene}
               loading={creationLoading}
               onRespond={handleCreationRespond}
+              portraits={creationPortraits}
             />
           </ErrorBoundary>
         )}
