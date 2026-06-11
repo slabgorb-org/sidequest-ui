@@ -320,13 +320,13 @@ function ActorChip({ actor }: { actor: EncounterActor }) {
     <div
       data-testid="actor-portrait"
       data-has-portrait={hasPortrait ? "true" : "false"}
-      title={`${actor.name} — ${actor.role}`}
+      title={`${humanizeActorName(actor.name)} — ${actor.role}`}
       className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0 overflow-hidden"
     >
       {hasPortrait ? (
         <img
           src={actor.portrait_url}
-          alt={actor.name}
+          alt={humanizeActorName(actor.name)}
           loading="lazy"
           className="w-full h-full object-cover"
         />
@@ -539,6 +539,21 @@ function humanizeSpellId(id: string): string {
     .join(" ");
 }
 
+/** "unknown_dark_contact" → "Unknown Dark Contact" (sq-playtest 2026-06-10 UX).
+ * A runtime-seated opponent with no known name carries a slug as its
+ * `actor.name`, and that field is a load-bearing entity id (tag targets /
+ * last_beat_impacts keys reference it) — so we humanize for DISPLAY only and
+ * never rewrite the id. De-underscore + capitalize the first letter of each
+ * segment; the rest of each segment is left untouched, so an already-humanized
+ * real name ("Kanga Moana-Teru") passes through unchanged rather than being
+ * lower-cased and mangled. Same transform the spell-id picker uses. */
+function humanizeActorName(name: string): string {
+  return name
+    .split("_")
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 function SpellPicker({
   spellcasting,
   onChoose,
@@ -605,9 +620,18 @@ function SpellPicker({
 function BeatTile({
   beat,
   onSelect,
+  disabled = false,
 }: {
   beat: BeatOption;
   onSelect?: (id: string) => void;
+  /**
+   * Sealed-and-waiting: the local player committed their Main Action for this
+   * round and the round has not resolved yet (WN sealed-round, story 102-4).
+   * A second click would hit the server's one-Main-Action-per-round guard and
+   * surface as a red error alert (coyote_star ship_combat playtest, 2026-06-10),
+   * so the tile goes inert instead of inviting an action that always errors.
+   */
+  disabled?: boolean;
 }) {
   const base = beat.base ?? 1;
   // The roll the player makes is d20 + their stat modifier vs this DC. `base`
@@ -650,12 +674,17 @@ function BeatTile({
   return (
     <button
       type="button"
-      title={tooltip}
+      title={disabled ? `${tooltip} — committed; waiting for the round to resolve` : tooltip}
       aria-label={finisher ? `${tooltip} — resolution beat` : tooltip}
       data-resolution={finisher ? "true" : undefined}
       data-risk={Math.min(1, Math.abs(base) / 10).toFixed(2)}
-      onClick={() => onSelect?.(beat.id)}
-      className="relative text-left cursor-pointer rounded-md transition-colors motion-reduce:transition-none flex flex-col justify-center gap-0.5 min-h-[40px] px-2.5 pl-3.5 py-1.5 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-finisher)]"
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? undefined : () => onSelect?.(beat.id)}
+      className={[
+        "relative text-left rounded-md transition-colors motion-reduce:transition-none flex flex-col justify-center gap-0.5 min-h-[40px] px-2.5 pl-3.5 py-1.5 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-finisher)]",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+      ].join(" ")}
       style={{
         fontFamily: "var(--font-sans, system-ui, sans-serif)",
         background: finisher ? finisherBg : normalBg,
@@ -663,9 +692,11 @@ function BeatTile({
         color: tileText,
       }}
       onMouseEnter={(e) => {
+        if (disabled) return;
         e.currentTarget.style.background = finisher ? finisherHover : normalHover;
       }}
       onMouseLeave={(e) => {
+        if (disabled) return;
         e.currentTarget.style.background = finisher ? finisherBg : normalBg;
       }}
     >
@@ -741,18 +772,21 @@ function BeatTile({
 function BeatGrid({
   beats,
   onSelect,
+  disabled = false,
 }: {
   beats: BeatOption[];
   onSelect?: (id: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div
       data-testid="beat-grid"
+      data-sealed={disabled ? "true" : "false"}
       className="grid gap-1.5 content-start"
       style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
     >
       {sortedBeats(beats).map((beat) => (
-        <BeatTile key={beat.id} beat={beat} onSelect={onSelect} />
+        <BeatTile key={beat.id} beat={beat} onSelect={onSelect} disabled={disabled} />
       ))}
     </div>
   );
@@ -1014,7 +1048,9 @@ function ThemPanel({ data }: { data: ConfrontationData }) {
         Them
       </span>
       <ActorChip actor={opponent} />
-      <span className="font-semibold text-[13px] text-foreground">{opponent.name}</span>
+      <span className="font-semibold text-[13px] text-foreground">
+        {humanizeActorName(opponent.name)}
+      </span>
       {opponent.role && (
         <span className="text-[11px] text-muted-foreground">{opponent.role}</span>
       )}
@@ -1094,6 +1130,28 @@ export function ConfrontationOverlay({
   // prepared-spell picker — a cast must name WHICH spell so the server can
   // route the WN cast spine instead of a generic stat throw.
   const [spellPickerOpen, setSpellPickerOpen] = useState(false);
+  // WN sealed round (story 102-4 / coyote_star ship_combat playtest 2026-06-10):
+  // once the local player commits a beat, a SECOND click hits the server's
+  // one-Main-Action-per-round seal guard and surfaces as a red error alert. The
+  // beat grid must go inert until the round resolves. We set this on commit and
+  // clear it when the server's `committed_actors` empties — the round walk
+  // clears the seal ledger on resolution (and a fresh round drops the key
+  // entirely), so an empty/absent list IS the "your next action is live" signal.
+  // Solo play resolves the round in the same dispatch, so the grid re-enables on
+  // the very next frame (a brief inert flash that also blocks the double-click).
+  const [sealedWaiting, setSealedWaiting] = useState(false);
+  const committedActorCount = Array.isArray(data?.committed_actors)
+    ? data.committed_actors.length
+    : 0;
+  // Reset the local seal when the server's committed_actors empties (round
+  // resolved). Done with the "adjust state during render" pattern (React docs:
+  // storing info from previous renders) rather than an effect — a setState in
+  // an effect here would be a redundant cascading render.
+  const [prevCommittedCount, setPrevCommittedCount] = useState(committedActorCount);
+  if (committedActorCount !== prevCommittedCount) {
+    setPrevCommittedCount(committedActorCount);
+    if (committedActorCount === 0) setSealedWaiting(false);
+  }
   const spellcasting = data?.spellcasting ?? null;
   // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
   // this handler is handed to every beat button; a stable identity avoids
@@ -1120,6 +1178,7 @@ export function ConfrontationOverlay({
       }
       setSpellPickerOpen(false);
       setCommittedBeatId(id);
+      setSealedWaiting(true);
       onBeatSelect?.(id);
     },
     [onBeatSelect, spellcasting],
@@ -1129,6 +1188,7 @@ export function ConfrontationOverlay({
     (spellId: string) => {
       setSpellPickerOpen(false);
       setCommittedBeatId(CAST_SPELL_BEAT_ID);
+      setSealedWaiting(true);
       onBeatSelect?.(CAST_SPELL_BEAT_ID, spellId);
     },
     [onBeatSelect],
@@ -1209,11 +1269,27 @@ export function ConfrontationOverlay({
               screen-reader user doesn't hit a silent dead-end on Enter. */}
           {(data.beats?.length ?? 0) > 0 && (
             <div aria-live="polite" className="sr-only">
-              Pick a beat to commit.
+              {sealedWaiting
+                ? "Committed. Waiting for the round to resolve."
+                : "Pick a beat to commit."}
             </div>
           )}
 
-          <BeatGrid beats={data.beats ?? []} onSelect={handleBeatSelect} />
+          {sealedWaiting && (
+            <div
+              data-testid="sealed-waiting-hint"
+              className="mb-1.5 text-[11px] italic"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              Committed — waiting for the round to resolve…
+            </div>
+          )}
+
+          <BeatGrid
+            beats={data.beats ?? []}
+            onSelect={handleBeatSelect}
+            disabled={sealedWaiting}
+          />
 
           {/* Story 102-2: prepared-spell picker — opened by the cast tile,
               commits onBeatSelect(cast_spell, spellId) on choice. Renders
