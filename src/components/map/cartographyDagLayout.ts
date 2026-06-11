@@ -29,6 +29,7 @@
 import { graph, sugiyama } from "d3-dag";
 
 import type { CartographyMetadata } from "@/components/MapOverlay";
+import type { MapPin } from "@/types/reference";
 
 /** Half-radius of a rendered region node (px), exported for the component. */
 export const NODE_R = 10;
@@ -51,6 +52,8 @@ export interface DagLayoutNode {
   x: number;
   /** Pixel y of the node centre in the SVG coordinate space. */
   y: number;
+  /** NPC portrait pins on this region (Story 104-3 / M-C). Empty when none. */
+  pins: MapPin[];
 }
 
 export interface DagLayoutEdge {
@@ -122,7 +125,10 @@ export function computeCartographyDagLayout(
   const g = graph<DagLayoutNode, undefined>();
   const byId = new Map<string, ReturnType<typeof g.node>>();
   for (const id of ids) {
-    byId.set(id, g.node({ id, name: regions[id]?.name ?? id, x: 0, y: 0 }));
+    byId.set(
+      id,
+      g.node({ id, name: regions[id]?.name ?? id, x: 0, y: 0, pins: regions[id]?.pins ?? [] }),
+    );
   }
   for (const { a, b } of edges) {
     if (a === b) continue;
@@ -147,6 +153,7 @@ export function computeCartographyDagLayout(
       name: regions[id]?.name ?? id,
       x: MARGIN + (gn.x ?? 0),
       y: MARGIN + (gn.y ?? 0),
+      pins: regions[id]?.pins ?? [],
     };
   });
 

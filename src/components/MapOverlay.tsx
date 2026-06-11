@@ -1,4 +1,5 @@
 import { CartographyMap } from "@/components/map/CartographyMap";
+import type { MapPin } from "@/types/reference";
 
 export interface RoomExitInfo {
   /** Target room ID this exit leads to. */
@@ -72,6 +73,10 @@ export interface CartographyRegion {
   name: string;
   description?: string;
   adjacent?: string[];
+  /** NPC portrait pins on this region (Story 104-3 / M-C). Optional — the in-game
+   * cartography omits them today; the lore-page `MapSection` adapter populates them
+   * so the shared `CartographyMap` can draw the "fancy node" portrait pins. */
+  pins?: MapPin[];
 }
 
 export interface CartographyRoute {
