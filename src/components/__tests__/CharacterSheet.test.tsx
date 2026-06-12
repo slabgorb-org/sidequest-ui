@@ -57,18 +57,20 @@ describe('CharacterSheet', () => {
     expect(screen.getByText(/Born in the Ashwood/)).toBeInTheDocument();
   });
 
-  it('renders portrait image with correct src', () => {
+  it('renders portrait image with the rounded-rect radius class', () => {
     render(<CharacterSheet data={BASE_DATA} />);
     const img = screen.getByRole('img');
     expect(img).toHaveAttribute('src', '/renders/kael.png');
+    expect(img).toHaveClass('rounded-xl');
+    expect(img).not.toHaveClass('rounded-full');
   });
 
-  it('renders without portrait when portrait_url is absent', () => {
+  it('renders the initials placeholder when portrait_url is absent', () => {
     const dataNoPortrait = { ...BASE_DATA, portrait_url: undefined };
     render(<CharacterSheet data={dataNoPortrait} />);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    // Should still render the rest
-    expect(screen.getByText('Kael')).toBeInTheDocument();
+    const placeholder = screen.getByTestId('portrait-frame-initials');
+    expect(placeholder).toHaveClass('rounded-xl');
   });
 
   it('renders with empty abilities list', () => {

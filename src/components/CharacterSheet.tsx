@@ -1,4 +1,5 @@
 import type { CreationAnswer, LinkedLoreFragment } from "@/types/payloads";
+import { PortraitFrame } from "./PortraitFrame";
 
 export type AbilitySource = "Race" | "Class" | "Item" | "Play";
 
@@ -112,13 +113,13 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
   return (
     <div data-testid="character-sheet" className="p-6 space-y-4">
       <div className="flex items-start gap-4">
-        {data.portrait_url && (
-          <img
-            src={data.portrait_url}
-            alt={data.name}
-            className="w-24 h-24 rounded object-cover"
-          />
-        )}
+        <PortraitFrame
+          url={data.portrait_url}
+          name={data.name}
+          sizeClass="w-24 h-24"
+          radiusClass="rounded-xl"
+          initialsClassName="bg-[var(--surface)] text-[var(--primary)] text-3xl font-semibold border border-[var(--primary)]/30"
+        />
         <div>
           <h2 className="text-2xl font-bold text-[var(--primary)]">
             {data.name}
