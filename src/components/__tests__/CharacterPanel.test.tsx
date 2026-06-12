@@ -73,8 +73,13 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
 
   it("displays character portrait when available", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    const img = screen.getByRole("img");
-    expect(img).toHaveAttribute("src", "/renders/kael.png");
+    const imgs = screen.getAllByRole("img");
+    const headerImg = imgs.find(el => el.getAttribute("src") === "/renders/kael.png");
+    expect(headerImg).toBeDefined();
+    expect(headerImg!).toHaveAttribute("src", "/renders/kael.png");
+    // Rounded-rect contract — must be rounded-lg, NOT rounded-full
+    expect(headerImg!.className).toContain("rounded-lg");
+    expect(headerImg!.className).not.toContain("rounded-full");
   });
 
   it("renders gracefully without portrait", () => {
@@ -87,16 +92,19 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
   it("renders portrait placeholder with initials when no portrait_url", () => {
     const noPortrait = { ...CHARACTER, portrait_url: undefined };
     render(<CharacterPanel character={noPortrait} />);
-    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    const placeholder = screen.getByTestId("portrait-frame-initials");
     expect(placeholder).toBeInTheDocument();
     expect(placeholder).toHaveAttribute("aria-hidden", "true");
     expect(placeholder).toHaveTextContent("K");
+    // Rounded-rect contract — must be rounded-lg, NOT rounded-full
+    expect(placeholder.className).toContain("rounded-lg");
+    expect(placeholder.className).not.toContain("rounded-full");
   });
 
   it("does not render placeholder when portrait_url is present", () => {
     render(<CharacterPanel character={CHARACTER} />);
     expect(
-      screen.queryByTestId("character-portrait-placeholder"),
+      screen.queryByTestId("portrait-frame-initials"),
     ).not.toBeInTheDocument();
   });
 
@@ -124,7 +132,7 @@ describe("CharacterPanel — 33-7: enriched header", () => {
     // Query by role/testid rather than child count — protects the semantic
     // contract (three meaningful elements) without coupling to DOM structure.
     expect(screen.getByTestId("character-header")).toBeInTheDocument();
-    expect(screen.getByRole("img")).toBeInTheDocument();
+    expect(screen.getAllByRole("img").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("heading", { level: 2, name: "Kael" })).toBeInTheDocument();
     expect(screen.getByTestId("character-subtitle")).toBeInTheDocument();
     expect(screen.getByTestId("character-level-badge")).toBeInTheDocument();
@@ -141,7 +149,7 @@ describe("CharacterPanel — 33-7: enriched header", () => {
   it("placeholder renders two-character initials for a two-word name", () => {
     const twoWord = { ...CHARACTER, name: "Lyra Dawnforge", portrait_url: undefined };
     render(<CharacterPanel character={twoWord} />);
-    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    const placeholder = screen.getByTestId("portrait-frame-initials");
     expect(placeholder).toHaveTextContent(/^LD$/);
   });
 
@@ -192,18 +200,24 @@ describe("CharacterPanel — 33-7: enriched header", () => {
 
   it("portrait slot is 48px (w-12 h-12) for both img and placeholder", () => {
     const { rerender } = render(<CharacterPanel character={CHARACTER} />);
-    const img = screen.getByRole("img");
-    expect(img.className).toContain("w-12");
-    expect(img.className).toContain("h-12");
-    expect(img.className).toContain("rounded-full");
+    const imgs = screen.getAllByRole("img");
+    const headerImg = imgs.find(el => el.getAttribute("src") === "/renders/kael.png");
+    expect(headerImg).toBeDefined();
+    expect(headerImg!.className).toContain("w-12");
+    expect(headerImg!.className).toContain("h-12");
+    // Rounded-rect contract — rounded-lg, NOT rounded-full
+    expect(headerImg!.className).toContain("rounded-lg");
+    expect(headerImg!.className).not.toContain("rounded-full");
 
     rerender(
       <CharacterPanel character={{ ...CHARACTER, portrait_url: undefined }} />,
     );
-    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    const placeholder = screen.getByTestId("portrait-frame-initials");
     expect(placeholder.className).toContain("w-12");
     expect(placeholder.className).toContain("h-12");
-    expect(placeholder.className).toContain("rounded-full");
+    // Rounded-rect contract — rounded-lg, NOT rounded-full
+    expect(placeholder.className).toContain("rounded-lg");
+    expect(placeholder.className).not.toContain("rounded-full");
   });
 
   it("name uses accent color (var --primary) and truncates", () => {

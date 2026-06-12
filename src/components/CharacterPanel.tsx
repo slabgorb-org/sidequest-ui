@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { CSSProperties } from "react";
 import type { CharacterSheetData, AbilityDefinition, ClassMove } from "./CharacterSheet";
+import { PortraitFrame } from "./PortraitFrame";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
@@ -121,14 +122,6 @@ function statMod(v: number): string {
   return (m >= 0 ? "+" : "") + m;
 }
 
-// Cap at 2 initials — avatar badges are ~2ch wide, and uncapped initials on
-// a long sentence-name produces noise like "TCMSTRIR".
-function toAvatarInitials(name: string): string {
-  const words = name.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "";
-  if (words.length === 1) return words[0][0].toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
-}
 
 export function CharacterPanel({
   character,
@@ -205,29 +198,22 @@ export function CharacterPanel({
           background: `linear-gradient(180deg, ${FOLIO.paper2} 0%, ${FOLIO.paper} 70%)`,
         }}
       >
-        {character.portrait_url ? (
-          <img
-            src={character.portrait_url}
-            alt={character.name}
-            className="w-12 h-12 rounded-full object-cover shrink-0 border border-[var(--primary)]/30"
-            style={{ borderColor: FOLIO.gold }}
-          />
-        ) : (
-          <div
-            aria-hidden="true"
-            data-testid="character-portrait-placeholder"
-            className="w-12 h-12 rounded-full shrink-0 flex items-center justify-center bg-[var(--surface)] border border-[var(--primary)]/30 text-[var(--primary)] text-xl font-semibold"
-            style={{
-              background: FOLIO.paper2,
-              borderColor: FOLIO.gold,
-              color: FOLIO.crimson,
-              fontFamily: FONT_DISPLAY,
-              fontSize: 28,
-            }}
-          >
-            {toAvatarInitials(character.name)}
-          </div>
-        )}
+        <PortraitFrame
+          url={character.portrait_url}
+          name={character.name}
+          sizeClass="w-12 h-12"
+          radiusClass="rounded-lg"
+          imgStyle={{ borderColor: FOLIO.gold }}
+          imgClassName="border border-[var(--primary)]/30"
+          initialsStyle={{
+            background: FOLIO.paper2,
+            borderColor: FOLIO.gold,
+            color: FOLIO.crimson,
+            fontFamily: FONT_DISPLAY,
+            fontSize: 28,
+          }}
+          initialsClassName="border border-[var(--primary)]/30 text-[var(--primary)] text-xl font-semibold"
+        />
         <div className="min-w-0 flex-1">
           {/* tracking-wide adds a touch of letter-spacing so tight kerns
               like "hir" don't read as "ib" at the H2 size on screenshot
@@ -476,28 +462,23 @@ export function CharacterPanel({
                   borderColor: FOLIO.rule,
                 }}
               >
-                {c.portrait_url ? (
-                  <img
-                    src={c.portrait_url}
-                    alt={c.character_name || c.name}
-                    className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0"
-                    style={{ borderColor: FOLIO.gold }}
-                  />
-                ) : (
-                  <span
-                    className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground flex-shrink-0 border border-border"
-                    style={{
-                      background: FOLIO.paper,
-                      color: FOLIO.crimson,
-                      borderColor: FOLIO.gold,
-                      fontFamily: FONT_DISPLAY,
-                      fontSize: 14,
-                      fontWeight: 400,
-                    }}
-                  >
-                    {toAvatarInitials(c.character_name || c.name)}
-                  </span>
-                )}
+                <PortraitFrame
+                  url={c.portrait_url}
+                  name={c.character_name || c.name}
+                  sizeClass="w-8 h-8"
+                  radiusClass="rounded-md"
+                  imgStyle={{ borderColor: FOLIO.gold }}
+                  imgClassName="border border-border"
+                  initialsStyle={{
+                    background: FOLIO.paper,
+                    color: FOLIO.crimson,
+                    borderColor: FOLIO.gold,
+                    fontFamily: FONT_DISPLAY,
+                    fontSize: 14,
+                    fontWeight: 400,
+                  }}
+                  initialsClassName="bg-secondary text-secondary-foreground text-[10px] font-bold border border-border"
+                />
                 <div className="flex-1 min-w-0">
                   <span
                     className="block text-xs font-semibold text-foreground truncate"
@@ -656,9 +637,11 @@ export function CharacterPanel({
                   : c.description || c.role
               }
             >
-              <span
-                className="w-8 h-8 rounded-full bg-secondary/40 flex items-center justify-center text-[10px] font-bold text-secondary-foreground/80 flex-shrink-0 border border-border/60"
-                style={{
+              <PortraitFrame
+                name={c.name}
+                sizeClass="w-8 h-8"
+                radiusClass="rounded-md"
+                initialsStyle={{
                   background: FOLIO.paper,
                   color: FOLIO.gold,
                   borderColor: FOLIO.rule,
@@ -666,9 +649,8 @@ export function CharacterPanel({
                   fontSize: 14,
                   fontWeight: 400,
                 }}
-              >
-                {toAvatarInitials(c.name)}
-              </span>
+                initialsClassName="bg-secondary/40 text-secondary-foreground/80 text-[10px] font-bold border border-border/60"
+              />
               <div className="flex-1 min-w-0">
                 <span
                   className="block text-xs font-semibold text-foreground/90 truncate"
