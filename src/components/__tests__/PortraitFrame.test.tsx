@@ -34,4 +34,18 @@ describe("PortraitFrame", () => {
     render(<PortraitFrame name="The Cfrom Mountain Stir Trir" sizeClass="w-8 h-8" radiusClass="rounded-md" />);
     expect(screen.getByTestId("portrait-frame-initials")).toHaveTextContent("TC");
   });
+
+  it("clears the error latch and retries the img when url changes", () => {
+    const { rerender } = render(
+      <PortraitFrame url="/renders/missing.png" name="Kael Stormbreaker" sizeClass="w-12 h-12" radiusClass="rounded-lg" />,
+    );
+    fireEvent.error(screen.getByRole("img"));
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+
+    rerender(
+      <PortraitFrame url="/renders/kael.png" name="Kael Stormbreaker" sizeClass="w-12 h-12" radiusClass="rounded-lg" />,
+    );
+    const img = screen.getByRole("img");
+    expect(img).toHaveAttribute("src", "/renders/kael.png");
+  });
 });

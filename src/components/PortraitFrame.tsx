@@ -42,6 +42,16 @@ export function PortraitFrame({
   initialsClassName = "",
 }: PortraitFrameProps) {
   const [errored, setErrored] = useState(false);
+  // Reset the error latch when the url prop changes (React's "adjusting state
+  // on prop change during render" pattern — preferred over a setState-in-effect).
+  // Party rows are keyed by stable player_id, so the instance persists across
+  // a broken→valid url swap; without this reset it would stay latched on initials.
+  const [prevUrl, setPrevUrl] = useState(url);
+  if (url !== prevUrl) {
+    setPrevUrl(url);
+    setErrored(false);
+  }
+
   const showImg = Boolean(url) && !errored;
 
   if (showImg) {
