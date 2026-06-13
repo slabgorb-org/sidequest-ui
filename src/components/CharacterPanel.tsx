@@ -811,6 +811,75 @@ function FolioEdgeTicks({
   );
 }
 
+/**
+ * Light & Darkness survival gauge (2026-06-13 spec). Reuses the FolioEdgeTicks
+ * pip layout under the "Light" label, adds a torch-charge readout, and surfaces
+ * the −2-in-the-dark roll penalty as a crimson affordance when the pool hits 0.
+ *
+ * `torchCharges` is OPTIONAL: torch count is an inventory quantity, and the
+ * server does not (yet) project a torch-charge count into PARTY_STATUS — only
+ * the light ResourcePool (current/max) reaches the UI. Until that wiring lands,
+ * the call site omits torchCharges and the readout is suppressed; the gauge
+ * still renders the pool and the dark-penalty affordance. Threading a real
+ * torch count is a follow-up (server-side PARTY_STATUS field).
+ *
+ * The minus glyph is U+2212 (MINUS SIGN), matching the spec's affordance copy.
+ */
+export function LightGauge({
+  current,
+  max,
+  torchCharges,
+}: {
+  current: number;
+  max: number;
+  torchCharges?: number;
+}) {
+  return (
+    <div
+      data-testid="light-gauge"
+      style={{ display: "flex", flexDirection: "column", gap: 4 }}
+    >
+      <FolioEdgeTicks current={current} max={max} label="Light" />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          padding: "0 16px",
+        }}
+      >
+        {torchCharges !== undefined && (
+          <span
+            data-testid="light-gauge-torches"
+            style={{
+              fontFamily: FONT_BODY,
+              fontSize: 12,
+              color: FOLIO.inkSoft,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {torchCharges} torch{torchCharges === 1 ? "" : "es"} left
+          </span>
+        )}
+        {current === 0 && (
+          <span
+            data-testid="light-gauge-dark-penalty"
+            style={{
+              fontFamily: FONT_LABEL,
+              fontSize: 12,
+              fontWeight: 600,
+              color: FOLIO.crimson,
+              letterSpacing: 0.5,
+            }}
+          >
+            {"−"}2 in the dark
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StatsContent({ stats }: { stats: Record<string, number> }) {
   const entries = Object.entries(stats).sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) {
@@ -1082,17 +1151,25 @@ function StatusContent({
   const entries = Object.entries(resources);
   return (
     <div className="space-y-3" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {entries.map(([name, pool]) => (
-        <GenericResourceBar
-          key={name}
-          name={name}
-          value={pool.value}
-          max={pool.max}
-          genre_slug={genreSlug}
-          thresholds={pool.thresholds}
-          onThresholdCrossed={onThresholdCrossed}
-        />
-      ))}
+      {entries.map(([name, pool]) =>
+        // Light & Darkness survival pool gets the dedicated gauge (pip row +
+        // −2-in-the-dark affordance) instead of the generic bar. torchCharges
+        // is omitted until the server projects a torch count into PARTY_STATUS
+        // (see LightGauge docstring).
+        name === "light" ? (
+          <LightGauge key={name} current={pool.value} max={pool.max} />
+        ) : (
+          <GenericResourceBar
+            key={name}
+            name={name}
+            value={pool.value}
+            max={pool.max}
+            genre_slug={genreSlug}
+            thresholds={pool.thresholds}
+            onThresholdCrossed={onThresholdCrossed}
+          />
+        ),
+      )}
     </div>
   );
 }

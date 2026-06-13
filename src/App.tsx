@@ -44,7 +44,7 @@ import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry, CharacterIncapacitatedPayload } from "@/types/payloads";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry, CharacterIncapacitatedPayload, ResourcePoolPayload } from "@/types/payloads";
 import type { InputBarRevealCall } from "@/components/InputBar";
 import { usePeerReveals } from "@/hooks/usePeerReveals";
 import { usePersistedPeerActions } from "@/hooks/usePersistedPeerActions";
@@ -1122,8 +1122,15 @@ function AppInner() {
         }
       }
 
-      // Extract genre resources from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
-      const resources = msg.payload.resources as Record<string, ResourcePool> | undefined;
+      // Extract genre resources from PARTY_STATUS (light, fuel, luck, …).
+      // The server projects each pool as ResourcePoolPayload with the field
+      // names CharacterPanel reads (value/max/thresholds), so the wire type is
+      // structurally a ResourcePool — no lossy remap. Before the 2026-06-13
+      // wiring fix the server sent no `resources` field at all and the
+      // CharacterPanel light gauge never rendered in real play.
+      const resources = msg.payload.resources as
+        | Record<string, ResourcePoolPayload>
+        | undefined;
       if (resources && typeof resources === "object") {
         setPartyResources(resources);
       }

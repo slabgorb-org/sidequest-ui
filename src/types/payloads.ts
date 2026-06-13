@@ -100,13 +100,28 @@ export interface PartyMemberPayload {
   class_reference_url?: string | null;
 }
 
+/** A resource-pool threshold as projected onto the PARTY_STATUS wire by the
+ *  server (sidequest/protocol/messages.py ResourceThresholdPayload). Field
+ *  names match the UI's GenericResourceBar.ResourceThreshold so the wire shape
+ *  drops straight into the component with no remap. */
+export interface ResourceThresholdPayload {
+  value: number;
+  label: string;
+  direction: "low" | "high";
+}
+
+/** A genre/world resource pool as projected onto PARTY_STATUS
+ *  (sidequest/protocol/messages.py ResourcePoolPayload). The server renames the
+ *  engine's `current` to `value` so this matches what CharacterPanel reads
+ *  (pool.value / pool.max / pool.thresholds) — no lossy client-side cast. */
 export interface ResourcePoolPayload {
   name: string;
   label?: string;
-  current: number;
+  value: number;
   min: number;
   max: number;
   voluntary: boolean;
+  thresholds: ResourceThresholdPayload[];
 }
 
 export interface RolledStat {
