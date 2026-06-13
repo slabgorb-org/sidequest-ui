@@ -2,7 +2,20 @@
  * ScrapbookGallery — pure presentational component for the diegetic image
  * scrapbook (story 33-17). Takes a list of gallery entries and renders them
  * as a turn-attributed, chapter-grouped travelogue with NPC/world-fact chips,
- * a grid/list view toggle, and a compact 3-col mode at 6+ images.
+ * a grid/list view toggle, and a compact 3-col mode at 6+ illustrated images.
+ *
+ * Two card variants keyed off `hasImage` (redesign, story 107-N):
+ *
+ *   Scene Card (hasImage === true)
+ *     The existing full 4:3 visual card with image, badges, legend, and chips.
+ *     This is the visual payoff; unchanged.
+ *
+ *   Inline Beat Card (hasImage === false)
+ *     A compact, single-row strip (~32-40px content-height) that replaces the
+ *     big empty 4:3 well for skipped / failed / pending entries. Spans the
+ *     full grid width (col-span-full) so it lives between illustrated scenes
+ *     as a travelogue ledger entry rather than eating half a fat empty cell.
+ *     Anatomy: TurnBadge · scene title · one-line caption · status glyph.
  *
  * Graceful degradation: scrapbook metadata fields (turn_number, scene_name,
  * narrative_beat, scene_type, npcs, world_facts, chapter) are all optional.
@@ -18,6 +31,10 @@ export type ScrapbookEntry = GalleryImage;
 
 type ViewMode = "grid" | "list";
 
+// `COMPACT_THRESHOLD` gates the 3-col grid. It now compares against the
+// ILLUSTRATED count only (entries with a real URL), not the total. Skipped
+// beats shouldn't tip the grid into compact mode before there are enough real
+// images to benefit from the denser layout.
 const COMPACT_THRESHOLD = 6;
 const UNSORTED_CHAPTER = "Unsorted";
 
@@ -254,6 +271,155 @@ function Lightbox({
   );
 }
 
+/**
+ * InlineBeatCard — Variant B: compact single-row strip for entries WITHOUT an
+ * image (skipped_policy / failed / pending). Replaces the giant empty 4:3 well.
+ *
+ * Spans col-span-full in the grid so it always lives on its own row — Scene
+ * Cards continue to pack normally, and this row reads as a quiet ledger entry
+ * between illustrated beats (the "travelogue" effect).
+ *
+ * Anatomy left→right:
+ *   [optional 48×36 thumb] · TurnBadge (compact T#) · scene title · one-line
+ *   caption · status glyph (right-aligned)
+ *
+ * NPC/world-fact chips are NOT rendered here — they belong on Scene Cards only,
+ * where there's visual room for them. Displaying them here would grow the row
+ * tall again and defeat the purpose.
+ */
+function InlineBeatCard({
+  entry,
+  compact,
+  onSelect,
+}: {
+  entry: ScrapbookEntry;
+  compact: boolean;
+  onSelect: (entry: ScrapbookEntry) => void;
+}) {
+  const id = entryId(entry);
+  const title = titleFor(entry);
+  const caption = entry.narrative_beat;
+
+  // The ``bg-surface/40`` shorthand requires a ``--color-surface`` Tailwind
+  // theme token, which the unified-theme CSS does not register. Reuse the
+  // same arbitrary-value pattern used by SceneCard below.
+  const cardBackground =
+    "bg-[color-mix(in_srgb,var(--surface,var(--card))_40%,transparent)]";
+
+  // Status glyph + tint — three distinct states, no shared appearance.
+  //   skipped_policy → ◦  muted  (intentionally not rendered, not an error)
+  //   failed         → ⚠  destructive tint  (expected image, didn't arrive)
+  //   pending        → …  muted italic  (dispatch in flight, not terminal)
+  const statusGlyph =
+    entry.render_status === "skipped_policy"
+      ? { glyph: "◦", cls: "text-muted-foreground/40" }
+      : entry.render_status === "failed"
+        ? { glyph: "⚠", cls: "text-destructive/60" }
+        : { glyph: "…", cls: "text-muted-foreground/50 italic" };
+
+  // Accessible label mirrors SceneCard — state-naming so a screen-reader
+  // user learns WHY this turn has no image (per CLAUDE.md "no silent
+  // fallbacks" — a generic "no image" label is not acceptable).
+  const ariaLabel =
+    entry.render_status === "skipped_policy"
+      ? `Open: ${title ?? "Scrapbook scene"} (skipped — no narrative weight)`
+      : entry.render_status === "failed"
+        ? `Open: ${title ?? "Scrapbook scene"} (render failed)`
+        : `Open: ${title ?? "Scrapbook scene"} (metadata only)`;
+
+  // Optional image slot: if an imageless-tier beat carries a non-empty url,
+  // show a 48×36 (4:3) thumbnail at the left edge of the row. Absent → pure
+  // text row. This can happen when a beat arrives with a url but no
+  // render_status (or render_status "rendered" but the url is populated).
+  // The `hasImage` check in the parent already determined url is empty for
+  // this code path to fire, but a future server payload might populate url
+  // on a skipped entry for a retried image; guard explicitly.
+  const hasThumb = typeof entry.url === "string" && entry.url.length > 0;
+
+  return (
+    <article
+      data-testid={`scrapbook-entry-${id}`}
+      data-has-image="false"
+      data-inline-beat="true"
+      // col-span-full places this row on its own grid track regardless of
+      // whether the parent is 2-col or 3-col compact. Scene Cards pack
+      // normally; this row always spans.
+      className={`col-span-full flex items-center gap-2 px-2 py-1.5 ${cardBackground} rounded border border-border/30 cursor-pointer min-h-[32px]`}
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      onClick={() => onSelect(entry)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(entry);
+        }
+      }}
+    >
+      {/* Optional 48×36 thumbnail at the left edge when a url is present
+          despite the entry being in the "no-image" path. Rare but possible
+          with retried renders or future server payload shapes. */}
+      {hasThumb && (
+        <img
+          data-testid={`scrapbook-inline-thumb-${id}`}
+          src={entry.url}
+          alt={entry.alt ?? title ?? "Scrapbook scene"}
+          loading="lazy"
+          className="w-12 h-9 object-cover rounded flex-shrink-0"
+          style={{ width: 48, height: 36 }}
+        />
+      )}
+
+      {/* Compact TurnBadge — always "T#" form since inline rows are tight.
+          Rendered inline (no absolute positioning) relative to the row. */}
+      {typeof entry.turn_number === "number" && (
+        <span
+          data-testid={`scrapbook-turn-badge-${id}`}
+          className="flex-shrink-0 px-1.5 py-0.5 rounded bg-black/70 text-[9px] font-semibold text-white"
+        >
+          {compact ? `T${entry.turn_number}` : `Turn ${entry.turn_number}`}
+        </span>
+      )}
+
+      {/* Scene title — semibold, full contrast, never truncated for a11y */}
+      {typeof title === "string" && (
+        <span
+          data-testid={`scrapbook-title-${id}`}
+          className="flex-shrink-0 font-semibold text-[10px] tracking-wide"
+        >
+          {title}
+        </span>
+      )}
+
+      {/* One-line caption — italic muted, line-clamp-1 so it never grows
+          the row height. Omitted when compact (same logic as SceneCard). */}
+      {!compact && typeof caption === "string" && (
+        <span
+          data-testid={`scrapbook-caption-${id}`}
+          className="flex-1 min-w-0 text-[9px] text-muted-foreground italic line-clamp-1"
+        >
+          {caption}
+        </span>
+      )}
+
+      {/* Spacer pushes the status glyph to the far right when there is no
+          caption to fill flex-1. */}
+      {(compact || typeof caption !== "string") && (
+        <span className="flex-1" aria-hidden="true" />
+      )}
+
+      {/* Status glyph at the trailing edge — state-specific, never generic */}
+      <span
+        data-testid={`scrapbook-inline-status-${id}`}
+        aria-hidden="true"
+        className={`flex-shrink-0 text-[10px] ${statusGlyph.cls}`}
+      >
+        {statusGlyph.glyph}
+      </span>
+    </article>
+  );
+}
+
 function ScrapbookCard({
   entry,
   compact,
@@ -320,6 +486,11 @@ function ScrapbookCard({
           // yet" (which would imply we expected one); this turn EARNED
           // having no image. The a11y label names the state aloud so a
           // non-sighted player learns WHY it's imageless.
+          //
+          // NOTE: this branch fires when ScrapbookCard is used in list view
+          // (where InlineBeatCard is bypassed). In grid view, entries without
+          // an image are rendered as InlineBeatCard instead (see the grid
+          // render path in ScrapbookGallery below).
           <div
             data-testid={`scrapbook-entry-${id}-render-status-skipped`}
             aria-label="Skipped: no narrative weight on this turn"
@@ -424,7 +595,18 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
     return <ScrapbookEmpty />;
   }
 
-  const compact = images.length >= COMPACT_THRESHOLD;
+  // Count illustrated entries (those with a non-empty url). Used for:
+  //   1. The "N beats · M illustrated" header count (honest about skipped beats)
+  //   2. The COMPACT_THRESHOLD gate (skipped beats shouldn't tip 3-col mode)
+  const illustrated = images.filter(
+    (e) => typeof e.url === "string" && e.url.length > 0,
+  ).length;
+  const total = images.length;
+
+  // Compact mode gates on ILLUSTRATED count, not total. A session with 11
+  // beats but only 3 illustrated images should not flip to 3-col — the
+  // 3-col layout is for when there are enough real images to fill it.
+  const compact = illustrated >= COMPACT_THRESHOLD;
   const sorted = sortEntries(images);
   const groups = groupByChapter(sorted);
 
@@ -436,11 +618,14 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
       className="flex flex-col h-full"
     >
       <header className="flex items-center justify-between px-3 py-2 border-b border-border/40">
+        {/* Honest scene count: total beats + illustrated subset. Beats
+            with no image (skipped / failed / pending) are counted but
+            not presented as "scenes" — that would imply illustration. */}
         <div
           data-testid="scrapbook-scene-count"
           className="text-xs text-muted-foreground"
         >
-          {images.length} scenes
+          {total} beats · {illustrated} illustrated
         </div>
         <div className="flex gap-1" role="group" aria-label="View mode">
           <button
@@ -500,14 +685,35 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
                     : "grid grid-cols-2 gap-2"
               }
             >
-              {group.entries.map((entry) => (
-                <ScrapbookCard
-                  key={entry.render_id ?? `entry-ts-${entry.timestamp}`}
-                  entry={entry}
-                  compact={compact}
-                  onSelect={handleSelect}
-                />
-              ))}
+              {group.entries.map((entry) => {
+                const hasImage =
+                  typeof entry.url === "string" && entry.url.length > 0;
+
+                // In grid view, entries without an image use the compact
+                // InlineBeatCard. In list view (linear column layout),
+                // we use ScrapbookCard for all entries so the list stays
+                // visually consistent — the 4:3 well is acceptable in a
+                // vertical list where every card fills the full width.
+                if (view === "grid" && !hasImage) {
+                  return (
+                    <InlineBeatCard
+                      key={entry.render_id ?? `entry-ts-${entry.timestamp}`}
+                      entry={entry}
+                      compact={compact}
+                      onSelect={handleSelect}
+                    />
+                  );
+                }
+
+                return (
+                  <ScrapbookCard
+                    key={entry.render_id ?? `entry-ts-${entry.timestamp}`}
+                    entry={entry}
+                    compact={compact}
+                    onSelect={handleSelect}
+                  />
+                );
+              })}
             </div>
           </section>
           );
