@@ -1152,6 +1152,22 @@ export function ConfrontationOverlay({
     setPrevCommittedCount(committedActorCount);
     if (committedActorCount === 0) setSealedWaiting(false);
   }
+  // #378 / beneath_sunden combat (2026-06-12): the non-WN confrontation paths
+  // (plain `combat`, dogfight, sealed-letter dial) NEVER populate
+  // `committed_actors`, so the transition above can never fire — the optimistic
+  // seal would soft-lock the grid after one beat (the player could act once per
+  // page load). Those rounds resolve synchronously server-side, and a fresh dice
+  // resolution (a new `request_id`) IS the "round reopened" signal. Clear the
+  // seal on it — but ONLY when no WN seal is actively holding the grid
+  // (`committedActorCount === 0`); an MP WN round mid-walk keeps its non-empty
+  // ledger and may only be cleared by the committed_actors transition above.
+  // Same "adjust state during render" pattern as the block above.
+  const diceRequestId = diceResult?.request_id ?? null;
+  const [prevDiceRequestId, setPrevDiceRequestId] = useState(diceRequestId);
+  if (diceRequestId !== prevDiceRequestId) {
+    setPrevDiceRequestId(diceRequestId);
+    if (diceRequestId !== null && committedActorCount === 0) setSealedWaiting(false);
+  }
   const spellcasting = data?.spellcasting ?? null;
   // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
   // this handler is handed to every beat button; a stable identity avoids
