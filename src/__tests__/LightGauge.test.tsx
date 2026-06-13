@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { LightGauge, CharacterPanel } from "../components/CharacterPanel";
+import type { ResourcePool } from "../components/CharacterPanel";
 import type { CharacterSheetData } from "../components/CharacterSheet";
+import type {
+  PartyStatusPayload,
+  ResourcePoolPayload,
+} from "../types/payloads";
 
 test("renders pips for current/max light", () => {
   render(<LightGauge current={4} max={6} torchCharges={2} />);
@@ -53,4 +58,102 @@ test("CharacterPanel renders the light gauge from resources.light in the Status 
     />,
   );
   expect(screen.getByText(/Light 4\/6/)).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Wire→gauge flow test (2026-06-13 producer/consumer wiring fix).
+//
+// The bug this guards: the server's PartyStatusPayload had no `resources`
+// field, and the UI's CharacterPanel reads `pool.value`/`pool.max`. The old
+// wire ResourcePoolPayload used `current` (never read), so even if the server
+// had projected pools the gauge would have rendered "Light undefined/6". This
+// test drives a *real* PartyStatusPayload (typed ResourcePoolPayload, server
+// `value` field) through App.tsx's exact extraction logic into CharacterPanel,
+// proving the projected field names reach LightGauge end-to-end.
+//
+// It would have FAILED before the fix: with the old wire shape `{current}`,
+// the typed extraction yields `value: undefined` → "Light undefined/6".
+
+// Mirror App.tsx's PARTY_STATUS resources handler (App.tsx ~1126): the wire
+// payload is cast to Record<string, ResourcePoolPayload> and handed straight
+// to CharacterPanel's `resources` prop (ResourcePoolPayload is structurally a
+// ResourcePool — value/max/thresholds).
+function extractResourcesLikeApp(
+  payload: PartyStatusPayload,
+): Record<string, ResourcePool> {
+  const resources = payload.resources as
+    | Record<string, ResourcePoolPayload>
+    | undefined;
+  return resources && typeof resources === "object" ? resources : {};
+}
+
+test("PARTY_STATUS resources.light flows through App handling into the gauge", () => {
+  window.localStorage.setItem(
+    "sq-character-panel",
+    JSON.stringify({ activeTab: "status" }),
+  );
+
+  // A PARTY_STATUS payload exactly as the server now projects it (views.py
+  // build_session_start_party_status → ResourcePoolPayload with `value`).
+  const payload: PartyStatusPayload = {
+    members: [],
+    resources: {
+      light: {
+        name: "light",
+        label: "Light",
+        value: 4,
+        min: 0,
+        max: 6,
+        voluntary: false,
+        thresholds: [],
+      },
+    },
+  };
+
+  const partyResources = extractResourcesLikeApp(payload);
+
+  render(
+    <CharacterPanel
+      character={minimalCharacter()}
+      resources={partyResources}
+      genreSlug="caverns_and_claudes"
+    />,
+  );
+
+  // The server `value` field reached LightGauge — not "Light undefined/6".
+  expect(screen.getByText(/Light 4\/6/)).toBeInTheDocument();
+  expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+});
+
+test("PARTY_STATUS resources.light at 0 renders the −2-in-the-dark affordance", () => {
+  window.localStorage.setItem(
+    "sq-character-panel",
+    JSON.stringify({ activeTab: "status" }),
+  );
+
+  const payload: PartyStatusPayload = {
+    members: [],
+    resources: {
+      light: {
+        name: "light",
+        label: "Light",
+        value: 0,
+        min: 0,
+        max: 6,
+        voluntary: false,
+        thresholds: [],
+      },
+    },
+  };
+
+  render(
+    <CharacterPanel
+      character={minimalCharacter()}
+      resources={extractResourcesLikeApp(payload)}
+      genreSlug="caverns_and_claudes"
+    />,
+  );
+
+  expect(screen.getByText(/Light 0\/6/)).toBeInTheDocument();
+  expect(screen.getByText(/−2 in the dark/)).toBeInTheDocument();
 });
