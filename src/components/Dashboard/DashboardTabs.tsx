@@ -9,6 +9,7 @@ const TAB_LABELS = [
   "⑥ Prompt",
   "⑦ Lore",
   "⑧ Encounters",
+  "⑨ Mechanical",
 ];
 
 interface Props {
