@@ -153,7 +153,7 @@ npx vitest run           # Run tests once
 
 ## Git Workflow
 
-- Branch strategy: gitflow
+- Branch strategy: github-flow (`develop` is the single integration branch; no develop→main promotion)
 - Default branch: develop
 - Feature branches: `feat/{description}`
 - PRs target: develop
