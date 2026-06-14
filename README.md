@@ -1,7 +1,7 @@
 # SideQuest UI
 
 React/TypeScript game client for the SideQuest AI Narrator. Connects to the
-Python [sidequest-server](https://github.com/slabgorb/sidequest-server) via
+Python [sidequest-server](https://github.com/slabgorb-org/sidequest-server) via
 WebSocket for real-time game sessions (the Rust prototype `sidequest-api` is
 archived read-only per ADR-082).
 
@@ -47,7 +47,7 @@ All paths are relative to `src/components/` unless noted.
 | Component                  | Purpose                                                       |
 |----------------------------|---------------------------------------------------------------|
 | `GameBoard/GameBoard.tsx`  | Root gameplay layout with widget registry                     |
-| `GameBoard/widgets/`       | Modular widget shell: `AudioWidget`, `CharacterWidget`, `ConfrontationWidget`, `ImageGalleryWidget`, `InventoryWidget`, `KnowledgeWidget`, `MapWidget`, `NarrativeWidget`, `ScrapbookGallery`, `ShipWidget` |
+| `GameBoard/widgets/`       | Modular widget shell: `AudioWidget`, `CharacterWidget`, `ImageGalleryWidget`, `InventoryWidget`, `KnowledgeWidget`, `LocationWidget`, `MapWidget`, `NarrativeWidget`, `QuestsWidget`, `RelationshipsWidget`, `ScrapbookGallery`, `ShipWidget` (confrontations render via `ConfrontationOverlay`, not a widget — the old `ConfrontationWidget` was removed 2026-05-13) |
 | `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback); `NarrationScroll` consumes live `NarrationDelta` streaming when the server runs with `SIDEQUEST_NARRATOR_STREAMING=1` (server default is **off** — non-streaming on the Anthropic SDK backend per ADR-101) |
 | `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), images |
 | `CharacterPanel.tsx`       | Persistent themed sidebar showing active character            |
@@ -104,7 +104,6 @@ Custom hooks under `src/hooks/`:
 | `usePeerReveals` + `usePeerEventCache` | Live teammate typing — per-round peer reveal map fed by `ACTION_REVEAL` (ADR-036 amendment 2026-05-03) |
 | `useOrbitalChart`      | Orbital chart fetch + plotted_course revision refetch (ADR-094) |
 | `useChassisInteriorSVG`| Resolve ship/chassis interior SVG for the active session |
-| `useDiceThrowGesture`  | Click-and-auto-roll gesture for the inline 3D dice tray |
 
 > The full list is authoritative in `src/hooks/`. Former voice hooks
 > (`useVoiceChat`, `useVoicePlayback`, `usePushToTalk`, `useWhisper`) were
@@ -154,8 +153,10 @@ npx vitest run --ui   # Browser UI
 
 ## Related Repos
 
-- [orc-quest](https://github.com/slabgorb/orc-quest) — Orchestrator (sprint tracking, ADRs)
-- [sidequest-server](https://github.com/slabgorb/sidequest-server) — Python FastAPI backend
-- [sidequest-daemon](https://github.com/slabgorb/sidequest-daemon) — Python media services (Z-Image, ACE-Step)
-- [sidequest-content](https://github.com/slabgorb/sidequest-content) — Genre packs
+- [sidequest](https://github.com/slabgorb-org/sidequest) — Orchestrator (sprint tracking, ADRs)
+- [sidequest-server](https://github.com/slabgorb-org/sidequest-server) — Python FastAPI backend
+- [sidequest-daemon](https://github.com/slabgorb-org/sidequest-daemon) — Python media services (Z-Image, ACE-Step)
+- [sidequest-content](https://github.com/slabgorb-org/sidequest-content) — Genre packs
+- [sidequest-composer](https://github.com/slabgorb-org/sidequest-composer) — Notation → rights-free audio (offline tool)
+- [sidequest-understudy](https://github.com/slabgorb-org/sidequest-understudy) — Naive simulated-player playtest client
 - [sidequest-api](https://github.com/slabgorb/sidequest-api) — Archived Rust prototype (read-only, ADR-082)
