@@ -128,7 +128,7 @@ describe("ConfrontationOverlay — sealed-round beat lock", () => {
     difficulty: 10,
     outcome: "CritSuccess",
     seed: 1,
-    throw_params: { dice: "1d20", base: 0, stat_check: "INT" } as DiceResultPayload["throw_params"],
+    throw_params: { velocity: [0, 0, 0], angular: [0, 0, 0], position: [0.5, 0.5] },
   });
 
   it("re-enables the grid on a fresh dice resolution when there is no WN seal (non-WN combat)", () => {

@@ -32,7 +32,7 @@ import {
 } from "@/types/protocol";
 import { makeRequestId } from "@/lib/utils";
 import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
-import { beatDispatchBlockReason } from "@/lib/beatDispatch";
+import { beatDispatchBlockReason, isItemUseBeat } from "@/lib/beatDispatch";
 import { toCharacterSummary, toCharacterSheetData } from "@/lib/partyStatusMapping";
 import {
   computeSubmittedPlayerIds,
@@ -1737,6 +1737,25 @@ function AppInner() {
         );
         return;
       }
+      // Story 106-4 Part C: a "Drink <potion>" item-use beat is AUTO-SUCCESS,
+      // no-roll. It carries no server-authored `difficulty`, so it must NOT take
+      // the d20 dice-tray path below (which refuses difficulty-less beats). Commit
+      // it directly: the server resolves the heal + consume and the opponent's
+      // own answer. `throw_params`/`face` are required wire fields but ignored
+      // server-side for item-use (no dice were rolled) — send a zeroed pair.
+      if (isItemUseBeat(beatId)) {
+        send({
+          type: MessageType.DICE_THROW,
+          payload: {
+            request_id: makeRequestId(),
+            throw_params: { velocity: [0, 0, 0], angular: [0, 0, 0], position: [0.5, 0.5] },
+            face: [1],
+            beat_id: beatId,
+          },
+          player_id: currentPlayerId ?? "",
+        } as unknown as GameMessage);
+        return;
+      }
       // Build DiceRequest locally — no server round-trip needed.
       // The server will receive beat_id + face + seed in one DiceThrow message.
       const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
@@ -1789,7 +1808,7 @@ function AppInner() {
       setDiceResult(null);
       setDiceRequest(localReq);
     },
-    [confrontationData, thinking, sessionBound, characterSheet, character, currentPlayerId],
+    [confrontationData, thinking, sessionBound, characterSheet, character, currentPlayerId, send],
   );
 
 

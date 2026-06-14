@@ -14,8 +14,11 @@ const appSrc = readFileSync(resolve(__dirname, "../App.tsx"), "utf-8");
 
 describe("Wiring: 67-8 Layer 3 — handleBeatSelect gates on sessionBound", () => {
   it("App.tsx imports the beatDispatchBlockReason gate", () => {
+    // Tolerate co-imports from the same module (e.g. isItemUseBeat, story
+    // 106-4 Part C) — the guard is "beatDispatchBlockReason is imported from
+    // @/lib/beatDispatch", not "it is the SOLE import".
     expect(appSrc).toMatch(
-      /import\s*\{\s*beatDispatchBlockReason\s*\}\s*from\s*["']@\/lib\/beatDispatch["']/,
+      /import\s*\{[^}]*\bbeatDispatchBlockReason\b[^}]*\}\s*from\s*["']@\/lib\/beatDispatch["']/,
     );
   });
 
