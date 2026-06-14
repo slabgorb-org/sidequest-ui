@@ -12,11 +12,13 @@ This is a personal project under the `slabgorb-org` GitHub organization.
 
 ## SideQuest System Overview
 
-Four repos compose the SideQuest stack (Python backend per ADR-082, ported from the Rust prototype 2026-04):
+Six repos compose the SideQuest stack (Python backend per ADR-082, ported from the Rust prototype 2026-04):
 - **sidequest-server** — Python/FastAPI game engine and WebSocket API on port 8765
 - **sidequest-ui** — React/TypeScript game client (Vite, port 5173)
-- **sidequest-daemon** — Python media services (image gen, audio library playback)
+- **sidequest-daemon** — Python media services (image gen, music gen)
 - **sidequest-content** — Genre packs (YAML configs, audio, images, world data)
+- **sidequest-composer** — Standalone CLI: public-domain notation → rights-free audio (offline)
+- **sidequest-understudy** — Naive simulated-player playtest client
 
 Orchestrator repo (`orc-quest`, also cloned as `oq-1` / `oq-2`) coordinates sprint tracking, docs, ADRs, and cross-repo scripts.
 
@@ -64,8 +66,8 @@ Rust prototype in 2026-04. The Rust codebase is preserved read-only at
 https://github.com/slabgorb/sidequest-api for historical reference; older ADRs
 that show Rust code are historical illustration only — see `docs/adr/README.md`
 for the translation table. New backend code goes in Python. Media services
-(`sidequest-daemon`) remain Python for inference library maturity (Flux /
-Z-Image / ACE-Step). The narrator LLM path uses the Anthropic Python SDK by
+(`sidequest-daemon`) remain Python for inference library maturity (Z-Image /
+ACE-Step). The narrator LLM path uses the Anthropic Python SDK by
 default per ADR-101 (supersedes ADR-001; `claude -p`/Ollama are opt-in
 non-default backends). (Kokoro TTS was formerly in this list; TTS has been
 removed from the system.)
@@ -131,7 +133,7 @@ npx vitest run           # Run tests once
 
 - **WebSocket client** connects to API at `ws://localhost:8765/ws`
 - **OTEL Dashboard** at `/dashboard` — connects to `/ws/watcher` for telemetry
-- **Providers** (`src/providers/`): `GameStateProvider` (WebSocket state), `ImageBusProvider` (image render pipeline), `ThemeProvider` (genre theme). Audio is wired through `useAudio` at the App level, not a context provider.
+- **Providers** (`src/providers/`): `GameStateProvider` (WebSocket state) and `ImageBusProvider` (image render pipeline). The genre theme is wired through the `useGenreTheme` hook (ADR-079), and audio through `useAudio`, at the App level — neither is a context provider.
 - **Screens**: `ConnectScreen` → `CharacterCreation` → `GameBoard` (with `ConfrontationOverlay` during encounters)
 - **Components**: `GameBoard/`, `CharacterPanel`, `NarrationCards`/`NarrationFocus`/`NarrationScroll`, `InputBar`, `CharacterSheet`, `InventoryPanel`, `MapOverlay`, `KnowledgeJournal`, `Dashboard/` (GM telemetry)
 
@@ -142,9 +144,11 @@ npx vitest run           # Run tests once
 | `src/components/` | React components |
 | `src/components/Dashboard/` | OTEL dashboard (tabs: Timeline, State, Subsystems, Timing, Console) |
 | `src/screens/` | Full-page views |
-| `src/providers/` | Context providers (game state, image bus, theme) |
-| `src/hooks/` | Custom hooks (WebSocket, state mirror, slash commands) |
+| `src/providers/` | Context providers (game state, image bus) |
+| `src/hooks/` | Custom hooks (WebSocket, state mirror, slash commands, genre theme) |
 | `src/audio/` | Audio engine (music, SFX) |
+| `src/dice/` | 3D dice overlay + `InlineDiceTray` (Three.js + Rapier, ADR-075) |
+| `src/lib/` | Shared client utilities |
 | `src/types/` | TypeScript type definitions |
 
 ## Git Workflow
