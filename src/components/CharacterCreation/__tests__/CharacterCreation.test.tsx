@@ -89,6 +89,40 @@ describe("CharacterCreation: stat_arrange branch", () => {
   });
 });
 
+describe("CharacterCreation: stat_arrange flavor ability names", () => {
+  it("renders slots labeled with flavor ability names when ability_names is present", () => {
+    const onRespond = vi.fn();
+    const flavorNames = ["Strength", "Agility", "Endurance", "Insight", "Spirit", "Harmony"];
+    render(
+      <CharacterCreation
+        scene={{
+          phase: "scene",
+          input_type: "stat_arrange",
+          prompt: "Arrange them.",
+          pool: [12, 9, 15, 8, 14, 11],
+          assignment: {
+            Strength: null,
+            Agility: null,
+            Endurance: null,
+            Insight: null,
+            Spirit: null,
+            Harmony: null,
+          },
+          ability_names: flavorNames,
+          class_requirements: [],
+          qualifying_classes: [],
+          confirm_enabled: false,
+        }}
+        loading={false}
+        onRespond={onRespond}
+      />,
+    );
+    for (const name of flavorNames) {
+      expect(screen.getByTestId(`arrange-slot-${name}`)).toBeInTheDocument();
+    }
+  });
+});
+
 describe("CharacterCreation: story branch", () => {
   it("renders StoryPanel when scene.input_type is story", () => {
     const onRespond = vi.fn();

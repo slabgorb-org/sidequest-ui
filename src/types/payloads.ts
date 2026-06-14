@@ -205,6 +205,15 @@ export interface CharacterCreationPayload {
   suggest_culture?: string | null;
   /** Portrait picker step (66): selected portrait ref (client → server on portrait_confirm). */
   selected_portrait_ref?: string | null;
+  /** Ability-score names in declaration order, for the arrange panel's slots.
+   * Flavor-named packs (e.g. elemental_harmony) send non-STR/DEX names here.
+   * The server's arrange render normally ALWAYS sends this with the pack's
+   * authoritative names (standard STR/DEX/CON/INT/WIS/CHA or flavor names) — it
+   * is the source of truth for slot labels. Optional in the type only because a
+   * payload may omit it (older servers / non-arrange phases); the server never
+   * sends explicit null. When absent, CharacterCreation.tsx falls back to the
+   * standard STR/DEX/CON/INT/WIS/CHA list as a safety net, not the expected path. */
+  ability_names?: string[];
 }
 
 export interface TurnStatusPayload {

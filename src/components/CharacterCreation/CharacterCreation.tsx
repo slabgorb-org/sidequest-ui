@@ -57,6 +57,8 @@ export interface CreationScene {
   class_requirements?: { name: string; requirement_label: string }[];
   qualifying_classes?: string[];
   confirm_enabled?: boolean;
+  /** Ability-score names in declaration order (flavor packs use non-STR/DEX names). */
+  ability_names?: string[];
   // --- the_story (story input_type) ---
   pronouns_options?: string[];
   pronouns_allow_freeform?: boolean;
@@ -270,6 +272,7 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
           }
           qualifyingClasses={scene.qualifying_classes ?? []}
           confirmEnabled={scene.confirm_enabled ?? false}
+          statOrder={scene.ability_names ?? ["STR", "DEX", "CON", "INT", "WIS", "CHA"]}
           onAssign={({ stat, value }) => onRespond({ phase: "arrange_assign", stat, value })}
           onClear={({ stat }) => onRespond({ phase: "arrange_clear", stat })}
           onConfirm={() => onRespond({ phase: "arrange_confirm" })}

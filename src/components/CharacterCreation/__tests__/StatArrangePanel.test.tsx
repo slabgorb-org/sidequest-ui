@@ -6,6 +6,7 @@ describe("StatArrangePanel", () => {
   const baseProps = {
     pool: [12, 9, 15, 8, 14, 11],
     assignment: { STR: null, DEX: null, CON: null, INT: null, WIS: null, CHA: null },
+    statOrder: ["STR", "DEX", "CON", "INT", "WIS", "CHA"],
     classRequirements: [
       { name: "Fighter", requirementLabel: "STR 9+" },
       { name: "Mage", requirementLabel: "INT 9+" },
