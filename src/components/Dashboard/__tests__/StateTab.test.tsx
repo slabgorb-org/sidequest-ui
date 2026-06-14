@@ -92,6 +92,13 @@ describe("StateTab — PlayerCard rendering (story 30-3)", () => {
     expect(screen.getAllByText(/Alpha/).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("uses a non-stale refresh tooltip (no 'Rust')", () => {
+    const session = makeSession();
+    render(<StateTab debugState={[session]} onRefresh={vi.fn()} />);
+    expect(screen.getByTitle(/Fetch latest state from server/i)).toBeInTheDocument();
+    expect(screen.queryByTitle(/Rust/i)).toBeNull();
+  });
+
   it("renders multiple players without crashing", () => {
     const session = makeSession({
       players: [
