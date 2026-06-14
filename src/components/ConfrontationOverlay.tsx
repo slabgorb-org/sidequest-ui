@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
+import { isItemUseBeat } from "@/lib/beatDispatch";
 import { YieldButton } from "@/components/YieldButton";
 
 // ═══════════════════════════════════════════════════════════
@@ -1194,7 +1195,16 @@ export function ConfrontationOverlay({
       }
       setSpellPickerOpen(false);
       setCommittedBeatId(id);
-      setSealedWaiting(true);
+      // Story 106-4 Part C: an item-use beat ("Drink <potion>") is auto-success,
+      // no-roll — it produces NO dice result, so the dice-result reset at
+      // setPrevDiceRequestId() never fires and an optimistic `sealedWaiting`
+      // would stick "Committed — waiting…" forever. Skip the optimistic lock for
+      // item beats: a solo drink resolves immediately (fresh beats arrive), and
+      // an MP seal surfaces via the server's `committed_actors` indicator. Other
+      // beats keep the lock (it gates the d20 animation against double-submit).
+      if (!isItemUseBeat(id)) {
+        setSealedWaiting(true);
+      }
       onBeatSelect?.(id);
     },
     [onBeatSelect, spellcasting],

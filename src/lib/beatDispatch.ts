@@ -66,3 +66,14 @@ export function beatDispatchBlockReason(
   }
   return null;
 }
+
+// Story 106-4 Part C: transient inventory item-use beats ("Drink <potion>").
+// The server appends these to the confrontation beat menu from the actor's
+// carried consumables (mirrors sidequest-server beat_filter.ITEM_USE_BEAT_PREFIX).
+// They are AUTO-SUCCESS, no-roll actions: they carry no server-authored
+// `difficulty` and must commit WITHOUT the d20 dice tray.
+export const ITEM_USE_BEAT_PREFIX = "use_item:";
+
+export function isItemUseBeat(beatId: string): boolean {
+  return beatId.startsWith(ITEM_USE_BEAT_PREFIX);
+}

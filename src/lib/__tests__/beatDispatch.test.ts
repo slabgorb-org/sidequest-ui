@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { beatDispatchBlockReason, type BeatDispatchState } from "@/lib/beatDispatch";
+import {
+  beatDispatchBlockReason,
+  isItemUseBeat,
+  ITEM_USE_BEAT_PREFIX,
+  type BeatDispatchState,
+} from "@/lib/beatDispatch";
 
 // Story 67-8, Layer 3 — the beat-commit session-bound gate.
 //
@@ -69,5 +74,18 @@ describe("beatDispatchBlockReason — beat-commit gate (67-8)", () => {
     expect(beatDispatchBlockReason("stare", readyState({ sessionBound: false }))?.code).toBe(
       "session_unbound",
     );
+  });
+});
+
+describe("isItemUseBeat — Story 106-4 Part C", () => {
+  it("recognizes transient inventory item-use beat ids", () => {
+    expect(isItemUseBeat(`${ITEM_USE_BEAT_PREFIX}potion_of_mending`)).toBe(true);
+    expect(isItemUseBeat("use_item:potion_of_mending")).toBe(true);
+  });
+
+  it("does not match authored confrontation beats", () => {
+    for (const id of ["strike", "brace", "break_contact", "cast_spell", "committed_blow"]) {
+      expect(isItemUseBeat(id)).toBe(false);
+    }
   });
 });
