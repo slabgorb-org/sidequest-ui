@@ -33,7 +33,7 @@ export function DashboardHeader({
       }}
     >
       <span style={{ color: THEME.accent, fontWeight: "bold", fontSize: 15 }}>
-        SideQuest OTEL
+        SideQuest Inspector
       </span>
       <span style={{ fontSize: 10, color: connected ? THEME.green : THEME.muted }}>
         ●
@@ -56,7 +56,7 @@ export function DashboardHeader({
       <button onClick={onClear} style={btnStyle}>
         Clear
       </button>
-      <button onClick={onRefreshState} style={btnStyle} title="Refresh game state from Rust memory">
+      <button onClick={onRefreshState} style={btnStyle} title="Refresh game state from server">
         ↻ State
       </button>
     </div>

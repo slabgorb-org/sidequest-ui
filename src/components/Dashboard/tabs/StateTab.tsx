@@ -53,7 +53,7 @@ export function StateTab({ debugState, onRefresh }: Props) {
           onChange={(e) => setFilter(e.target.value)}
           style={inputStyle}
         />
-        <button onClick={onRefresh} style={btnStyle} title="Fetch latest state from Rust memory">
+        <button onClick={onRefresh} style={btnStyle} title="Fetch latest state from server">
           ↻ Refresh
         </button>
         <span style={{ color: THEME.muted, fontSize: 11, marginLeft: "auto" }}>
