@@ -96,6 +96,13 @@ export interface CharacterSheetData {
    *  "Lore" subsection beneath the origin block inside the History section.
    *  Absent/empty ⇒ no Lore subsection. */
   lore_fragments?: LinkedLoreFragment[];
+  /** WN-family skill name → level mapping (ADR-143 Task 11). Absent/empty
+   *  for non-WN characters — Skills section is NOT rendered when empty.
+   *  Mechanics-first: Sebastien/Jade axis — the math must be legible. */
+  skills?: Record<string, number>;
+  /** WN-family focus ids (ADR-143 Task 11). Absent/empty for non-WN
+   *  characters — Foci section is NOT rendered when empty. */
+  foci?: string[];
 }
 
 export interface CharacterSheetProps {
@@ -167,6 +174,35 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
               <span className="font-mono">{value}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ADR-143 Task 11: WN-family Skills — only rendered when non-empty.
+          Mirrors the Stats grid layout so the math is legible in the same
+          visual language (mechanics-first — Sebastien/Jade axis). */}
+      {data.skills && Object.keys(data.skills).length > 0 && (
+        <div data-testid="character-skills">
+          <h3 className="text-sm font-semibold mb-1">Skills</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(data.skills).sort(([a], [b]) => a.localeCompare(b)).map(([skill, level]) => (
+              <div key={skill} className="flex justify-between px-2 py-1 rounded bg-[var(--surface)]">
+                <span className="text-[var(--primary)]">{toDisplayName(skill)}</span>
+                <span className="font-mono">{level}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ADR-143 Task 11: WN-family Foci — only rendered when non-empty. */}
+      {data.foci && data.foci.length > 0 && (
+        <div data-testid="character-foci">
+          <h3 className="text-sm font-semibold mb-1">Foci</h3>
+          <ul className="list-disc list-inside text-sm">
+            {data.foci.map((focus) => (
+              <li key={focus}>{toDisplayName(focus)}</li>
+            ))}
+          </ul>
         </div>
       )}
 

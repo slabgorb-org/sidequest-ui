@@ -194,3 +194,103 @@ describe("toCharacterSheetData — creation_answers provenance (story 93-3)", ()
     expect(built.creation_answers ?? []).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-143 Task 11: skills/foci carried wire → sheet.
+//
+// The server stamps WN-family skills + foci onto members[].sheet.skills /
+// .foci (CharacterSheetDetails). The CharacterSheet Skills/Foci sections read
+// CharacterSheetData.skills / .foci — so toCharacterSheetData must thread
+// sheetFacet.skills / .foci through. These are the ONLY tests that prove the
+// wire fields reach the production assembly (the component tests hand-construct
+// `data={...}` and bypass this mapper). Per sidequest-ui/CLAUDE.md "Every Test
+// Suite Needs a Wiring Test."
+// ---------------------------------------------------------------------------
+
+describe("toCharacterSheetData — skills/foci wiring (ADR-143 Task 11)", () => {
+  it("carries skills from the sheet facet into CharacterSheetData", () => {
+    const raw = wireMember({
+      sheet: {
+        race: "Human",
+        stats: { strength: 14 },
+        abilities: [],
+        class_moves: [],
+        backstory: "Born in the caverns.",
+        skills: { Sneak: 1, Exert: 0 },
+        foci: ["Die Hard"],
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.skills).toEqual({ Sneak: 1, Exert: 0 });
+  });
+
+  it("carries foci (raw snake_case ids) from the sheet facet into CharacterSheetData", () => {
+    // The server ships focus IDS raw (Character.foci holds ids). The mapper
+    // threads them verbatim; the CharacterSheet title-cases them at render.
+    const raw = wireMember({
+      sheet: {
+        race: "Human",
+        stats: { strength: 14 },
+        abilities: [],
+        class_moves: [],
+        backstory: "Born in the caverns.",
+        skills: { Sneak: 1 },
+        foci: ["die_hard", "night_warrior"],
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.foci).toEqual(["die_hard", "night_warrior"]);
+  });
+
+  it("carries skills/foci in single-player too — the mechanical surface is NOT identity-gated", () => {
+    const raw = wireMember({
+      sheet: {
+        race: "Human",
+        stats: { strength: 14 },
+        abilities: [],
+        class_moves: [],
+        backstory: "Born in the caverns.",
+        skills: { Notice: 1 },
+        foci: ["Wanderer"],
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, /* isMultiplayer */ false);
+    expect(built.skills).toEqual({ Notice: 1 });
+    expect(built.foci).toEqual(["Wanderer"]);
+  });
+
+  it("keeps non-WN empty skills/foci hidden — empty {} / [] survives so no section renders", () => {
+    // The server sends skills: {} / foci: [] for non-WN characters. The
+    // CharacterSheet renders the Skills/Foci sections only when non-empty, so
+    // the mapper must pass an empty (falsy-for-rendering) value through — never
+    // fabricate content for a non-WN pack.
+    const raw = wireMember({
+      sheet: {
+        race: "Human",
+        stats: { strength: 14 },
+        abilities: [],
+        class_moves: [],
+        backstory: "Born in the caverns.",
+        skills: {},
+        foci: [],
+      },
+    });
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(Object.keys(built.skills ?? {})).toHaveLength(0);
+    expect(built.foci ?? []).toHaveLength(0);
+  });
+
+  it("yields undefined skills/foci when the facet omits them — graceful legacy save, no fabrication", () => {
+    // The legacy sheet facet (wireMember default) carries no skills/foci; the
+    // map must not invent any. The component then renders no Skills/Foci.
+    const raw = wireMember();
+    const sheetFacet = raw.sheet as Record<string, unknown>;
+    const built = toCharacterSheetData(raw, sheetFacet, true);
+    expect(built.skills).toBeUndefined();
+    expect(built.foci).toBeUndefined();
+  });
+});

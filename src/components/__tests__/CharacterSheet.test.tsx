@@ -667,3 +667,117 @@ describe('CharacterSheet — Story 93-4: History Lore subsection', () => {
     expect(within(history).queryByTestId('history-lore')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-143 Task 11: Skills + Foci sections (WN-family characters)
+//
+// Mechanics-first legibility (Sebastien/Jade axis): WWN characters have
+// skills (name→level) and foci (focus ids) that must be visible on the
+// player-facing sheet.  Non-WN characters have empty collections and must
+// NOT show empty section headers (conditional rendering).
+//
+// Implementation anchors:
+//   - data-testid="character-skills"   — the Skills section container
+//   - data-testid="character-foci"     — the Foci section container
+// ---------------------------------------------------------------------------
+
+describe('CharacterSheet — ADR-143 Task 11: Skills section', () => {
+  const WWN_DATA: CharacterSheetData = {
+    ...BASE_DATA,
+    skills: { Sneak: 1, Exert: 0 },
+    foci: ['Die Hard'],
+  };
+
+  // --- Skills present → renders section ---
+
+  it('renders a Skills section when skills is non-empty', () => {
+    render(<CharacterSheet data={WWN_DATA} />);
+    expect(screen.getByTestId('character-skills')).toBeInTheDocument();
+  });
+
+  it('renders each skill name and level', () => {
+    render(<CharacterSheet data={WWN_DATA} />);
+    const section = screen.getByTestId('character-skills');
+    expect(within(section).getByText(/Sneak/i)).toBeInTheDocument();
+    expect(within(section).getByText('1')).toBeInTheDocument();
+    expect(within(section).getByText(/Exert/i)).toBeInTheDocument();
+    expect(within(section).getByText('0')).toBeInTheDocument();
+  });
+
+  // --- Skills absent / empty → no section ---
+
+  it('does NOT render a Skills section when skills is absent', () => {
+    render(<CharacterSheet data={BASE_DATA} />);
+    expect(screen.queryByTestId('character-skills')).not.toBeInTheDocument();
+  });
+
+  it('does NOT render a Skills section when skills is an empty object', () => {
+    render(<CharacterSheet data={{ ...BASE_DATA, skills: {} }} />);
+    expect(screen.queryByTestId('character-skills')).not.toBeInTheDocument();
+  });
+});
+
+describe('CharacterSheet — ADR-143 Task 11: Foci section', () => {
+  // Server ships focus IDS raw (e.g. "die_hard") — Character.foci holds ids,
+  // not display labels. The sheet must title-case them like every sibling
+  // list (abilities, injury_tags, skills). Use real snake_case ids in the
+  // fixture so the formatting is locked, not bypassed by pre-formatted text.
+  const WWN_DATA: CharacterSheetData = {
+    ...BASE_DATA,
+    skills: { Sneak: 1 },
+    foci: ['die_hard', 'night_warrior'],
+  };
+
+  // --- Foci present → renders section ---
+
+  it('renders a Foci section when foci is non-empty', () => {
+    render(<CharacterSheet data={WWN_DATA} />);
+    expect(screen.getByTestId('character-foci')).toBeInTheDocument();
+  });
+
+  it('renders each focus, converting the raw snake_case id to a display name', () => {
+    render(<CharacterSheet data={WWN_DATA} />);
+    const section = screen.getByTestId('character-foci');
+    // die_hard → "Die Hard", night_warrior → "Night Warrior" (toDisplayName,
+    // matching the abilities/skills/injury-tags lists). The raw id must NOT
+    // leak through.
+    expect(within(section).getByText('Die Hard')).toBeInTheDocument();
+    expect(within(section).getByText('Night Warrior')).toBeInTheDocument();
+    expect(within(section).queryByText('die_hard')).not.toBeInTheDocument();
+  });
+
+  // --- Foci absent / empty → no section ---
+
+  it('does NOT render a Foci section when foci is absent', () => {
+    render(<CharacterSheet data={BASE_DATA} />);
+    expect(screen.queryByTestId('character-foci')).not.toBeInTheDocument();
+  });
+
+  it('does NOT render a Foci section when foci is an empty array', () => {
+    render(<CharacterSheet data={{ ...BASE_DATA, foci: [] }} />);
+    expect(screen.queryByTestId('character-foci')).not.toBeInTheDocument();
+  });
+
+  // --- Wiring: CharacterSheetData type accepts skills + foci ---
+
+  it('AC-6 (wiring): a WWN-shaped CharacterSheetData renders both Skills and Foci', () => {
+    const wwn: CharacterSheetData = {
+      name: 'Aldren',
+      class: 'Warrior',
+      level: 1,
+      stats: { str: 14, dex: 10, con: 12, int: 8, wis: 11, cha: 9 },
+      abilities: [makeAbility('Veteran Luck')],
+      class_moves: [],
+      backstory: 'Born in the caverns beneath Sunden.',
+      portrait_url: undefined,
+      skills: { Sneak: 1, Notice: 0 },
+      foci: ['Die Hard'],
+    };
+    render(<CharacterSheet data={wwn} />);
+    const sheet = screen.getByTestId('character-sheet');
+    expect(within(sheet).getByTestId('character-skills')).toBeInTheDocument();
+    expect(within(sheet).getByTestId('character-foci')).toBeInTheDocument();
+    expect(within(sheet).getByText(/Sneak/i)).toBeInTheDocument();
+    expect(within(sheet).getByText('Die Hard')).toBeInTheDocument();
+  });
+});

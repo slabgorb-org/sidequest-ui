@@ -94,5 +94,16 @@ export function toCharacterSheetData(
     creation_answers: Array.isArray(sheetFacet.creation_answers)
       ? (sheetFacet.creation_answers as CreationAnswer[])
       : undefined,
+    // ADR-143 Task 11: WN-family skills/foci ride the sheet facet
+    // (members[].sheet.skills / .foci). NOT identity-gated — a player's own
+    // mechanical surface is theirs to see regardless of MP. The server sends
+    // {} / [] for non-WN characters; the CharacterSheet renders the Skills /
+    // Foci sections only when non-empty, so an empty pass-through stays
+    // hidden (no fabrication of sections for non-WN packs).
+    skills:
+      sheetFacet.skills && typeof sheetFacet.skills === "object"
+        ? (sheetFacet.skills as Record<string, number>)
+        : undefined,
+    foci: Array.isArray(sheetFacet.foci) ? (sheetFacet.foci as string[]) : undefined,
   };
 }
