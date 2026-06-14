@@ -15,9 +15,14 @@ export interface StatArrangePanelProps {
   onConfirm: () => void;
   onReject: () => void;
   confirmEnabled: boolean;
+  /** Ability-score names in declaration order, used as the slot labels. The
+   * server's arrange payload normally always sends these (standard or flavor
+   * names) via `ability_names`; CharacterCreation.tsx forwards them here. The
+   * `?? ["STR","DEX","CON","INT","WIS","CHA"]` default applied there is a safety
+   * net for payloads that omit the field (older servers / non-arrange edge
+   * cases), not the expected path. */
+  statOrder: string[];
 }
-
-const STAT_ORDER = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
 
 export function StatArrangePanel({
   pool,
@@ -29,6 +34,7 @@ export function StatArrangePanel({
   onConfirm,
   onReject,
   confirmEnabled,
+  statOrder,
 }: StatArrangePanelProps) {
   const [selectedPoolIdx, setSelectedPoolIdx] = useState<number | null>(null);
 
@@ -70,7 +76,7 @@ export function StatArrangePanel({
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        {STAT_ORDER.map((stat) => {
+        {statOrder.map((stat) => {
           const value = assignment[stat];
           return (
             <button
