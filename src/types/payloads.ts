@@ -927,12 +927,26 @@ export interface CharacterIncapacitatedPayload {
 // in sidequest-server/sidequest/protocol/models.py) on the snake_case wire.
 // The rich shape (log + anchors + stakes) is the source of truth — distinct
 // from the legacy StateDelta.quests Record<string,string>, which is never read.
+// Story 117-7: one discovered lore fragment cohered under its quest. Mirrors
+// the server pydantic model QuestLoreEntry (sidequest-server/sidequest/protocol/
+// models.py, `extra: forbid`): `fact_id` is the dedup key against the broader
+// KnownFacts surface; `content` is the player-facing readable fragment.
+export interface QuestLoreEntry {
+  fact_id: string;
+  content: string;
+}
+
 export interface QuestLogEntry {
   quest_id: string;
   title: string;
   objective: string;
   status: string;
   anchor_id: string | null;
+  // Story 117-5/117-7: the "what I've learned about this job" projection —
+  // ScenarioClue facts the party has learned about this quest's anchor. Always
+  // present on the wire (server `Field(default_factory=list)`, never None);
+  // empty when nothing is learned.
+  related_lore: QuestLoreEntry[];
 }
 
 export interface QuestAnchorEntry {

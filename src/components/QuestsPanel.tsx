@@ -114,6 +114,27 @@ export function QuestsPanel({ data }: QuestsPanelProps) {
                 Resolves: {anchor.resolution}
               </div>
             ) : null}
+            {/* Story 117-7: the discovered lore cohered under this quest — the
+                "what I've learned about this job" picture the playgroup was
+                missing (server projection landed in 117-5). Defensive `?? []`
+                tolerates a version-skew wire entry that omits the field; the
+                block is suppressed entirely when nothing is learned. Keyed on
+                fact_id (the server dedup key), never the array index. */}
+            {(q.related_lore ?? []).length > 0 ? (
+              <div
+                data-testid="quests-lore"
+                style={{ marginTop: "0.5rem" }}
+              >
+                <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+                  What I've learned about this job
+                </div>
+                {(q.related_lore ?? []).map((lore) => (
+                  <div key={lore.fact_id} style={{ color: FOLIO.inkSoft }}>
+                    {lore.content}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
       })}

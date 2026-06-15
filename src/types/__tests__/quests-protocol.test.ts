@@ -38,6 +38,7 @@ describe("QuestsPayload mirrors the server shape exactly (no fabrication)", () =
       objective: "Reach the Emerald City",
       status: "active",
       anchor_id: "emerald_city",
+      related_lore: [],
     };
     const anchor: QuestAnchorEntry = {
       anchor_id: "emerald_city",

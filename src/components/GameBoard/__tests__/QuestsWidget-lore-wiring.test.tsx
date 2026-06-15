@@ -84,7 +84,7 @@ describe("QuestsWidget lore wiring (Story 117-7, mirror → widget → panel)", 
 
   it("renders the lore block from the production widget fed by mirrored state", () => {
     const result = mirror([questsMsg(wirePayload)]);
-    const questsData = result.current.state.questsData;
+    const questsData = result.current.state.questsData ?? null;
     // The widget is GameBoard's real consumer; feeding it the mirrored snapshot
     // exercises the same data the dock renders at runtime.
     render(<QuestsWidget data={questsData} />);
