@@ -17,6 +17,7 @@ import { MessageType } from "../protocol";
 import type {
   QuestsPayload,
   QuestLogEntry,
+  QuestLoreEntry,
   QuestAnchorEntry,
 } from "../payloads";
 
@@ -37,6 +38,7 @@ describe("QuestsPayload mirrors the server shape exactly (no fabrication)", () =
       objective: "Reach the Emerald City",
       status: "active",
       anchor_id: "emerald_city",
+      related_lore: [],
     };
     const anchor: QuestAnchorEntry = {
       anchor_id: "emerald_city",
@@ -65,5 +67,76 @@ describe("QuestsPayload mirrors the server shape exactly (no fabrication)", () =
     };
     expect(orphan.quest_id).toBeNull();
     expect(orphan.resolution).toBeNull();
+  });
+});
+
+/**
+ * Story 117-7: the QuestLogEntry must carry the related_lore the server has
+ * projected since 117-5 (server #876). Server source of truth:
+ * sidequest-server/sidequest/protocol/models.py
+ *   QuestLoreEntry(fact_id: str, content: str)            # model_config extra=forbid
+ *   QuestLogEntry(..., related_lore: list[QuestLoreEntry] = [])  # never None
+ *
+ * Constructing the typed literals below is the compile-time guard: if the dev
+ * omits the related_lore field or the QuestLoreEntry type, this file does not
+ * compile. At runtime it asserts the nested {fact_id, content} shape is present
+ * and addressable — a thin Record<string,string> could not carry it.
+ */
+describe("QuestLogEntry carries related_lore (Story 117-7, mirrors 117-5 server)", () => {
+  it("types a quest's related_lore as a list of {fact_id, content} fragments", () => {
+    const lore: QuestLoreEntry = {
+      fact_id: "clue_ledger_001",
+      content: "The floor boss keeps a second ledger in the back office.",
+    };
+    const entry: QuestLogEntry = {
+      quest_id: "q_detective",
+      title: "Run the floor boss to ground",
+      objective: "Find proof of the skim",
+      status: "active",
+      anchor_id: "back_office",
+      related_lore: [lore],
+    };
+
+    expect(entry.related_lore).toHaveLength(1);
+    expect(entry.related_lore[0].fact_id).toBe("clue_ledger_001");
+    expect(entry.related_lore[0].content).toBe(
+      "The floor boss keeps a second ledger in the back office.",
+    );
+  });
+
+  it("permits an empty related_lore list (nothing learned yet — never None)", () => {
+    const entry: QuestLogEntry = {
+      quest_id: "q_fresh",
+      title: "A brand-new lead",
+      objective: "Ask around",
+      status: "active",
+      anchor_id: null,
+      related_lore: [],
+    };
+    expect(entry.related_lore).toEqual([]);
+  });
+
+  it("threads related_lore through a full QuestsPayload", () => {
+    const payload: QuestsPayload = {
+      quest_log: [
+        {
+          quest_id: "q_detective",
+          title: "Run the floor boss to ground",
+          objective: "Find proof of the skim",
+          status: "active",
+          anchor_id: "back_office",
+          related_lore: [
+            { fact_id: "f1", content: "A guard takes a cut on Thursdays." },
+          ],
+        },
+      ],
+      quest_anchors: [
+        { anchor_id: "back_office", quest_id: "q_detective", resolution: null },
+      ],
+      active_stakes: "The skim is escalating",
+    };
+    expect(payload.quest_log[0].related_lore[0].content).toBe(
+      "A guard takes a cut on Thursdays.",
+    );
   });
 });

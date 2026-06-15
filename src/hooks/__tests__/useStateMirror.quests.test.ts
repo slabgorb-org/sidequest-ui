@@ -56,6 +56,7 @@ function payload(title: string, stakes: string): QuestsPayload {
         objective: `Pursue: ${title}`,
         status: "active",
         anchor_id: "anchor_a",
+        related_lore: [],
       },
     ],
     quest_anchors: [
