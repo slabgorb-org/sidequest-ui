@@ -41,7 +41,12 @@ export function FateDiceTray({ roll, ruleset }: FateDiceTrayProps) {
 
   return (
     <div data-testid="fate-dice-tray" className="flex flex-col">
-      {/* Four dF dice on the table. */}
+      {/* Four dF dice on the table. NOTE: the 3D dice currently render the idle
+          pickup row (throwParams=null) — they do NOT yet animate to the rolled
+          faces, because FATE_ROLL carries no throw_params/seed to replay (unlike
+          DICE_RESULT). The authoritative result is the text readout below; the
+          3D faces are decorative until the roll carries replay params (follow-up
+          alongside the F3b mount). */}
       <div data-testid="fate-dice-frame" style={{ position: "relative", height: 200 }}>
         <Canvas
           camera={{ position: [0, 2.3, 0], rotation: [-Math.PI / 2, 0, 0], up: [0, 0, -1], fov: 42 }}
