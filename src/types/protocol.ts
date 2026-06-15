@@ -97,6 +97,13 @@ export const MessageType = {
   // PC-scoped (payload.character_name); the UI locks that seat's input and
   // shows a death banner / re-roll CTA. Server-side intake gate is authority.
   CHARACTER_INCAPACITATED: "CHARACTER_INCAPACITATED",
+  // Story 118-1/118-2 / ADR-144 F3: snapshot channel for the player-facing Fate
+  // spine (per-PC fate points, skills on the ladder, aspects+pips, stress,
+  // consequence slots, scene aspects, active conflict). The RELATIONSHIPS/QUESTS
+  // analog. Server emits ONLY on a ruleset=='fate' pack (server #880), so the
+  // Fate surface never co-renders with the WN/native ConfrontationOverlay.
+  // Full-replace per message; UI consumer is the FatePanel (118-2).
+  FATE_STATE: "FATE_STATE",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

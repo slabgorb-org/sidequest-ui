@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 import type {
+  FateStatePayload,
   FootnoteData,
   LocationDescriptionPayload,
   LocationOverlayChangedPayload,
@@ -82,6 +83,11 @@ export function useStateMirror(messages: GameMessage[]): void {
     // every message is a full replace (same idempotent-replay contract as
     // relationships). Null until the first projection arrives.
     let questsData: QuestsPayload | null = null;
+    // Story 118-2 / ADR-144 F3b: player-facing Fate spine. FATE_STATE is a
+    // snapshot — every message is a full replace (same idempotent-replay
+    // contract as quests). Null until the first projection arrives, and it only
+    // ever arrives on a ruleset=='fate' pack (server gate).
+    let fateState: FateStatePayload | null = null;
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -236,6 +242,22 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // Story 118-2 / ADR-144 F3b: full replace of the Fate spine. FATE_STATE is
+      // a snapshot — the latest message wins, mirroring QUESTS. No Silent
+      // Fallbacks: validate the shape at the boundary so a malformed wire
+      // payload (version skew, serialization bug) fails loud and leaves
+      // fateState unchanged rather than propagating garbage that crashes the
+      // panel. Mirrors the QUESTS boundary guard above.
+      if (msg.type === MessageType.FATE_STATE) {
+        const p = msg.payload as unknown as FateStatePayload;
+        if (!Array.isArray(p.characters) || !Array.isArray(p.scene_aspects)) {
+          console.error('[useStateMirror] malformed FATE_STATE payload — ignoring', p);
+          continue;
+        }
+        fateState = p;
+        continue;
+      }
+
       // Story 54-9: per-encounter overlay delta. When a baseline exists
       // for the same region_id, replace its overlays slice. When the
       // baseline is for a DIFFERENT region the delta is stale (room change
@@ -356,6 +378,11 @@ export function useStateMirror(messages: GameMessage[]): void {
     // QUESTS message has arrived, the latest snapshot otherwise. Same
     // always-replace shape as relationships above.
     current = { ...current, questsData };
+
+    // Story 118-2 / ADR-144 F3b: Fate-spine slice. Always mirrored — null when
+    // no FATE_STATE message has arrived (the non-fate-pack reality), the latest
+    // snapshot otherwise. Same always-replace shape as questsData above.
+    current = { ...current, fateState };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

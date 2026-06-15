@@ -51,6 +51,7 @@ import type {
   LocationDescriptionPayload,
   RelationshipEntryPayload,
   QuestsPayload,
+  FateStatePayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -74,6 +75,7 @@ import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 import { QuestsWidget } from "./widgets/QuestsWidget";
+import { FateWidget } from "./widgets/FateWidget";
 // ConfrontationWidget removed 2026-05-13 — confrontation rendered as a bottom
 // strip between the dockview workspace and the InputBar (D2 mock) until Story
 // 85-3 (2026-06-04) promoted it BACK into the dockview as the data-gated
@@ -185,6 +187,14 @@ export interface GameBoardProps {
    * mirroring the relationships tab.
    */
   questsData?: QuestsPayload | null;
+  /**
+   * Story 118-2 / ADR-144 F3b: player-facing Fate sheet, mirrored from
+   * state.fateState. Null until a FATE_STATE snapshot arrives — and it only
+   * ever arrives on a ruleset=='fate' pack (server gate). The Fate tab is
+   * dataGated:true and added to availableWidgets only when this is non-null, so
+   * it never co-renders with the WN/native ConfrontationOverlay (epic 118).
+   */
+  fateData?: FateStatePayload | null;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -290,6 +300,7 @@ export function GameBoard({
   knowledgeEntries,
   relationshipsData = null,
   questsData = null,
+  fateData = null,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -375,6 +386,14 @@ export function GameBoard({
     if (navMode === "region" || navMode === "room_graph") {
       available.add("location");
     }
+    // Story 118-2 / ADR-144 F3b: the Fate tab is ruleset-gated. The server emits
+    // FATE_STATE only on a ruleset=='fate' pack, so gating the tab on
+    // `fateData != null` keeps it off the 7 WN/native packs entirely — it can
+    // never sit beside the beat/dial ConfrontationOverlay (epic 118). This is
+    // the UI realization of the ruleset gate and the paired negative test.
+    if (fateData != null) {
+      available.add("fate");
+    }
     // Story 85-3 (Tier B): confrontation mode claims the canvas ONLY while an
     // encounter is active — data-gated on confrontationData. The sync effect
     // below adds the panel (and auto-focuses it) when this set gains
@@ -383,7 +402,7 @@ export function GameBoard({
       available.add("confrontation");
     }
     return available;
-  }, [worldSlug, navMode, confrontationData]);
+  }, [worldSlug, navMode, fateData, confrontationData]);
 
   // Hotkeys — unchanged signature; confrontation never had one.
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -552,6 +571,11 @@ export function GameBoard({
         // Always render — QuestsPanel shows an empty state when the spine is
         // null/empty. Tab is always present from session start (Story 77-5).
         return <QuestsWidget data={questsData ?? null} />;
+      case "fate":
+        // Story 118-2 / ADR-144 F3b: the Fate sheet. The tab only exists when
+        // fateData is present (dataGated:true gate above), but render
+        // defensively — FatePanel shows an empty state for null/empty data.
+        return <FateWidget data={fateData ?? null} />;
       case "location": {
         // Story 85-2: the Location-tab header reads as a "Region — Subregion"
         // breadcrumb. The region is the shared LOCATION_DESCRIPTION payload;
@@ -611,7 +635,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      currentLocation, knowledgeEntries, relationshipsData, questsData, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
@@ -737,6 +761,7 @@ export function GameBoard({
       "character",
       "relationships",
       "quests",
+      "fate",
       "inventory",
       "map",
       "location",

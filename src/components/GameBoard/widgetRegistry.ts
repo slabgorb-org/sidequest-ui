@@ -26,6 +26,7 @@ export type WidgetId =
   | "knowledge"
   | "relationships"
   | "quests"
+  | "fate"
   | "gallery"
   | "audio"
   | "confrontation";
@@ -154,6 +155,24 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     defaultH: 5,
     closable: true,
     dataGated: false,
+  },
+  // Story 118-2 / ADR-144 F3b: player-facing Fate sheet (fate points, ladder
+  // skills, aspects, stress, consequences). UNLIKE quests/relationships
+  // (always-present), this is dataGated:true — the tab appears only when a
+  // FATE_STATE projection has arrived. The server emits FATE_STATE only on a
+  // ruleset=='fate' pack (server #880), so the tab never shows on the 7
+  // WN/native packs and can never co-render with the ConfrontationOverlay
+  // (epic 118 ruleset-gate). Hotkey 'f' — free (verified against buildHotkeyMap).
+  fate: {
+    id: "fate",
+    label: "Fate",
+    hotkey: "f",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
+    closable: true,
+    dataGated: true,
   },
   gallery: {
     id: "gallery",
