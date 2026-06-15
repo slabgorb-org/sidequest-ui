@@ -511,6 +511,25 @@ export interface DiceResultPayload {
   roll_role?: DiceRollRole;
 }
 
+/** Server -> all clients: one resolved 4dF roll (ADR-144 F3c, Story 118-3).
+ *
+ * The player-facing Fate roll surface — the four Fudge faces, the ladder
+ * rating (value + adjective), the shift total, the outcome tier, and a
+ * succeed-with-style flag. A momentary EVENT, like DiceResult. */
+export interface FateRollPayload {
+  /** The four raw Fudge faces, each -1 / 0 / +1. */
+  dice: number[];
+  roll_total: number;
+  ladder_total: number;
+  /** The Fate ladder adjective for `ladder_total` (e.g. "Great"). */
+  ladder_name: string;
+  opposition: number;
+  shifts: number;
+  /** One of Fail / Tie / Succeed / SucceedWithStyle. */
+  tier: string;
+  succeeded_with_style: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Discriminated union
 // ---------------------------------------------------------------------------
@@ -629,6 +648,11 @@ export interface DiceResultMessage extends BaseMessage {
   payload: DiceResultPayload;
 }
 
+export interface FateRollMessage extends BaseMessage {
+  type: typeof MessageType.FATE_ROLL;
+  payload: FateRollPayload;
+}
+
 export interface ScrapbookEntryMessage extends BaseMessage {
   type: typeof MessageType.SCRAPBOOK_ENTRY;
   payload: ScrapbookEntryPayload;
@@ -667,6 +691,7 @@ export type TypedGameMessage =
   | DiceRequestMessage
   | DiceThrowMessage
   | DiceResultMessage
+  | FateRollMessage
   | ScrapbookEntryMessage
   | RelationshipsMessage
   | CharacterIncapacitatedMessage;
@@ -753,6 +778,10 @@ export function isDiceThrow(msg: TypedGameMessage): msg is DiceThrowMessage {
 
 export function isDiceResult(msg: TypedGameMessage): msg is DiceResultMessage {
   return msg.type === MessageType.DICE_RESULT;
+}
+
+export function isFateRoll(msg: TypedGameMessage): msg is FateRollMessage {
+  return msg.type === MessageType.FATE_ROLL;
 }
 
 export function isScrapbookEntry(msg: TypedGameMessage): msg is ScrapbookEntryMessage {
