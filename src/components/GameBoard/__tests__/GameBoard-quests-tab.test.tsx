@@ -74,6 +74,7 @@ const seeded: QuestsPayload = {
       objective: "Reach the Emerald City",
       status: "active",
       anchor_id: "emerald_city",
+      related_lore: [],
     },
   ],
   quest_anchors: [

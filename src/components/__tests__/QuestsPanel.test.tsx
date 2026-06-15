@@ -18,7 +18,7 @@
  *   - AC5: the panel root is an ARIA region with an accessible name
  */
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { QuestsPanel } from "../QuestsPanel";
 import type { QuestsPayload } from "../../types/payloads";
 
@@ -30,6 +30,7 @@ const seeded: QuestsPayload = {
       objective: "Reach the Emerald City and ask the Wizard",
       status: "active",
       anchor_id: "emerald_city",
+      related_lore: [],
     },
   ],
   quest_anchors: [
@@ -124,6 +125,7 @@ describe("QuestsPanel — anchor surfacing (rework: No-Silent-Fallbacks)", () =>
           objective: "Reach the Emerald City",
           status: "active",
           anchor_id: null,
+          related_lore: [],
         },
       ],
       quest_anchors: [
@@ -139,5 +141,190 @@ describe("QuestsPanel — anchor surfacing (rework: No-Silent-Fallbacks)", () =>
     expect(
       screen.getByText(/the vault opens at midnight/i),
     ).toBeInTheDocument();
+  });
+});
+
+// Story 117-7: render the related_lore the server projects (117-5). The "what
+// I've learned about this job" block coheres the discovered ScenarioClue facts
+// under their owning quest — the visible payoff of the server-side projection.
+// Without this block the coherence is on the wire but unseen (Keith's symptom:
+// "knowledge has multiple references but nothing pulls them into a coherent
+// picture"). Player-facing legibility per CLAUDE.md.
+describe("QuestsPanel — related lore (Story 117-7)", () => {
+  const withLore: QuestsPayload = {
+    quest_log: [
+      {
+        quest_id: "q_detective",
+        title: "Run the floor boss to ground",
+        objective: "Find proof of the skim",
+        status: "active",
+        anchor_id: "back_office",
+        related_lore: [
+          {
+            fact_id: "clue_ledger",
+            content: "The floor boss keeps a second ledger in the back office.",
+          },
+          {
+            fact_id: "clue_guard",
+            content: "A guard takes a cut every Thursday.",
+          },
+        ],
+      },
+    ],
+    quest_anchors: [
+      { anchor_id: "back_office", quest_id: "q_detective", resolution: null },
+    ],
+    active_stakes: "The skim is escalating",
+  };
+
+  it("renders a 'what I've learned' lore block listing every related fragment", () => {
+    render(<QuestsPanel data={withLore} />);
+    const lore = screen.getByTestId("quests-lore");
+    // The story names this block explicitly — its label must surface.
+    expect(lore).toHaveTextContent(/what i've learned/i);
+    // Every projected fragment's readable content must render, in full.
+    expect(
+      within(lore).getByText(
+        /the floor boss keeps a second ledger in the back office\./i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(lore).getByText(/a guard takes a cut every thursday\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the actual content string, not the fact_id (no thin-shape fabrication)", () => {
+    // A lossy title->status Record could never carry the lore content. The
+    // fact_id is an internal dedup key, NOT the player-facing text — it must
+    // not be what is shown to the player.
+    render(<QuestsPanel data={withLore} />);
+    const lore = screen.getByTestId("quests-lore");
+    expect(
+      within(lore).getByText(/keeps a second ledger/i),
+    ).toBeInTheDocument();
+    expect(within(lore).queryByText("clue_ledger")).not.toBeInTheDocument();
+  });
+
+  it("renders no lore block for a quest with an empty related_lore list", () => {
+    const noLore: QuestsPayload = {
+      quest_log: [
+        {
+          quest_id: "q_fresh",
+          title: "A brand-new lead",
+          objective: "Ask around",
+          status: "active",
+          anchor_id: null,
+          related_lore: [],
+        },
+      ],
+      quest_anchors: [],
+      active_stakes: "nothing yet",
+    };
+    render(<QuestsPanel data={noLore} />);
+    // No dangling "What I've learned" header when there is nothing learned.
+    expect(screen.queryByTestId("quests-lore")).not.toBeInTheDocument();
+    expect(screen.queryByText(/what i've learned/i)).not.toBeInTheDocument();
+  });
+
+  it("scopes each quest's lore to its own entry (no cross-quest leakage)", () => {
+    const twoQuests: QuestsPayload = {
+      quest_log: [
+        {
+          quest_id: "q_detective",
+          title: "Run the floor boss to ground",
+          objective: "Find proof of the skim",
+          status: "active",
+          anchor_id: null,
+          related_lore: [
+            { fact_id: "f_ledger", content: "There is a second ledger." },
+          ],
+        },
+        {
+          quest_id: "q_escort",
+          title: "Escort the witness",
+          objective: "Get her to the safehouse",
+          status: "active",
+          anchor_id: null,
+          related_lore: [],
+        },
+      ],
+      quest_anchors: [],
+      active_stakes: "high",
+    };
+    render(<QuestsPanel data={twoQuests} />);
+    const entries = screen.getAllByTestId("quests-entry");
+    expect(entries).toHaveLength(2);
+
+    const detectiveEntry = entries.find((e) =>
+      within(e).queryByText(/run the floor boss to ground/i),
+    )!;
+    const escortEntry = entries.find((e) =>
+      within(e).queryByText(/escort the witness/i),
+    )!;
+
+    // The lore lives under the detective quest only.
+    expect(
+      within(detectiveEntry).getByText(/there is a second ledger\./i),
+    ).toBeInTheDocument();
+    // It must NOT appear under the escort quest (which learned nothing).
+    expect(
+      within(escortEntry).queryByText(/there is a second ledger\./i),
+    ).not.toBeInTheDocument();
+    expect(
+      within(escortEntry).queryByTestId("quests-lore"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders both fragments even when their content is identical (stable per-fact keys)", () => {
+    // Two distinct facts (different fact_id) can carry the same content. Keying
+    // the lore list on content (or array index) would collapse or mis-render
+    // them; keying on fact_id keeps both. Guards the React key={index}/key=content
+    // anti-pattern (lang-review #6).
+    const dupContent: QuestsPayload = {
+      quest_log: [
+        {
+          quest_id: "q_detective",
+          title: "Run the floor boss to ground",
+          objective: "Find proof",
+          status: "active",
+          anchor_id: null,
+          related_lore: [
+            { fact_id: "f_a", content: "The vault opens at midnight." },
+            { fact_id: "f_b", content: "The vault opens at midnight." },
+          ],
+        },
+      ],
+      quest_anchors: [],
+      active_stakes: "high",
+    };
+    render(<QuestsPanel data={dupContent} />);
+    const lore = screen.getByTestId("quests-lore");
+    expect(
+      within(lore).getAllByText(/the vault opens at midnight\./i),
+    ).toHaveLength(2);
+  });
+
+  it("does not throw when a quest entry omits related_lore (version-skew wire payload)", () => {
+    // The server always emits related_lore (never None), but an old/pre-117-5
+    // server or a serialization skew could send a quest entry without it. The
+    // panel must degrade gracefully — render the quest, render no lore block,
+    // and never white-screen (No-Silent-Fallbacks: tolerate, don't crash).
+    const legacyEntry = {
+      quest_log: [
+        {
+          quest_id: "q_legacy",
+          title: "An old save's quest",
+          objective: "Carry on",
+          status: "active",
+          anchor_id: null,
+          // related_lore intentionally absent
+        },
+      ],
+      quest_anchors: [],
+      active_stakes: "high",
+    } as unknown as QuestsPayload;
+    expect(() => render(<QuestsPanel data={legacyEntry} />)).not.toThrow();
+    expect(screen.getByText(/an old save's quest/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("quests-lore")).not.toBeInTheDocument();
   });
 });
