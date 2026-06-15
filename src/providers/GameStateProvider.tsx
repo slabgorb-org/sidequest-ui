@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { MagicState } from '@/types/magic';
 import type {
+  FateStatePayload,
   LocationDescriptionPayload,
   QuestsPayload,
   RelationshipEntryPayload,
@@ -81,6 +82,14 @@ export interface ClientGameState {
    * source of truth.
    */
   questsData?: QuestsPayload | null;
+  /**
+   * Story 118-2 / ADR-144 F3b: player-facing Fate spine (per-PC sheets + scene
+   * aspects + active conflict), mirrored from the FATE_STATE snapshot (full
+   * replace per message). Null until the first projection arrives — and it
+   * NEVER arrives on a non-fate pack (server emits only on ruleset=='fate'),
+   * which is what keeps the Fate tab off WN/native packs.
+   */
+  fateState?: FateStatePayload | null;
 }
 
 export interface GameStateContextValue {
@@ -103,6 +112,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   currentLocation: null,
   relationships: null,
   questsData: null,
+  fateState: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

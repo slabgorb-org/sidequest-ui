@@ -644,6 +644,11 @@ export interface CharacterIncapacitatedMessage extends BaseMessage {
   payload: CharacterIncapacitatedPayload;
 }
 
+export interface FateStateMessage extends BaseMessage {
+  type: typeof MessageType.FATE_STATE;
+  payload: FateStatePayload;
+}
+
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -669,7 +674,8 @@ export type TypedGameMessage =
   | DiceResultMessage
   | ScrapbookEntryMessage
   | RelationshipsMessage
-  | CharacterIncapacitatedMessage;
+  | CharacterIncapacitatedMessage
+  | FateStateMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -968,4 +974,82 @@ export interface QuestsPayload {
 export interface LocationOverlayChangedPayload {
   region_id: string;
   overlays: LocationDescriptionOverlaySummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Story 118-1/118-2 / ADR-144 F3: player-facing Fate spine snapshot. Field
+// names mirror the server pydantic models (sidequest-server/sidequest/protocol/
+// models.py, all `extra: forbid`) on the snake_case wire, built by
+// game/ruleset/fate_projection.py:build_fate_state_payload. The rich nested
+// shape is the source of truth — the FatePanel renders every mechanical number
+// (the Sebastien/Jade legibility mandate), so the client must not thin it.
+// ---------------------------------------------------------------------------
+
+/** One skill on the Fate ladder. `rating` is the signed value (Terrible -2 ..
+ *  Legendary +8); `ladder` is its adjective (server `fate_resolution.ladder_name`)
+ *  so the panel shows BOTH the math and the name. */
+export interface FateSkillEntry {
+  name: string;
+  rating: number;
+  ladder: string;
+}
+
+/** One Fate aspect. `kind` is the snake_case taxonomy (high_concept / trouble /
+ *  character / situation / boost / consequence); `free_invokes` is the count of
+ *  unused free invocations rendered as pips. */
+export interface FateAspectEntry {
+  text: string;
+  kind: string;
+  free_invokes: number;
+}
+
+/** One checkable stress box of a fixed `value`. */
+export interface FateStressBox {
+  value: number;
+  checked: boolean;
+}
+
+/** One consequence slot. `filled` is true when taken (it then carries `text` as
+ *  an invokable aspect); an open slot is `filled:false` with empty `text`.
+ *  `value` is the SRD absorption value (mild 2 / moderate 4 / severe 6 / extreme 8). */
+export interface FateConsequenceEntry {
+  level: string;
+  value: number;
+  filled: boolean;
+  text: string;
+}
+
+/** One PC's full Fate sheet. `aspects` is named character aspects only; a filled
+ *  consequence surfaces in `consequences`, not duplicated here. `stress` maps each
+ *  track name (physical / mental) to its ordered boxes. */
+export interface FateCharacterEntry {
+  name: string;
+  fate_points: number;
+  refresh: number;
+  skills: FateSkillEntry[];
+  aspects: FateAspectEntry[];
+  stress: Record<string, FateStressBox[]>;
+  consequences: FateConsequenceEntry[];
+}
+
+/** One participant in an active Fate conflict. `side` is the encounter actor's
+ *  side (player / opponent / neutral). */
+export interface FateConflictParticipant {
+  name: string;
+  side: string;
+}
+
+/** The active Fate conflict's participants by side, in seating order. */
+export interface FateConflictEntry {
+  active: boolean;
+  participants: FateConflictParticipant[];
+}
+
+/** Full Fate-spine snapshot: per-PC sheets + scene situation aspects (incl.
+ *  boosts) + the active conflict. An unpopulated payload is a clean
+ *  empty-but-valid snapshot — never None. `conflict` is null when none is active. */
+export interface FateStatePayload {
+  characters: FateCharacterEntry[];
+  scene_aspects: FateAspectEntry[];
+  conflict: FateConflictEntry | null;
 }

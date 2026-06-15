@@ -2654,6 +2654,7 @@ function AppInner() {
                 currentLocation={gameState.currentLocation ?? null}
                 relationshipsData={gameState.relationships ?? null}
                 questsData={gameState.questsData ?? null}
+                fateData={gameState.fateState ?? null}
                 audio={audio}
                 nowPlaying={nowPlaying}
                 knowledgeEntries={gameState.knowledge}
