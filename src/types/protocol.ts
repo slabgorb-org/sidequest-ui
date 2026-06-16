@@ -108,6 +108,12 @@ export const MessageType = {
   // Fate surface never co-renders with the WN/native ConfrontationOverlay.
   // Full-replace per message; UI consumer is the FatePanel (118-2).
   FATE_STATE: "FATE_STATE",
+  // Story 118-6 / ADR-144 F3f/F1d: OUTBOUND — the player committed a Fate action
+  // from the conflict surface (a proactive tile, an invoke-bearing action, or a
+  // concede). Carries the FateActionPayload (action, skill, invoke_aspect,
+  // invoke_mode, aspect_text, player_action). The server's FateActionHandler is
+  // the economy + validation authority (No Silent Fallbacks — the client mirrors).
+  FATE_ACTION: "FATE_ACTION",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

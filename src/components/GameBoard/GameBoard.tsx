@@ -77,6 +77,10 @@ import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 import { QuestsWidget } from "./widgets/QuestsWidget";
 import { FateWidget } from "./widgets/FateWidget";
+import {
+  FateConflictSurface,
+  type FateActionInput,
+} from "@/components/FateConflictSurface";
 // ConfrontationWidget removed 2026-05-13 — confrontation rendered as a bottom
 // strip between the dockview workspace and the InputBar (D2 mock) until Story
 // 85-3 (2026-06-04) promoted it BACK into the dockview as the data-gated
@@ -197,11 +201,20 @@ export interface GameBoardProps {
    */
   fateData?: FateStatePayload | null;
   /**
-   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll (state.latestFateRoll),
-   * threaded into the Fate panel so the FateDiceTray mounts when a roll arrives.
-   * Null until the first FATE_ROLL — only ever on a ruleset=='fate' pack.
+   * Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll
+   * (state.latestFateRoll). Null until a FATE_ROLL event arrives (only ever on a
+   * ruleset=='fate' pack). One slice, two consumers: the Fate panel's FateWidget
+   * threads it so the FateDiceTray mounts (F3g), and the Fate conflict surface
+   * composes it (F3f).
    */
   latestFateRoll?: FateRollPayload | null;
+  /**
+   * Story 118-6 / ADR-144 F3f: the player committed a Fate action from the
+   * conflict surface (a proactive tile, an invoke-bearing action, or a concede).
+   * App serializes it onto a FATE_ACTION message over the WebSocket (the F1d
+   * explicit channel — the server is the economy + validation authority).
+   */
+  onFateAction?: (action: FateActionInput) => void;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -309,6 +322,7 @@ export function GameBoard({
   questsData = null,
   fateData = null,
   latestFateRoll = null,
+  onFateAction,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -351,6 +365,12 @@ export function GameBoard({
   const { toggleWidget } = useGameBoardLayout(genreSlug, worldSlug);
 
   const dockviewApiRef = useRef<DockviewApi | null>(null);
+  // Story 118-6: a render-trigger for the panel-sync effect so it re-runs once the
+  // dockview API is ready. Without it, a data-gated dynamic panel that is ALREADY
+  // available at mount (e.g. reconnecting mid-conflict — fateData.conflict.active,
+  // or mid-confrontation) is never added: the sync effect's first run sees a null
+  // api and returns, and availableWidgets does not change afterward to re-trigger it.
+  const [dockviewReady, setDockviewReady] = useState(false);
 
   // Build available widgets set. Tabs are deterministic per-session — they
   // appear once the game is loaded (we're already past chargen by the time
@@ -401,6 +421,14 @@ export function GameBoard({
     // the UI realization of the ruleset gate and the paired negative test.
     if (fateData != null) {
       available.add("fate");
+    }
+    // Story 118-6 / ADR-144 F3f: the Fate conflict surface claims the canvas ONLY
+    // while a Fate conflict is ACTIVE — gated on fateData.conflict.active (the Fate
+    // analog of confrontationData). A WN/native pack never emits a Fate conflict,
+    // so this can never co-render with the ConfrontationOverlay (the epic-118
+    // paired negative). Distinct from the always-available Fate SHEET tab above.
+    if (fateData?.conflict?.active === true) {
+      available.add("fate-conflict");
     }
     // Story 85-3 (Tier B): confrontation mode claims the canvas ONLY while an
     // encounter is active — data-gated on confrontationData. The sync effect
@@ -594,6 +622,29 @@ export function GameBoard({
             ruleset={fateData != null ? "fate" : ""}
           />
         );
+      case "fate-conflict": {
+        // Story 118-6 / ADR-144 F3f: the Fate conflict surface. Reachable only
+        // while a Fate conflict is active (gated in availableWidgets). actorName is
+        // the local PC's character name — it drives whose sheet powers the Invoke
+        // economy. ``ruleset="fate"`` is honest here: the surface is conflict-gated
+        // upstream, and a Fate conflict only ever exists on a ruleset=='fate' pack.
+        // The shared latestFateRoll slice (F3g) feeds the surface's own fateRoll prop.
+        const fateActor =
+          characters?.find((c) => c.player_id === currentPlayerId)?.character_name ??
+          characters?.find((c) => c.player_id === currentPlayerId)?.name ??
+          "";
+        const fateSealed = currentPlayerId != null && sealedPlayerIds.has(currentPlayerId);
+        return (
+          <FateConflictSurface
+            fateState={fateData ?? null}
+            fateRoll={latestFateRoll ?? null}
+            ruleset="fate"
+            actorName={fateActor}
+            sealedWaiting={fateSealed}
+            onFateAction={onFateAction}
+          />
+        );
+      }
       case "location": {
         // Story 85-2: the Location-tab header reads as a "Region — Subregion"
         // breadcrumb. The region is the shared LOCATION_DESCRIPTION payload;
@@ -657,6 +708,7 @@ export function GameBoard({
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
+      onFateAction,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, lastOrbitalError,
       sendOrbitalIntent, sessionBoundEpoch,
       // Story 85-3: confrontation-mode panel inputs.
@@ -762,6 +814,9 @@ export function GameBoard({
   const onDockviewReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
     dockviewApiRef.current = api;
+    // Re-trigger the panel-sync effect now that the api exists, so a dynamic panel
+    // available at mount (mid-conflict / mid-confrontation reconnect) is added.
+    setDockviewReady(true);
 
     // Always-present panels
     const narrative = api.addPanel({
@@ -780,6 +835,7 @@ export function GameBoard({
       "relationships",
       "quests",
       "fate",
+      "fate-conflict",
       "inventory",
       "map",
       "location",
@@ -866,15 +922,15 @@ export function GameBoard({
           title: def.label,
           ...(anchorId ? { position: { referencePanel: anchorId } } : {}),
         });
-        // Story 85-3 (Tier B): confrontation mode auto-focuses the moment it
-        // appears so the drama peak claims the canvas (AC2). Other dynamic
-        // panels join the tab strip without stealing focus.
-        if (id === "confrontation") {
+        // Story 85-3 (Tier B) / 118-6 (F3f): confrontation and its Fate analog
+        // auto-focus the moment they appear so the drama peak claims the canvas
+        // (AC2). Other dynamic panels join the tab strip without stealing focus.
+        if (id === "confrontation" || id === "fate-conflict") {
           panel.api.setActive();
         }
       }
     }
-  }, [availableWidgets]);
+  }, [availableWidgets, dockviewReady]);
 
   // Running header (shared by mobile and desktop). Mobile users were
   // previously trapped in-session because the header — and its Leave button

@@ -92,11 +92,12 @@ export interface ClientGameState {
    */
   fateState?: FateStatePayload | null;
   /**
-   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll, mirrored from the
-   * FATE_ROLL EVENT (the most recent roll wins — unlike the FATE_STATE snapshot
-   * above). Null until the first roll arrives. Drives the FateDiceTray mount in
-   * the Fate panel; like fateState it only ever arrives on a ruleset=='fate'
-   * pack (server gate).
+   * Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll,
+   * mirrored from the FATE_ROLL EVENT (the most recent roll wins — unlike the
+   * FATE_STATE snapshot above). Null until the first roll arrives. One slice,
+   * two consumers: the FateDiceTray mount in the Fate panel (F3g) and the Fate
+   * conflict surface (F3f). Like fateState it only ever arrives on a
+   * ruleset=='fate' pack (server gate).
    */
   latestFateRoll?: FateRollPayload | null;
 }
