@@ -1,15 +1,15 @@
-import { THEME } from "./shared/constants";
+import { THEME, SERIF, MONO } from "./shared/constants";
 
 const TAB_LABELS = [
-  "① Timeline",
-  "② State",
-  "③ Subsystems",
-  "④ Timing",
-  "⑤ Console",
-  "⑥ Prompt",
-  "⑦ Lore",
-  "⑧ Encounters",
-  "⑨ Mechanical",
+  "Timeline",
+  "State",
+  "Subsystems",
+  "Timing",
+  "Console",
+  "Prompt",
+  "Lore",
+  "Encounters",
+  "Mechanical",
 ];
 
 interface Props {
@@ -24,8 +24,8 @@ export function DashboardTabs({ activeTab, onTabChange, turnCount, errorCount }:
     <div
       style={{
         display: "flex",
-        borderBottom: `2px solid ${THEME.border}`,
-        background: THEME.surface,
+        padding: "0 18px",
+        borderBottom: `1px solid ${THEME.rule}`,
       }}
     >
       {TAB_LABELS.map((label, i) => {
@@ -42,13 +42,16 @@ export function DashboardTabs({ activeTab, onTabChange, turnCount, errorCount }:
             key={i}
             onClick={() => onTabChange(i)}
             style={{
-              padding: "8px 20px",
+              padding: "9px 15px",
               cursor: "pointer",
-              color: isActive ? THEME.accent : THEME.muted,
-              borderBottom: `2px solid ${isActive ? THEME.accent : "transparent"}`,
-              marginBottom: -2,
-              fontSize: 12,
+              fontFamily: SERIF,
+              fontVariant: "small-caps",
+              letterSpacing: "0.07em",
+              fontSize: 13,
               userSelect: "none",
+              color: isActive ? THEME.ink : THEME.muted,
+              borderBottom: `2px solid ${isActive ? THEME.accent : "transparent"}`,
+              marginBottom: -1,
             }}
           >
             {label}
@@ -64,12 +67,11 @@ function Badge({ value, error }: { value: number; error?: boolean }) {
   return (
     <span
       style={{
-        fontSize: 10,
-        marginLeft: 4,
-        padding: "1px 5px",
-        borderRadius: 8,
-        background: error ? THEME.red : THEME.border,
-        color: error ? "white" : THEME.text,
+        fontFamily: MONO,
+        fontSize: 9,
+        marginLeft: 5,
+        color: error ? THEME.accent : THEME.muted,
+        verticalAlign: "super",
       }}
     >
       {value}

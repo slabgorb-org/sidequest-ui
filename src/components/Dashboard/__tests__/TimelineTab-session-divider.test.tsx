@@ -225,9 +225,11 @@ describe("TimelineTab session-divider rendering (playtest 2026-04-11)", () => {
       <TimelineTab turns={turns} selectedTurn={0} onSelectTurn={vi.fn()} />,
     );
 
-    // The Tier label and value both appear in the Turn Details panel.
-    // (We use a regex because there's surrounding markup.)
-    expect(screen.getByText(/Tier:/)).toBeInTheDocument();
+    // The tier label and value both appear in the Turn Details grid. The
+    // Tufte redesign renders the key as a small-caps "tier" label (no colon)
+    // with the value beneath it; the wiring intent (extraction_tier reaches
+    // the panel) is unchanged.
+    expect(screen.getByText(/tier/i)).toBeInTheDocument();
     expect(screen.getByText(/delta/)).toBeInTheDocument();
   });
 });

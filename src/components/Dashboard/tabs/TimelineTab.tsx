@@ -1,13 +1,16 @@
 import React, { useMemo } from "react";
 import type { WatcherEvent, TurnCompleteFields, TurnSpan } from "@/types/watcher";
 import { FlameChart } from "../charts/FlameChart";
-import { THEME } from "../shared/constants";
+import { SectionTitle } from "../charts/tufte";
+import { THEME, MONO, SERIF } from "../shared/constants";
 
 interface Props {
   turns: WatcherEvent[];
   selectedTurn: number | null;
   onSelectTurn: (index: number) => void;
 }
+
+const PROBLEM_TIERS = new Set(["degraded", "skipped", "none", "unknown"]);
 
 export function TimelineTab({ turns, selectedTurn, onSelectTurn }: Props) {
   const selected = selectedTurn !== null ? turns[selectedTurn] : null;
@@ -28,123 +31,104 @@ export function TimelineTab({ turns, selectedTurn, onSelectTurn }: Props) {
     ];
   }, [fields]);
 
-  const totalMs = fields
-    ? fields.total_duration_ms || fields.agent_duration_ms || 1
-    : 0;
+  const totalMs = fields ? fields.total_duration_ms || fields.agent_duration_ms || 1 : 0;
+
+  // Bottleneck = longest single span (honest, from flat span data).
+  const bottleneck = useMemo(() => {
+    let bn: TurnSpan | null = null;
+    for (const s of spans) if (!bn || (s.duration_ms || 0) > (bn.duration_ms || 0)) bn = s;
+    return bn;
+  }, [spans]);
 
   return (
-    <div style={{ display: "flex", gap: 16, padding: 16, height: "100%" }}>
+    <div style={{ display: "flex", gap: 32, alignItems: "flex-start", padding: "24px 26px", height: "100%" }}>
       {/* Turn list sidebar */}
-      <div style={{ width: 220, flexShrink: 0 }}>
-        <Card title="Turns">
-          <div style={{ maxHeight: "calc(100vh - 170px)", overflowY: "auto" }}>
-            {turns.length === 0 ? (
-              <div style={{ color: THEME.muted, fontSize: 12, padding: 8 }}>
-                Waiting for first turn...
-              </div>
-            ) : (
-              renderTurnList(turns, selectedTurn, onSelectTurn)
-            )}
-          </div>
-        </Card>
+      <div style={{ width: 204, flexShrink: 0 }}>
+        <SectionTitle marginBottom={8}>Turns</SectionTitle>
+        <div style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
+          {turns.length === 0 ? (
+            <div style={{ color: THEME.muted, fontSize: 12, fontStyle: "italic", padding: 8 }}>
+              Waiting for first turn…
+            </div>
+          ) : (
+            renderTurnList(turns, selectedTurn, onSelectTurn)
+          )}
+        </div>
       </div>
 
       {/* Flame chart + metadata */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Card
-          title={
-            fields
-              ? `Turn ${fields.turn_id ?? "?"} → ${fields.agent_name ?? "?"} · ${(totalMs / 1000).toFixed(1)}s`
-              : "Select a turn"
+        <SectionTitle
+          right={
+            bottleneck ? (
+              <span style={{ fontFamily: MONO, fontSize: 11, color: THEME.accent }}>
+                bottleneck · {bottleneck.name} {bottleneck.duration_ms}ms
+              </span>
+            ) : undefined
           }
         >
-          <FlameChart spans={spans} totalMs={totalMs} />
-        </Card>
+          {fields
+            ? `Turn ${fields.turn_id ?? "?"} → ${fields.agent_name ?? "?"} · ${(totalMs / 1000).toFixed(2)}s`
+            : "Select a turn"}
+        </SectionTitle>
+        <div style={{ fontFamily: SERIF, fontStyle: "italic", color: THEME.dot, fontSize: 11, margin: "6px 0 10px" }}>
+          width = time · color = component · outlined = slowest span
+        </div>
+
+        <FlameChart spans={spans} totalMs={totalMs} />
 
         {fields && (
-          <Card title="Turn Details">
-            <div style={{ color: THEME.muted, fontSize: 12, lineHeight: 1.8 }}>
-              <div>
-                <b>Input:</b> {fields.player_input || "—"}
-              </div>
-              <div>
-                <b>Agent:</b> {fields.agent_name || "?"}
-              </div>
-              <div>
-                <b>Tokens:</b> {fields.token_count_in || 0} in /{" "}
-                {fields.token_count_out || 0} out &nbsp; <b>Tier:</b>{" "}
-                {fields.extraction_tier || "?"} &nbsp; <b>Degraded:</b>{" "}
-                {fields.is_degraded ? (
-                  <span style={{ color: THEME.red }}>YES</span>
-                ) : (
-                  "no"
-                )}
-              </div>
-              <div>
-                <b>Patches:</b>{" "}
-                {(fields.patches || [])
-                  .map(
-                    (p) =>
-                      `${p.patch_type}(${(p.fields_changed || []).join(",")})`,
-                  )
-                  .join(", ") || "none"}
-              </div>
-              <div>
-                <b>Beats:</b>{" "}
-                {(fields.beats_fired || [])
-                  .map(
-                    (b) =>
-                      `${b.trope}@${(b.threshold || 0).toFixed(1)}`,
-                  )
-                  .join(", ") || "none"}
-              </div>
-              <div>
-                <b>Delta empty:</b> {String(fields.delta_empty ?? "—")}
-              </div>
+          <>
+            <div
+              style={{
+                fontFamily: SERIF,
+                fontStyle: "italic",
+                color: THEME.inkDim,
+                fontSize: 14,
+                marginTop: 16,
+                borderTop: `1px solid ${THEME.rule}`,
+                paddingTop: 12,
+              }}
+            >
+              “{fields.player_input || "—"}”
             </div>
-          </Card>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px 28px", marginTop: 14 }}>
+              {detailRows(fields).map((dr) => (
+                <Detail key={dr.k} k={dr.k} v={dr.v} accent={dr.accent} />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        background: THEME.surface,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: 6,
-        padding: 12,
-        marginBottom: 12,
-      }}
-    >
-      <div
-        style={{
-          color: THEME.accent,
-          fontSize: 12,
-          fontWeight: "bold",
-          marginBottom: 8,
-          textTransform: "uppercase",
-          letterSpacing: 1,
-        }}
-      >
-        {title}
-      </div>
-      {children}
-    </div>
-  );
+function detailRows(f: TurnCompleteFields): { k: string; v: string; accent?: boolean }[] {
+  const tier = f.extraction_tier || "?";
+  const patches =
+    (f.patches || []).map((p) => `${p.patch_type}(${(p.fields_changed || []).join(",")})`).join(", ") || "none";
+  const beats = (f.beats_fired || []).map((b) => `${b.trope}@${(b.threshold || 0).toFixed(1)}`).join(", ") || "none";
+  return [
+    { k: "agent", v: f.agent_name || "?" },
+    { k: "tokens", v: `${f.token_count_in || 0} in / ${f.token_count_out || 0} out` },
+    { k: "tier", v: tier, accent: PROBLEM_TIERS.has(tier) },
+    { k: "degraded", v: f.is_degraded ? "yes" : "no", accent: !!f.is_degraded },
+    { k: "total", v: `${((f.total_duration_ms || 0) / 1000).toFixed(2)}s` },
+    { k: "patches", v: patches },
+    { k: "beats", v: beats },
+  ];
 }
 
-function badgeStyle(bg: string): React.CSSProperties {
-  return {
-    fontSize: 9,
-    padding: "1px 5px",
-    borderRadius: 8,
-    background: bg,
-    color: "white",
-  };
+function Detail({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontFamily: SERIF, fontVariant: "small-caps", letterSpacing: "0.07em", color: THEME.muted, fontSize: 11 }}>
+        {k}
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 13, color: accent ? THEME.accent : THEME.ink, marginTop: 2 }}>{v}</div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,15 +162,10 @@ interface SessionTuple {
 }
 
 function sameSession(a: SessionTuple, b: SessionTuple): boolean {
-  return (
-    a.player_id === b.player_id && a.genre === b.genre && a.world === b.world
-  );
+  return a.player_id === b.player_id && a.genre === b.genre && a.world === b.world;
 }
 
-function isSessionBoundary(
-  prev: TurnCompleteFields | null,
-  curr: TurnCompleteFields,
-): boolean {
+function isSessionBoundary(prev: TurnCompleteFields | null, curr: TurnCompleteFields): boolean {
   if (!prev) return false;
   if (!sameSession(prev, curr)) return true;
   // turn_id reset within the same (player_id, genre, world) tuple — almost
@@ -224,16 +203,16 @@ function SessionDivider({ label }: { label: string }) {
         alignItems: "center",
         gap: 6,
         padding: "8px 10px 4px",
-        color: THEME.accent,
-        fontSize: 10,
-        fontWeight: "bold",
-        textTransform: "uppercase",
-        letterSpacing: 1,
+        color: THEME.muted,
+        fontFamily: SERIF,
+        fontVariant: "small-caps",
+        fontSize: 11,
+        letterSpacing: "0.06em",
       }}
     >
-      <div style={{ flex: 1, height: 1, background: THEME.accent, opacity: 0.4 }} />
+      <div style={{ flex: 1, height: 1, background: THEME.rule }} />
       <span>── {label} ──</span>
-      <div style={{ flex: 1, height: 1, background: THEME.accent, opacity: 0.4 }} />
+      <div style={{ flex: 1, height: 1, background: THEME.rule }} />
     </div>
   );
 }
@@ -263,8 +242,7 @@ function renderTurnList(
       index: i,
       fields: f,
       isBoundary: boundary || prev === null,
-      sessionHeader:
-        boundary || prev === null ? sessionLabel(f, t.timestamp) : null,
+      sessionHeader: boundary || prev === null ? sessionLabel(f, t.timestamp) : null,
     });
     prev = f;
   }
@@ -279,28 +257,36 @@ function renderTurnList(
         <div
           onClick={() => onSelectTurn(i)}
           style={{
-            padding: "6px 10px",
-            cursor: "pointer",
-            borderLeft: `3px solid ${isSelected ? THEME.accent : "transparent"}`,
-            background: isSelected ? "rgba(0,212,255,0.08)" : undefined,
-            fontSize: 12,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            padding: "5px 9px",
+            cursor: "pointer",
+            fontFamily: SERIF,
+            fontSize: 12.5,
+            color: isSelected ? THEME.ink : THEME.muted,
+            borderLeft: `2px solid ${isSelected ? THEME.accent : "transparent"}`,
+            background: isSelected ? "rgba(255,255,255,0.04)" : "transparent",
           }}
         >
           <span>
-            #{f.turn_id ?? i + 1} {agent} {dur}s
+            #{f.turn_id ?? i + 1} {agent}
           </span>
-          {f.is_degraded && <span style={badgeStyle(THEME.red)}>DEGRADED</span>}
+          <span
+            style={{
+              fontFamily: MONO,
+              fontSize: 11,
+              color: f.is_degraded ? THEME.accent : isSelected ? THEME.inkDim : THEME.muted,
+            }}
+          >
+            {dur}s
+          </span>
         </div>
         {/* Divider goes ABOVE the boundary turn in chronological order, which
             in the rendered (reversed) order means BELOW the row in the DOM.
             That puts the divider visually between this row and the older row
             below it, matching how the user reads the list top-down. */}
-        {isBoundary && sessionHeader && (
-          <SessionDivider label={sessionHeader} />
-        )}
+        {isBoundary && sessionHeader && <SessionDivider label={sessionHeader} />}
       </React.Fragment>
     );
   });

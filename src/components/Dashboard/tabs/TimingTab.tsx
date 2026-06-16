@@ -3,8 +3,11 @@ import type { WatcherEvent, TurnCompleteFields } from "@/types/watcher";
 import { Histogram } from "../charts/Histogram";
 import { ScatterPlot } from "../charts/ScatterPlot";
 import { TokenBarChart } from "../charts/TokenBarChart";
-import { DonutChart } from "../charts/DonutChart";
-import { THEME, AGENT_COLORS } from "../shared/constants";
+import { AgentDotPlot } from "../charts/AgentDotPlot";
+import { TierPlot } from "../charts/TierPlot";
+import { Sparkline, SectionTitle } from "../charts/tufte";
+import { quantile } from "../charts/chartMath";
+import { THEME, AGENT_COLORS, MONO, SERIF } from "../shared/constants";
 
 interface Props {
   turns: WatcherEvent[];
@@ -58,143 +61,129 @@ export function TimingTab({ turns }: Props) {
     return Object.entries(counts).map(([label, value]) => ({ label, value }));
   }, [turnFields]);
 
-  // Per-agent breakdown
-  const agentBreakdown = useMemo(() => {
+  // Per-agent duration sequences (seconds) for the mean & range dot plot.
+  const agentSeries = useMemo(() => {
     const agents: Record<string, number[]> = {};
     turnFields.forEach((f) => {
+      const ms = f.agent_duration_ms || 0;
+      if (ms <= 0) return;
       const name = f.agent_name || "?";
-      if (!agents[name]) agents[name] = [];
-      agents[name].push(f.agent_duration_ms || 0);
+      (agents[name] = agents[name] || []).push(ms / 1000);
     });
-    return Object.entries(agents)
-      .map(([name, durs]) => ({
-        name,
-        avg: durs.reduce((a, b) => a + b, 0) / durs.length,
-        count: durs.length,
-      }))
-      .sort((a, b) => b.avg - a.avg);
+    return Object.entries(agents).map(([name, durationsSec]) => ({ name, durationsSec }));
   }, [turnFields]);
 
   // Stats
-  const sortedDurs = [...durations.map((d) => d.ms)].sort((a, b) => a - b);
-  const p50 =
-    sortedDurs.length > 0
-      ? (sortedDurs[Math.floor(sortedDurs.length * 0.5)] / 1000).toFixed(1) + "s"
-      : "—";
-  const p95 =
-    sortedDurs.length > 0
-      ? (sortedDurs[Math.floor(sortedDurs.length * 0.95)] / 1000).toFixed(1) + "s"
-      : "—";
-  const p99 =
-    sortedDurs.length > 0
-      ? (sortedDurs[Math.floor(sortedDurs.length * 0.99)] / 1000).toFixed(1) + "s"
-      : "—";
+  const seq = durations.map((d) => d.ms / 1000); // chronological
+  const p50 = seq.length > 0 ? quantile(seq, 0.5).toFixed(1) + "s" : "—";
+  const p95 = seq.length > 0 ? quantile(seq, 0.95).toFixed(1) + "s" : "—";
+  const p99 = seq.length > 0 ? quantile(seq, 0.99).toFixed(1) + "s" : "—";
   const degradedCount = turnFields.filter((f) => f.is_degraded).length;
   const degradedPct =
-    turnFields.length > 0
-      ? Math.round((degradedCount / turnFields.length) * 100)
-      : 0;
+    turnFields.length > 0 ? Math.round((degradedCount / turnFields.length) * 100) : 0;
+
+  const stats: StatProps[] = [
+    { label: "p50", value: p50, sub: "median" },
+    {
+      label: "p95",
+      value: p95,
+      sub: "95th percentile",
+      spark: seq.length > 1 ? <Sparkline values={seq} color={THEME.muted} width={74} height={18} /> : null,
+    },
+    { label: "p99", value: p99, sub: "tail" },
+    {
+      label: "degraded",
+      value: `${degradedCount}/${turnFields.length}`,
+      sub: `${degradedPct}% of turns`,
+      alert: degradedPct > 10,
+    },
+  ];
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: "24px 26px", maxWidth: 1180, margin: "0 auto" }}>
       {/* Summary stats */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-        <StatCard label="p50" value={p50} />
-        <StatCard label="p95" value={p95} />
-        <StatCard label="p99" value={p99} />
-        <StatCard
-          label="Degraded"
-          value={`${degradedCount}/${turnFields.length} (${degradedPct}%)`}
-          alert={degradedPct > 10}
-        />
+      <div style={{ display: "flex", gap: 46, alignItems: "flex-end", marginBottom: 32, flexWrap: "wrap" }}>
+        {stats.map((s) => (
+          <Stat key={s.label} {...s} />
+        ))}
       </div>
 
       {/* Phase breakdown — only renders when phase_durations_ms is present.
-          Older servers (pre-phase-timing) don't ship it; the card just
+          Older servers (pre-phase-timing) don't ship it; the section just
           short-circuits in that case. */}
-      <PhaseBreakdownCard turnFields={turnFields} />
+      <PhaseBreakdown turnFields={turnFields} />
 
-      {/* Charts grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Card title="Agent Duration Histogram">
+      {/* Distribution + per-agent */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 32 }}>
+        <div>
+          <SectionTitle marginBottom={14}>Agent duration · distribution</SectionTitle>
           <Histogram durations={durations} />
-        </Card>
-        <Card title="Per-Agent Breakdown">
-          {agentBreakdown.length === 0 ? (
-            <div style={{ color: THEME.muted, fontSize: 11 }}>No data yet</div>
-          ) : (
-            agentBreakdown.map((a) => (
-              <div
-                key={a.name}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "4px 0",
-                  fontSize: 12,
-                }}
-              >
-                <span style={{ color: AGENT_COLORS[a.name] || THEME.text }}>{a.name}</span>
-                <span style={{ color: THEME.muted }}>
-                  avg: {(a.avg / 1000).toFixed(1)}s ({a.count} turns)
-                </span>
-              </div>
-            ))
-          )}
-        </Card>
+        </div>
+        <div>
+          <SectionTitle marginBottom={14}>By agent · mean &amp; range</SectionTitle>
+          <AgentDotPlot agents={agentSeries} />
+        </div>
       </div>
 
-      <Card title="Turn Duration Over Time">
+      {/* Over time */}
+      <div style={{ marginBottom: 32 }}>
+        <SectionTitle>Turn duration over time</SectionTitle>
+        <div style={{ display: "flex", gap: 16, margin: "6px 0 12px", fontFamily: MONO, fontSize: 11, flexWrap: "wrap" }}>
+          {["narrator", "ensemble", "creature_smith", "dialectician"].map((n) => (
+            <span key={n} style={{ color: AGENT_COLORS[n] || THEME.inkDim }}>
+              ● {n}
+            </span>
+          ))}
+        </div>
         <ScatterPlot data={scatterData} />
-      </Card>
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Card title="Token Usage (in/out per turn)">
+      {/* Tokens + tiers */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
+        <div>
+          <SectionTitle marginBottom={10}>
+            Token usage{" "}
+            <span style={{ fontVariant: "normal", fontStyle: "italic", letterSpacing: 0, color: THEME.dot, fontSize: 11 }}>
+              — in / out
+            </span>
+          </SectionTitle>
           <TokenBarChart data={tokenData} />
-        </Card>
-        <Card title="Extraction Tier Distribution">
-          <DonutChart data={tierData} />
-        </Card>
+        </div>
+        <div>
+          <SectionTitle marginBottom={14}>Extraction tier</SectionTitle>
+          <TierPlot data={tierData} />
+        </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+interface StatProps {
+  label: string;
+  value: string;
+  sub: string;
+  spark?: React.ReactNode;
+  alert?: boolean;
+}
+
+function Stat({ label, value, sub, spark, alert }: StatProps) {
   return (
-    <div
-      style={{
-        background: THEME.surface,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: 6,
-        padding: "12px 20px",
-        textAlign: "center",
-        minWidth: 100,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          color: alert ? THEME.red : THEME.accent,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{
-          fontSize: 10,
-          color: THEME.muted,
-          textTransform: "uppercase",
-          marginTop: 2,
-        }}
-      >
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <span style={{ fontFamily: SERIF, fontVariant: "small-caps", letterSpacing: "0.09em", color: THEME.muted, fontSize: 12 }}>
         {label}
-      </div>
+      </span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, lineHeight: 1, color: alert ? THEME.accent : THEME.ink }}>
+          {value}
+        </span>
+        {spark}
+      </span>
+      <span style={{ fontFamily: SERIF, fontStyle: "italic", color: THEME.dot, fontSize: 11 }}>{sub}</span>
     </div>
   );
 }
 
-function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }) {
+function PhaseBreakdown({ turnFields }: { turnFields: TurnCompleteFields[] }) {
   const latest = useMemo(() => {
     for (let i = turnFields.length - 1; i >= 0; i--) {
       const f = turnFields[i];
@@ -233,21 +222,20 @@ function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }
     .map(([name, ms]) => ({ name, ms, calls: latestCallCounts[name] ?? 1 }))
     .sort((a, b) => b.ms - a.ms);
 
+  // Session-avg lookup keyed by phase name — drives the avg-tick overlay.
+  const avgByName: Record<string, number> = {};
+  averages.forEach((a) => (avgByName[a.name] = a.avgMs));
+  const maxMs = Math.max(1, ...latestRows.map((r) => r.ms), latestUnaccounted, ...averages.map((a) => a.avgMs));
+
   return (
-    <Card title="Phase Breakdown">
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+    <section style={{ marginBottom: 32 }}>
+      <SectionTitle>Phase breakdown</SectionTitle>
+      <div style={{ fontFamily: MONO, fontSize: 10, color: THEME.dot, marginBottom: 12 }}>
+        bar = latest turn · │ = session avg
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
         <div>
-          <div
-            style={{
-              color: THEME.muted,
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            Latest Turn — total {(latestTotal / 1000).toFixed(2)}s
-          </div>
+          <div style={subheadStyle}>Latest turn — total {(latestTotal / 1000).toFixed(2)}s</div>
           {latestRows.length === 0 ? (
             <div style={{ color: THEME.muted, fontSize: 11 }}>No phase data yet</div>
           ) : (
@@ -259,6 +247,8 @@ function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }
                   ms={p.ms}
                   calls={p.calls}
                   totalMs={latestTotal || 1}
+                  avgMs={avgByName[p.name]}
+                  maxMs={maxMs}
                 />
               ))}
               {latestUnaccounted > 0 && (
@@ -267,6 +257,7 @@ function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }
                   ms={latestUnaccounted}
                   calls={1}
                   totalMs={latestTotal || 1}
+                  maxMs={maxMs}
                   muted
                 />
               )}
@@ -274,39 +265,23 @@ function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }
           )}
         </div>
         <div>
-          <div
-            style={{
-              color: THEME.muted,
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            Average across {averages[0]?.turns ?? 0} turn(s)
-          </div>
+          <div style={subheadStyle}>Average across {averages[0]?.turns ?? 0} turn(s)</div>
           {averages.length === 0 ? (
             <div style={{ color: THEME.muted, fontSize: 11 }}>No phase data yet</div>
           ) : (
             averages.map((p) => (
               <div
                 key={p.name}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "3px 0",
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                }}
+                style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 12 }}
               >
-                <span style={{ color: THEME.text }}>{p.name}</span>
-                <span style={{ color: THEME.muted }}>{(p.avgMs / 1000).toFixed(2)}s</span>
+                <span style={{ fontFamily: SERIF, color: THEME.inkDim, fontSize: 13 }}>{p.name}</span>
+                <span style={{ fontFamily: MONO, color: THEME.muted }}>{(p.avgMs / 1000).toFixed(2)}s</span>
               </div>
             ))
           )}
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -315,82 +290,85 @@ function PhaseRow({
   ms,
   calls,
   totalMs,
+  avgMs,
+  maxMs,
   muted,
 }: {
   name: string;
   ms: number;
   calls: number;
   totalMs: number;
+  avgMs?: number;
+  maxMs: number;
   muted?: boolean;
 }) {
   const pct = totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0;
+  const barPct = (ms / maxMs) * 100;
+  const avgPct = avgMs != null ? (avgMs / maxMs) * 100 : null;
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "1fr auto auto",
-        gap: 8,
+        gridTemplateColumns: "118px 1fr 56px 40px",
+        gap: 10,
         alignItems: "center",
-        padding: "3px 0",
+        padding: "4px 0",
         fontSize: 12,
-        fontFamily: "monospace",
       }}
     >
-      <div style={{ position: "relative" }}>
+      <span style={{ fontFamily: SERIF, fontSize: 13, color: muted ? THEME.muted : THEME.ink, fontStyle: muted ? "italic" : "normal" }}>
+        {name}
+        {calls > 1 ? ` ×${calls}` : ""}
+      </span>
+      {/* bar track: dotted leader + bar + session-avg tick */}
+      <div style={{ position: "relative", height: 12 }}>
         <div
           style={{
             position: "absolute",
-            top: 0,
+            top: "50%",
             left: 0,
-            bottom: 0,
-            width: `${pct}%`,
-            background: muted ? THEME.border : THEME.accent,
-            opacity: muted ? 0.4 : 0.25,
+            right: 0,
+            borderTop: `1px dotted ${THEME.rule}`,
           }}
         />
-        <span
+        <div
           style={{
-            position: "relative",
-            color: muted ? THEME.muted : THEME.text,
-            fontStyle: muted ? "italic" : "normal",
+            position: "absolute",
+            top: "50%",
+            transform: "translateY(-50%)",
+            left: 0,
+            width: `${barPct}%`,
+            height: 8,
+            background: muted ? THEME.faint : THEME.inkDim,
+            opacity: muted ? 0.6 : 0.85,
           }}
-        >
-          {name}
-          {calls > 1 ? ` ×${calls}` : ""}
-        </span>
+        />
+        {avgPct != null && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: `${avgPct}%`,
+              width: 1.4,
+              background: THEME.accent,
+            }}
+            title={`session avg ${(avgMs! / 1000).toFixed(2)}s`}
+          />
+        )}
       </div>
-      <span style={{ color: THEME.muted, minWidth: 50, textAlign: "right" }}>
+      <span style={{ fontFamily: MONO, color: muted ? THEME.muted : THEME.ink, textAlign: "right" }}>
         {(ms / 1000).toFixed(2)}s
       </span>
-      <span style={{ color: THEME.muted, minWidth: 32, textAlign: "right" }}>{pct}%</span>
+      <span style={{ fontFamily: MONO, color: THEME.muted, textAlign: "right" }}>{pct}%</span>
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        background: THEME.surface,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: 6,
-        padding: 12,
-        marginBottom: 12,
-      }}
-    >
-      <div
-        style={{
-          color: THEME.accent,
-          fontSize: 12,
-          fontWeight: "bold",
-          marginBottom: 8,
-          textTransform: "uppercase",
-          letterSpacing: 1,
-        }}
-      >
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
+const subheadStyle: React.CSSProperties = {
+  fontFamily: SERIF,
+  fontStyle: "italic",
+  color: THEME.dot,
+  fontSize: 11,
+  marginBottom: 8,
+};
