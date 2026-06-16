@@ -90,4 +90,44 @@ describe("PortraitPanel", () => {
     expect(screen.getByTestId("portrait-empty")).toBeInTheDocument();
     expect(screen.getByTestId("portrait-skip")).toBeInTheDocument();
   });
+
+  // sq-playtest 2026-06-16: the picker fetch is async. `null` is the loading
+  // sentinel — while the roster is in flight the panel must show a loading
+  // status (with Skip), NEVER the permanent "No sample portraits" empty-state.
+  it("loading (null portraits): shows portrait-loading, NOT the empty-state", () => {
+    render(
+      <PortraitPanel
+        portraits={null}
+        suggestArchetype={null}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("portrait-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("portrait-empty")).not.toBeInTheDocument();
+    // Skip stays reachable so a slow or failed fetch never traps the player.
+    expect(screen.getByTestId("portrait-skip")).toBeInTheDocument();
+  });
+
+  it("loading then resolved: a null→[items] transition replaces loading with the grid", () => {
+    const { rerender } = render(
+      <PortraitPanel
+        portraits={null}
+        suggestArchetype={null}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("portrait-loading")).toBeInTheDocument();
+    rerender(
+      <PortraitPanel
+        portraits={portraits}
+        suggestArchetype={null}
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("portrait-loading")).not.toBeInTheDocument();
+    expect(screen.getByTestId("portrait-tile-picker_a")).toBeInTheDocument();
+  });
 });
