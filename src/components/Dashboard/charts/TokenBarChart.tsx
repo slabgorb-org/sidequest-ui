@@ -1,25 +1,24 @@
 import { THEME, MONO, SERIF } from "../shared/constants";
 import { ChartSvg } from "./tufte";
-
-interface TokenData {
-  turnIndex: number;
-  tokensIn: number;
-  tokensOut: number;
-}
+import type { TurnTokenCacheRow } from "../source/telemetryAdapter";
 
 interface Props {
-  data: TokenData[];
+  data: TurnTokenCacheRow[];
 }
 
 // Tokens in / out per turn. Tufte: in and out share ONE honest scale so the
 // out ≪ in relationship reads truthfully; direct labels at the data instead of
 // a legend box; faint baselines, no gridlines.
 //
-// NOTE: the design also split "in" into cached vs fresh with a cache-hit-rate
-// sparkline. That telemetry (cache_read / cache_hit / cold) is NOT on the
-// turn_complete event — it lives on prompt_assembled (PromptTab surfaces it).
-// Joining the two streams onto this chart is deferred to a follow-up story; we
-// render only the token counts the turn actually carries.
+// The "in" bar is split into cached (faded, bottom) + fresh (solid, top) on the
+// SAME shared scale, so a mostly-cached turn reads as mostly-faded. The split is
+// ADDITIVE: cached = cache_read, fresh = token_count_in (already cache-exclusive
+// per the Anthropic API), so the bar height = cached + fresh = the true prompt
+// size. A cache-hit-rate track flags cold-start misses in accent, and a
+// "served from cache" line sums the real cache_read. null turns (non-SDK) render
+// fresh-only with an explicit n/a — never a fabricated estimate (No Silent
+// Fallbacks). Cache data is joined from prompt_assembled in telemetryAdapter
+// (buildTurnTokenCacheRows); see Story 124-1.
 export function TokenBarChart({ data }: Props) {
   if (data.length === 0) {
     return <div style={{ color: THEME.muted, fontSize: 11 }}>No data yet</div>;
@@ -27,12 +26,15 @@ export function TokenBarChart({ data }: Props) {
 
   const N = data.length;
   const W = 520;
-  const H = 210;
+  const H = 250;
   const lab = 64;
   const xl = lab + 8;
   const xr = W - 10;
   const cw = xr - xl;
-  const maxIn = Math.max(...data.map((t) => t.tokensIn), 1);
+  // Shared scale spans the FULL stacked in-bar (cached + fresh), so the cached
+  // segment is drawn truthfully against the same axis as fresh.
+  const stacked = (t: TurnTokenCacheRow) => t.tokensIn + (t.cached ?? 0);
+  const maxIn = Math.max(...data.map(stacked), 1);
   const maxOut = Math.max(...data.map((t) => t.tokensOut), 1);
   const maxTok = Math.max(maxIn, maxOut);
   const bw = Math.max(1.6, cw / N - 1.4);
@@ -43,9 +45,29 @@ export function TokenBarChart({ data }: Props) {
   const outBase = 188;
   const soh = 60;
 
+  // Real cache_read summed across turns that actually reported it (warm + cold).
+  // null turns are unknown and contribute nothing — no fabricated savings.
+  const knownTurns = data.filter((t) => t.cached !== null);
+  const savedFromCache = knownTurns.reduce((s, t) => s + (t.cached ?? 0), 0);
+  const coldTurns = data.filter((t) => t.cacheState === "cold");
+
+  // Hit-rate track: cache_read / (cache_read + fresh) per KNOWN turn. Unknown
+  // (null) turns are excluded — you cannot rate a turn whose cache state the
+  // engine never reported.
+  const hrBase = 236;
+  const hrH = 22;
+  const hitPoints = data
+    .map((t, i) => {
+      if (t.cached === null) return null;
+      const denom = (t.cached ?? 0) + t.tokensIn;
+      const rate = denom > 0 ? (t.cached ?? 0) / denom : 0;
+      return { x: xAt(i) + bw / 2, rate, cold: t.cacheState === "cold" };
+    })
+    .filter((p): p is { x: number; rate: number; cold: boolean } => p !== null);
+
   return (
     <ChartSvg width={W} height={H}>
-      {/* tokens in */}
+      {/* tokens in (cached + fresh, stacked, shared scale) */}
       <line x1={xl} x2={xr} y1={inBase} y2={inBase} stroke={THEME.faint} strokeWidth={1} />
       <text x={lab} y={inBase - sh / 2 - 3} textAnchor="end" fill={THEME.steel} fontFamily={SERIF} fontSize={12}>
         tokens in
@@ -59,14 +81,28 @@ export function TokenBarChart({ data }: Props) {
         fontStyle="italic"
         fontSize={9}
       >
-        shared scale
+        cached + fresh
       </text>
       {data.map((t, i) => {
-        const h = (t.tokensIn / maxTok) * sh;
+        const total = stacked(t);
+        const totalH = (total / maxTok) * sh;
+        const cachedH = ((t.cached ?? 0) / maxTok) * sh;
+        const freshH = (t.tokensIn / maxTok) * sh;
+        const title =
+          t.cached === null
+            ? `T${t.turnIndex} fresh ${t.tokensIn} · cache n/a`
+            : `T${t.turnIndex} cached ${t.cached} · fresh ${t.tokensIn}`;
         return (
-          <rect key={`in${i}`} x={xAt(i)} y={inBase - h} width={bw} height={h} fill={THEME.steel} opacity={0.9}>
-            <title>{`T${t.turnIndex} in ${t.tokensIn}`}</title>
-          </rect>
+          <g key={`in${i}`}>
+            {/* cached segment (faded, bottom) — only when known and > 0 */}
+            {t.cached !== null && t.cached > 0 && (
+              <rect x={xAt(i)} y={inBase - cachedH} width={bw} height={cachedH} fill={THEME.steel} opacity={0.32} />
+            )}
+            {/* fresh segment (solid, stacked on top) */}
+            <rect x={xAt(i)} y={inBase - totalH} width={bw} height={freshH} fill={THEME.steel} opacity={0.9}>
+              <title>{title}</title>
+            </rect>
+          </g>
         );
       })}
       <text x={xr} y={inBase - sh - 2} textAnchor="end" fill={THEME.muted} fontFamily={MONO} fontSize={9}>
@@ -89,6 +125,35 @@ export function TokenBarChart({ data }: Props) {
       <text x={xr} y={outBase - soh - 2} textAnchor="end" fill={THEME.muted} fontFamily={MONO} fontSize={9}>
         peak out {maxOut}
       </text>
+
+      {/* cache hit-rate track — dots per known turn, cold-start misses in accent */}
+      <line x1={xl} x2={xr} y1={hrBase} y2={hrBase} stroke={THEME.faint} strokeWidth={1} />
+      <text x={lab} y={hrBase - hrH / 2 + 4} textAnchor="end" fill={THEME.muted} fontFamily={SERIF} fontSize={11}>
+        cache hit rate
+      </text>
+      {hitPoints.map((p, i) => (
+        <circle
+          key={`hr${i}`}
+          cx={p.x}
+          cy={hrBase - p.rate * hrH}
+          r={p.cold ? 2.4 : 1.8}
+          fill={p.cold ? THEME.accent : THEME.steel}
+        >
+          <title>
+            {p.cold ? `T${i + 1} cold-start miss` : `T${i + 1} ${Math.round(p.rate * 100)}% from cache`}
+          </title>
+        </circle>
+      ))}
+
+      {/* summary line: real cache_read served, and cold-start count */}
+      {knownTurns.length > 0 && (
+        <text x={xl} y={H - 4} fill={THEME.steel} fontFamily={MONO} fontSize={10}>
+          served from cache {savedFromCache} tokens
+          {coldTurns.length > 0
+            ? ` · ${coldTurns.length} cold-start miss${coldTurns.length > 1 ? "es" : ""}`
+            : ""}
+        </text>
+      )}
     </ChartSvg>
   );
 }

@@ -3,6 +3,7 @@ import type { WatcherEvent, TurnCompleteFields } from "@/types/watcher";
 import { Histogram } from "../charts/Histogram";
 import { ScatterPlot } from "../charts/ScatterPlot";
 import { TokenBarChart } from "../charts/TokenBarChart";
+import { buildTurnTokenCacheRows } from "../source/telemetryAdapter";
 import { AgentDotPlot } from "../charts/AgentDotPlot";
 import { TierPlot } from "../charts/TierPlot";
 import { Sparkline, SectionTitle } from "../charts/tufte";
@@ -11,9 +12,13 @@ import { THEME, AGENT_COLORS, MONO, SERIF } from "../shared/constants";
 
 interface Props {
   turns: WatcherEvent[];
+  /** The ordered full event stream (turn_complete + prompt_assembled), used to
+   *  join per-turn cache_read onto the token chart. When omitted, the token
+   *  chart degrades to fresh-only with no fabricated cache. */
+  allEvents?: WatcherEvent[];
 }
 
-export function TimingTab({ turns }: Props) {
+export function TimingTab({ turns, allEvents }: Props) {
   const turnFields = useMemo(
     () => turns.map((t) => t.fields as TurnCompleteFields),
     [turns],
@@ -40,15 +45,12 @@ export function TimingTab({ turns }: Props) {
     [turnFields],
   );
 
-  // Token data
+  // Token data — cached/fresh split joined from the prompt_assembled stream
+  // (telemetryAdapter). Falls back to the turn_complete array (fresh-only, no
+  // cache) when the full stream isn't supplied.
   const tokenData = useMemo(
-    () =>
-      turnFields.map((f, i) => ({
-        turnIndex: i + 1,
-        tokensIn: f.token_count_in || 0,
-        tokensOut: f.token_count_out || 0,
-      })),
-    [turnFields],
+    () => buildTurnTokenCacheRows(allEvents ?? turns),
+    [allEvents, turns],
   );
 
   // Extraction tier distribution
@@ -144,7 +146,7 @@ export function TimingTab({ turns }: Props) {
           <SectionTitle marginBottom={10}>
             Token usage{" "}
             <span style={{ fontVariant: "normal", fontStyle: "italic", letterSpacing: 0, color: THEME.dot, fontSize: 11 }}>
-              — in / out
+              — cached · fresh · out
             </span>
           </SectionTitle>
           <TokenBarChart data={tokenData} />
