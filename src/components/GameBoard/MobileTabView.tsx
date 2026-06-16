@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart, Scroll, Dices } from "lucide-react";
+import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart, Scroll, Dices, Swords } from "lucide-react";
 import type { WidgetId } from "./widgetRegistry";
 
 interface MobileTab {
@@ -26,6 +26,12 @@ const TABS: MobileTab[] = [
   // gates on a FATE_STATE projection (ruleset=='fate' packs only). Kept in sync
   // with the desktop dockview rightGroupOrder (after quests) for layout parity.
   { id: "fate", label: "Fate", icon: <Dices size={18} /> },
+  // Story 118-6 / ADR-144 F3f: the Fate conflict surface. Data-gated on an ACTIVE
+  // Fate conflict (fateData.conflict.active) in the parent's availableWidgets — so
+  // the mobile tab appears only mid-conflict and never beside a WN/native pack
+  // (which emits no Fate conflict). Kept in sync with the desktop dockview
+  // rightGroupOrder (after fate) for mobile/desktop layout parity.
+  { id: "fate-conflict", label: "Fate Conflict", icon: <Swords size={18} /> },
   { id: "map", label: "Map", icon: <Map size={18} /> },
   // Capability-gated like every non-narrative tab: only renders when
   // `location` is in availableWidgets (region / room_graph worlds). Kept in

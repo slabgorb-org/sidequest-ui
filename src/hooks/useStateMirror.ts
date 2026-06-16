@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 import type {
+  FateRollPayload,
   FateStatePayload,
   FootnoteData,
   LocationDescriptionPayload,
@@ -88,6 +89,11 @@ export function useStateMirror(messages: GameMessage[]): void {
     // contract as quests). Null until the first projection arrives, and it only
     // ever arrives on a ruleset=='fate' pack (server gate).
     let fateState: FateStatePayload | null = null;
+    // Story 118-6 / ADR-144 F3f: the latest resolved 4dF roll. Unlike FATE_STATE
+    // (a snapshot), FATE_ROLL is an EVENT (the DICE_RESULT analog) — each message
+    // replaces the prior roll so the Fate conflict surface can hand it to the
+    // FateDiceTray. Null until the first roll arrives.
+    let fateRoll: FateRollPayload | null = null;
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -258,6 +264,20 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // Story 118-6 / ADR-144 F3f: the resolved 4dF roll (an event, latest-wins).
+      // No-Silent-Fallbacks boundary: a malformed payload (dice not a 4-tuple, e.g.
+      // version skew) is ignored loud and leaves the prior roll unchanged rather
+      // than handing the dice tray garbage. Mirrors the FATE_STATE guard above.
+      if (msg.type === MessageType.FATE_ROLL) {
+        const p = msg.payload as unknown as FateRollPayload;
+        if (!Array.isArray(p.dice) || p.dice.length !== 4) {
+          console.error('[useStateMirror] malformed FATE_ROLL payload — ignoring', p);
+          continue;
+        }
+        fateRoll = p;
+        continue;
+      }
+
       // Story 54-9: per-encounter overlay delta. When a baseline exists
       // for the same region_id, replace its overlays slice. When the
       // baseline is for a DIFFERENT region the delta is stale (room change
@@ -383,6 +403,10 @@ export function useStateMirror(messages: GameMessage[]): void {
     // no FATE_STATE message has arrived (the non-fate-pack reality), the latest
     // snapshot otherwise. Same always-replace shape as questsData above.
     current = { ...current, fateState };
+
+    // Story 118-6 / ADR-144 F3f: latest 4dF roll. Always mirrored — null until the
+    // first FATE_ROLL arrives, the latest roll otherwise (event, not a snapshot).
+    current = { ...current, fateRoll };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

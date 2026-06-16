@@ -27,6 +27,7 @@ export type WidgetId =
   | "relationships"
   | "quests"
   | "fate"
+  | "fate-conflict"
   | "gallery"
   | "audio"
   | "confrontation";
@@ -203,6 +204,23 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
   confrontation: {
     id: "confrontation",
     label: "Confrontation",
+    minW: 4,
+    minH: 4,
+    defaultW: 6,
+    defaultH: 7,
+    closable: true,
+    dataGated: true,
+  },
+  // Story 118-6 / ADR-144 F3f: the Fate conflict surface — the Fate ANALOG of
+  // confrontation. dataGated → GameBoard adds the panel and auto-focuses it when
+  // a Fate conflict is ACTIVE (fateData.conflict.active), and removes it when the
+  // conflict ends. NO hotkey — like confrontation it auto-focuses on data, not a
+  // manual toggle. It is gated on a Fate conflict, which a WN/native pack never
+  // emits, so it can never co-render with the ConfrontationOverlay (ADR-143 / the
+  // epic-118 ruleset gate). Wide default: it's the drama peak (Cost Scales with Drama).
+  "fate-conflict": {
+    id: "fate-conflict",
+    label: "Fate Conflict",
     minW: 4,
     minH: 4,
     defaultW: 6,

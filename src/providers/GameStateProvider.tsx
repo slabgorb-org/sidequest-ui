@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { MagicState } from '@/types/magic';
 import type {
+  FateRollPayload,
   FateStatePayload,
   LocationDescriptionPayload,
   QuestsPayload,
@@ -90,6 +91,12 @@ export interface ClientGameState {
    * which is what keeps the Fate tab off WN/native packs.
    */
   fateState?: FateStatePayload | null;
+  /**
+   * Story 118-6 / ADR-144 F3f: the latest resolved 4dF roll. An EVENT (the
+   * DICE_RESULT analog, latest-wins) — null until the first FATE_ROLL arrives.
+   * Consumed by the Fate conflict surface to render the FateDiceTray.
+   */
+  fateRoll?: FateRollPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -113,6 +120,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   relationships: null,
   questsData: null,
   fateState: null,
+  fateRoll: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

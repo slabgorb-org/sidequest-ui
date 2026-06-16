@@ -6,6 +6,7 @@ import { ReferenceRulesPage } from "@/screens/reference/ReferenceRulesPage";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import type { PortraitOption } from "@/components/CharacterCreation/PortraitPanel";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
+import type { FateActionInput } from "@/components/FateConflictSurface";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -1930,6 +1931,36 @@ function AppInner() {
     localTurnInFlightRef.current = true;
   }, [send]);
 
+  // Story 118-6 / ADR-144 F3f: a Fate action committed from the conflict surface
+  // (proactive tile, invoke-bearing action, or concede). Serialized onto a
+  // FATE_ACTION message over the WebSocket (the F1d explicit channel) — the
+  // server's FateActionHandler is the economy + validation authority. The freeform
+  // flourish rides as player_action (narrator color, sanitized server-side).
+  const handleFateAction = useCallback(
+    (action: FateActionInput) => {
+      send({
+        type: MessageType.FATE_ACTION,
+        payload: {
+          request_id: makeRequestId(),
+          action: action.action,
+          skill: action.skill ?? "",
+          target: action.target ?? null,
+          difficulty: 0,
+          invoke_aspect: action.invoke_aspect ?? "",
+          invoke_mode: action.invoke_mode ?? "bonus",
+          aspect_text: action.aspect_text ?? "",
+          player_action: action.player_action ?? "",
+        },
+        player_id: "",
+      });
+      // A committed Fate action is a genuine local turn submission — arm the
+      // in-flight gate so a stale transient error clears when it resolves
+      // (mirrors handleYield).
+      localTurnInFlightRef.current = true;
+    },
+    [send],
+  );
+
   const navigate = useNavigate();
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby.
@@ -2655,6 +2686,8 @@ function AppInner() {
                 relationshipsData={gameState.relationships ?? null}
                 questsData={gameState.questsData ?? null}
                 fateData={gameState.fateState ?? null}
+                fateRoll={gameState.fateRoll ?? null}
+                onFateAction={handleFateAction}
                 audio={audio}
                 nowPlaying={nowPlaying}
                 knowledgeEntries={gameState.knowledge}
