@@ -345,6 +345,7 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
         prompt={scene.prompt}
         availableSkills={scene.fate_available_skills ?? []}
         apexRating={scene.fate_apex_rating ?? 0}
+        pyramid={scene.fate_pyramid ?? []}
         ladderLabels={scene.fate_ladder_labels ?? {}}
         currentAllocation={scene.fate_current_allocation ?? {}}
         legal={scene.fate_legal ?? false}

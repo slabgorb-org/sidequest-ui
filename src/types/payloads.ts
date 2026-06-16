@@ -226,8 +226,9 @@ export interface CharacterCreationPayload {
   fate_apex_rating?: number;
   /** fate_skill_pyramid: in-progress {skill: rating} allocation (also client → server submit). */
   fate_current_allocation?: Record<string, number>;
-  /** fate_skill_pyramid: ladder rating → adjective (4→Great … 1→Average). */
-  fate_ladder_labels?: Record<number, string>;
+  /** fate_skill_pyramid: ladder rating → adjective (4→Great … 1→Average).
+   *  JSON object keys are strings, so the runtime shape is Record<string,string>. */
+  fate_ladder_labels?: Record<string, string>;
   /** fate_stunts: the pack stunt catalog. */
   fate_available_stunts?: FateStuntOptionPayload[];
   /** fate_stunts: selected stunt names (render echo AND client → server submit). */

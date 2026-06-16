@@ -33,7 +33,7 @@ import { CharacterCreation, type CreationScene } from "../CharacterCreation";
 const HIGH_CONCEPT = "Hard-Boiled Private Eye";
 const TROUBLE = "Can't Walk Away From a Dame in Trouble";
 
-function aspectsScene(overrides: Record<string, unknown> = {}) {
+function aspectsScene(overrides: Partial<CreationScene> = {}) {
   return {
     phase: "scene",
     input_type: "fate_aspects",
@@ -49,7 +49,7 @@ function aspectsScene(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function pyramidScene(overrides: Record<string, unknown> = {}) {
+function pyramidScene(overrides: Partial<CreationScene> = {}) {
   return {
     phase: "scene",
     input_type: "fate_skill_pyramid",
@@ -65,7 +65,7 @@ function pyramidScene(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function stuntsScene(overrides: Record<string, unknown> = {}) {
+function stuntsScene(overrides: Partial<CreationScene> = {}) {
   return {
     phase: "scene",
     input_type: "fate_stunts",
@@ -83,14 +83,8 @@ function stuntsScene(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderScene(scene: Record<string, unknown>, onRespond = vi.fn()) {
-  render(
-    <CharacterCreation
-      scene={scene as unknown as CreationScene}
-      loading={false}
-      onRespond={onRespond}
-    />,
-  );
+function renderScene(scene: CreationScene, onRespond = vi.fn()) {
+  render(<CharacterCreation scene={scene} loading={false} onRespond={onRespond} />);
   return onRespond;
 }
 
@@ -138,6 +132,14 @@ describe("CharacterCreation: Fate skill pyramid (121-8)", () => {
     for (const label of ["Great", "Good", "Fair", "Average"]) {
       expect(screen.getByText(new RegExp(label))).toBeInTheDocument();
     }
+  });
+
+  it("shows per-rung budgets from fate_pyramid (placed/total)", () => {
+    // pyramid [1,2,3,4] @ apex 4; allocation {Investigate:4, Shoot:3, Contacts:3}.
+    renderScene(pyramidScene());
+    expect(screen.getByTestId("fate-rung-4")).toHaveTextContent("1/1"); // Great: 1 placed / 1 budget
+    expect(screen.getByTestId("fate-rung-3")).toHaveTextContent("2/2"); // Good: 2 placed / 2 budget
+    expect(screen.getByTestId("fate-rung-1")).toHaveTextContent("0/4"); // Average: 0 placed / 4 budget
   });
 
   it("mirrors server legality without adjudicating — shows the violation text", () => {

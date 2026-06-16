@@ -125,6 +125,7 @@ export function FateSkillPyramidPanel({
   prompt,
   availableSkills,
   apexRating,
+  pyramid,
   ladderLabels,
   currentAllocation,
   legal,
@@ -134,6 +135,7 @@ export function FateSkillPyramidPanel({
   prompt?: string;
   availableSkills: string[];
   apexRating: number;
+  pyramid: number[];
   ladderLabels: Record<string, string>;
   currentAllocation: Record<string, number>;
   legal: boolean;
@@ -146,6 +148,11 @@ export function FateSkillPyramidPanel({
 
   const ratings = Array.from({ length: apexRating }, (_, i) => apexRating - i); // apex..1
   const labelFor = (r: number) => ladderLabels[String(r)] ?? ladderLabels[r] ?? `+${r}`;
+  // Per-rung budget: pyramid[i] skills sit at rating (apexRating - i). The math on
+  // screen (mechanics-first): how many skills go at each rung, and how many remain.
+  const budgetFor = (r: number) => pyramid[apexRating - r] ?? 0;
+  const placedAt = (r: number) =>
+    Object.values(allocation).filter((rating) => rating === r).length;
 
   const setRating = (skill: string, rating: number) =>
     setAllocation((prev) => ({ ...prev, [skill]: rating }));
@@ -158,11 +165,12 @@ export function FateSkillPyramidPanel({
     <div data-testid="character-creation" className={WRAP}>
       <p className={PROMPT}>{prompt}</p>
 
-      {/* Ladder legend — the math on screen (each adjective once). */}
+      {/* Ladder legend with per-rung budgets — the math on screen (each adjective
+          once): "place N skills at this rung; M remaining". */}
       <div data-testid="fate-ladder" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {ratings.map((r) => (
-          <span key={r}>
-            {labelFor(r)} (+{r})
+          <span key={r} data-testid={`fate-rung-${r}`}>
+            {labelFor(r)} (+{r}): {placedAt(r)}/{budgetFor(r)}
           </span>
         ))}
       </div>
