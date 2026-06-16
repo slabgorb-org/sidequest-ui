@@ -53,8 +53,10 @@ export interface TurnTokenCacheRow {
   cached: number | null;
   /** warm: cache_read > 0. cold: cache_usage present but cache_read === 0 (a
    *  real, known miss). null: cache_usage absent/null (unknown — excluded from
-   *  hit-rate, never scored as a miss). */
-  cacheState: "warm" | "cold" | "null";
+   *  hit-rate, never scored as a miss). malformed: cache_usage IS present but its
+   *  cache_read is missing/non-numeric (server schema drift) — surfaced as its
+   *  own state rather than silently folded into null (No Silent Fallbacks). */
+  cacheState: "warm" | "cold" | "null" | "malformed";
 }
 
 /** Minimal shape of the cache_usage object on a prompt_assembled event. */
@@ -104,15 +106,19 @@ export function buildTurnTokenCacheRows(
 
     let cached: number | null = null;
     let cacheState: TurnTokenCacheRow["cacheState"] = "null";
-    if (
-      havePending &&
-      pendingUsage != null &&
-      typeof pendingUsage.cache_read === "number"
-    ) {
-      cached = pendingUsage.cache_read;
-      // `cache_read === 0` is a KNOWN zero (cold), not an unknown — use the
-      // numeric value, never a `|| null` falsy collapse (lang-review #4).
-      cacheState = cached > 0 ? "warm" : "cold";
+    if (havePending && pendingUsage != null) {
+      if (typeof pendingUsage.cache_read === "number") {
+        cached = pendingUsage.cache_read;
+        // `cache_read === 0` is a KNOWN zero (cold), not an unknown — use the
+        // numeric value, never a `|| null` falsy collapse (lang-review #4).
+        cacheState = cached > 0 ? "warm" : "cold";
+      } else {
+        // cache_usage IS present but its cache_read is absent/non-numeric — a
+        // server schema drift. Surface it distinctly instead of folding into the
+        // benign non-SDK `null` bucket (No Silent Fallbacks). `cached` stays null:
+        // there is no honest number to show, so never fabricate one.
+        cacheState = "malformed";
+      }
     }
 
     rows.push({
