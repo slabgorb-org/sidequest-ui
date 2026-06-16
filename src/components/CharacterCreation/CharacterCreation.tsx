@@ -4,6 +4,13 @@ import { parseStatLine } from "./parseStatLine";
 import { StatArrangePanel } from "./StatArrangePanel";
 import { StoryPanel } from "./StoryPanel";
 import { PortraitPanel, type PortraitOption } from "./PortraitPanel";
+import {
+  FateAspectsPanel,
+  FateSkillPyramidPanel,
+  FateStuntsPanel,
+  type FateAspectSlot,
+  type FateStuntOption,
+} from "./FateChargenPanel";
 
 interface CreationChoice {
   label: string;
@@ -70,6 +77,20 @@ export interface CreationScene {
   portraits_available?: boolean;
   suggest_archetype?: string | null;
   suggest_culture?: string | null;
+  // --- Fate chargen steps (story 121-8, ADR-144 F4a3) ---
+  fate_aspect_slots?: FateAspectSlot[];
+  fate_available_skills?: string[];
+  fate_pyramid?: number[];
+  fate_apex_rating?: number;
+  fate_current_allocation?: Record<string, number>;
+  fate_ladder_labels?: Record<string, string>;
+  fate_available_stunts?: FateStuntOption[];
+  fate_selected_stunts?: string[];
+  fate_free_stunts?: number;
+  fate_base_refresh?: number;
+  fate_current_refresh?: number;
+  fate_legal?: boolean;
+  fate_violations?: string[];
 }
 
 export interface CharacterCreationProps {
@@ -301,6 +322,49 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
           onConfirm={(payload) => onRespond({ phase: "story_confirm", ...payload })}
         />
       </div>
+    );
+  }
+
+  if (scene.input_type === "fate_aspects") {
+    // ADR-144 F4a3 (121-8): editable aspect slots, pre-filled from the seed.
+    // Keyed by sceneKey so edit state resets per step.
+    return (
+      <FateAspectsPanel
+        key={sceneKey ?? "fate-aspects"}
+        prompt={scene.prompt}
+        slots={scene.fate_aspect_slots ?? []}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  if (scene.input_type === "fate_skill_pyramid") {
+    return (
+      <FateSkillPyramidPanel
+        key={sceneKey ?? "fate-pyramid"}
+        prompt={scene.prompt}
+        availableSkills={scene.fate_available_skills ?? []}
+        apexRating={scene.fate_apex_rating ?? 0}
+        ladderLabels={scene.fate_ladder_labels ?? {}}
+        currentAllocation={scene.fate_current_allocation ?? {}}
+        legal={scene.fate_legal ?? false}
+        violations={scene.fate_violations ?? []}
+        onRespond={onRespond}
+      />
+    );
+  }
+
+  if (scene.input_type === "fate_stunts") {
+    return (
+      <FateStuntsPanel
+        key={sceneKey ?? "fate-stunts"}
+        prompt={scene.prompt}
+        stunts={scene.fate_available_stunts ?? []}
+        selectedStunts={scene.fate_selected_stunts ?? []}
+        freeStunts={scene.fate_free_stunts ?? 0}
+        baseRefresh={scene.fate_base_refresh ?? 0}
+        onRespond={onRespond}
+      />
     );
   }
 

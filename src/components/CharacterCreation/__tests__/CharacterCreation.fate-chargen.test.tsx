@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { CharacterCreation } from "../CharacterCreation";
+import { CharacterCreation, type CreationScene } from "../CharacterCreation";
 
 /**
  * Story 121-8 RED — Fate chargen UI renderers (ADR-144 F4a3, design §7).
@@ -83,8 +83,14 @@ function stuntsScene(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderScene(scene: object, onRespond = vi.fn()) {
-  render(<CharacterCreation scene={scene} loading={false} onRespond={onRespond} />);
+function renderScene(scene: Record<string, unknown>, onRespond = vi.fn()) {
+  render(
+    <CharacterCreation
+      scene={scene as unknown as CreationScene}
+      loading={false}
+      onRespond={onRespond}
+    />,
+  );
   return onRespond;
 }
 
