@@ -24,7 +24,15 @@ import { FateDiceTray } from "@/dice/FateDiceTray";
  * free invocation AND zero fate points) is disabled, not offered-then-rejected.
  */
 
-export type FateActionVerb = "overcome" | "create_advantage" | "attack" | "concede";
+export type FateActionVerb =
+  | "overcome"
+  | "create_advantage"
+  | "attack"
+  | "concede"
+  // ADR-144 F3e: the compel accept/refuse round-trip. Pre-roll, non-committing —
+  // they resolve the narrator's offered compel, never seal onto the exchange.
+  | "compel_accept"
+  | "compel_refuse";
 
 /** What a clicked tile dispatches — the client mirror of FateActionPayload. The
  *  server remains the validation + economy authority (No Silent Fallbacks). */
@@ -107,6 +115,9 @@ export function FateConflictSurface({
   // offered when there are several. Overcome/create_advantage are passive — no target.
   const opponents = conflict.participants.filter((p) => p.side === "opponent");
   const activeTarget = target || opponents[0]?.name || "";
+  // ADR-144 F3e: the narrator's offered compels awaiting accept/refuse. The
+  // server is the economy authority; the panel only reflects FATE_STATE.
+  const compels = conflict.pending_compels ?? [];
 
   function dispatch(verb: Exclude<FateActionVerb, "concede">) {
     onFateAction?.({
@@ -138,6 +149,12 @@ export function FateConflictSurface({
     onFateAction?.({ action: "concede" });
     setFreeform("");
     setPending(null);
+  }
+
+  function resolveCompel(aspect: string, verb: "compel_accept" | "compel_refuse") {
+    // Pre-roll, non-committing: name the compelled aspect so the server resolves
+    // the right pending compel. The economy (+1 accept / -1 refuse) is server-side.
+    onFateAction?.({ action: verb, aspect_text: aspect });
   }
 
   function toggleInvoke(aspect: string) {
@@ -175,6 +192,44 @@ export function FateConflictSurface({
 
       {/* The 4dF roll (composed FateDiceTray, fate-gated in its own right). */}
       {fateRoll && <FateDiceTray roll={fateRoll} ruleset={ruleset} />}
+
+      {/* ADR-144 F3e: the narrator's offered compels. Each is a decision gate —
+          Accept earns a fate point and takes the complication; Refuse pays one to
+          decline (SRD). The ±1 delta is shown on the control (mechanics-first
+          legibility). Disabled while a sealed round resolves. */}
+      {compels.length > 0 && (
+        <div data-testid="fate-compel-rack" className="flex flex-col gap-2">
+          {compels.map((c) => (
+            <div
+              key={c.aspect}
+              className="flex flex-col gap-1"
+              style={{ borderLeft: `2px solid ${FOLIO.accent}`, paddingLeft: 8 }}
+            >
+              <span>
+                <strong>Compel — {c.aspect}:</strong> {c.reason}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  data-testid={`fate-compel-accept-${c.aspect}`}
+                  disabled={sealedWaiting}
+                  onClick={() => resolveCompel(c.aspect, "compel_accept")}
+                >
+                  Accept (+1 FP)
+                </button>
+                <button
+                  type="button"
+                  data-testid={`fate-compel-refuse-${c.aspect}`}
+                  disabled={sealedWaiting}
+                  onClick={() => resolveCompel(c.aspect, "compel_refuse")}
+                >
+                  Refuse (−1 FP)
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* The local PC's invokable aspects — each Invoke gated on the economy. */}
       {me && (
