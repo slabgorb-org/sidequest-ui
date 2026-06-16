@@ -35,6 +35,10 @@ export interface FateActionInput {
   invoke_mode?: "bonus" | "reroll";
   aspect_text?: string;
   player_action?: string;
+  /** The opponent an `attack` targets. REQUIRED for attack — the server's
+   *  `_resolve_attack` fails loud ("an attack must name a target") when it is
+   *  absent. Omitted for overcome/create_advantage (passive opposition). */
+  target?: string;
 }
 
 export interface FateConflictSurfaceProps {
@@ -85,6 +89,7 @@ export function FateConflictSurface({
 }: FateConflictSurfaceProps) {
   const [freeform, setFreeform] = useState("");
   const [skill, setSkill] = useState("");
+  const [target, setTarget] = useState("");
   const [pending, setPending] = useState<{ aspect: string; mode: "bonus" | "reroll" } | null>(null);
 
   // The ruleset + conflict gates: never co-render with the WN/native overlay, and
@@ -97,12 +102,21 @@ export function FateConflictSurface({
   const me = fateState?.characters.find((c) => c.name === actorName) ?? null;
   const skills = me?.skills ?? [];
   const activeSkill = skill || skills[0]?.name || "";
+  // The Other an attack must name (ADR-116 / server _resolve_attack fails loud on a
+  // null target). Default to the sole/first opponent-side participant; a picker is
+  // offered when there are several. Overcome/create_advantage are passive — no target.
+  const opponents = conflict.participants.filter((p) => p.side === "opponent");
+  const activeTarget = target || opponents[0]?.name || "";
 
   function dispatch(verb: Exclude<FateActionVerb, "concede">) {
     onFateAction?.({
       action: verb,
       skill: activeSkill,
       player_action: freeform.trim(),
+      // An attack MUST name its target (the server's _resolve_attack rejects a null
+      // target loudly); overcome/create_advantage resolve against passive opposition
+      // and carry no opponent target.
+      ...(verb === "attack" ? { target: activeTarget } : {}),
       // The armed invoke (if any) rides the action — the F3d affordance. mode is
       // 'bonus' (+2) or 'reroll'; both are server-authoritative now (Story 118-6
       // AC#1 made reroll real, so offering it is not Illusionism).
@@ -230,6 +244,23 @@ export function FateConflictSurface({
           {skills.map((s) => (
             <option key={s.name} value={s.name}>
               {s.name} ({s.ladder})
+            </option>
+          ))}
+        </select>
+      )}
+
+      {/* The Other an attack targets — opponent-side participants. Always present
+          in a conflict (ADR-116: a confrontation requires an Other). */}
+      {opponents.length > 0 && (
+        <select
+          data-testid="fate-target-select"
+          value={activeTarget}
+          disabled={sealedWaiting}
+          onChange={(e) => setTarget(e.target.value)}
+        >
+          {opponents.map((o) => (
+            <option key={o.name} value={o.name}>
+              {o.name}
             </option>
           ))}
         </select>
