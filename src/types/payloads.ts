@@ -214,6 +214,58 @@ export interface CharacterCreationPayload {
    * sends explicit null. When absent, CharacterCreation.tsx falls back to the
    * standard STR/DEX/CON/INT/WIS/CHA list as a safety net, not the expected path. */
   ability_names?: string[];
+  // --- Fate chargen steps (story 121-8, ADR-144 F4a3) ---
+  // The UI mirrors these; the server (validate_fate_sheet) stays the authority.
+  /** fate_aspects: editable aspect slots (HC + Trouble + N free). */
+  fate_aspect_slots?: FateAspectSlotPayload[];
+  /** fate_skill_pyramid: the pack skills the player may place. */
+  fate_available_skills?: string[];
+  /** fate_skill_pyramid: rung counts (apex-narrowest, e.g. [1,2,3,4]). */
+  fate_pyramid?: number[];
+  /** fate_skill_pyramid: the top ladder rating (e.g. 4 = Great). */
+  fate_apex_rating?: number;
+  /** fate_skill_pyramid: in-progress {skill: rating} allocation (also client → server submit). */
+  fate_current_allocation?: Record<string, number>;
+  /** fate_skill_pyramid: ladder rating → adjective (4→Great … 1→Average).
+   *  JSON object keys are strings, so the runtime shape is Record<string,string>. */
+  fate_ladder_labels?: Record<string, string>;
+  /** fate_stunts: the pack stunt catalog. */
+  fate_available_stunts?: FateStuntOptionPayload[];
+  /** fate_stunts: selected stunt names (render echo AND client → server submit). */
+  fate_selected_stunts?: string[];
+  /** fate_stunts: stunts free before refresh is debited. */
+  fate_free_stunts?: number;
+  /** fate_stunts: the pack starting refresh before any debit. */
+  fate_base_refresh?: number;
+  /** fate_stunts: refresh remaining for the current selection (the readout). */
+  fate_current_refresh?: number;
+  /** Live-legality mirror for the current step (pyramid/stunts). */
+  fate_legal?: boolean;
+  /** Human-readable violations for the current step (mirror; server re-validates). */
+  fate_violations?: string[];
+  /** client → server (fate_aspects_confirm). */
+  fate_high_concept?: string;
+  /** client → server (fate_aspects_confirm). */
+  fate_trouble?: string;
+  /** client → server (fate_aspects_confirm). */
+  fate_free_aspects?: string[];
+  /** client → server (fate_pyramid_confirm): submitted {skill: rating}. */
+  fate_allocation?: Record<string, number>;
+}
+
+/** One editable aspect slot on the Fate aspects step (121-8). */
+export interface FateAspectSlotPayload {
+  kind: string;
+  label: string;
+  value?: string;
+  required?: boolean;
+  suggestion?: string;
+}
+
+/** One stunt in the catalog on the Fate stunts step (121-8). */
+export interface FateStuntOptionPayload {
+  name: string;
+  description?: string;
 }
 
 export interface TurnStatusPayload {
