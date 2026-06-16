@@ -2686,7 +2686,7 @@ function AppInner() {
                 relationshipsData={gameState.relationships ?? null}
                 questsData={gameState.questsData ?? null}
                 fateData={gameState.fateState ?? null}
-                fateRoll={gameState.fateRoll ?? null}
+                latestFateRoll={gameState.latestFateRoll ?? null}
                 onFateAction={handleFateAction}
                 audio={audio}
                 nowPlaying={nowPlaying}

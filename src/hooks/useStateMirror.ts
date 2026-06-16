@@ -89,11 +89,12 @@ export function useStateMirror(messages: GameMessage[]): void {
     // contract as quests). Null until the first projection arrives, and it only
     // ever arrives on a ruleset=='fate' pack (server gate).
     let fateState: FateStatePayload | null = null;
-    // Story 118-6 / ADR-144 F3f: the latest resolved 4dF roll. Unlike FATE_STATE
-    // (a snapshot), FATE_ROLL is an EVENT (the DICE_RESULT analog) — each message
-    // replaces the prior roll so the Fate conflict surface can hand it to the
-    // FateDiceTray. Null until the first roll arrives.
-    let fateRoll: FateRollPayload | null = null;
+    // Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll.
+    // Unlike FATE_STATE (a snapshot), FATE_ROLL is an EVENT (the DICE_RESULT
+    // analog) — the most recent roll wins. One slice feeds two consumers: the
+    // Fate panel's FateDiceTray (F3g) and the Fate conflict surface (F3f). Null
+    // until the first roll arrives (only ever on a ruleset=='fate' pack).
+    let latestFateRoll: FateRollPayload | null = null;
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -264,17 +265,19 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
-      // Story 118-6 / ADR-144 F3f: the resolved 4dF roll (an event, latest-wins).
-      // No-Silent-Fallbacks boundary: a malformed payload (dice not a 4-tuple, e.g.
-      // version skew) is ignored loud and leaves the prior roll unchanged rather
-      // than handing the dice tray garbage. Mirrors the FATE_STATE guard above.
+      // Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the 4dF roll EVENT. The
+      // latest roll wins (not accumulated). No-Silent-Fallbacks: validate the
+      // dice tuple at the boundary so a malformed wire payload doesn't reach
+      // FateDiceTray's `roll.dice.map(...)` (panel) or the conflict surface and
+      // white-screen them — drop it and keep the last valid roll. Mirrors the
+      // FATE_STATE boundary guard above.
       if (msg.type === MessageType.FATE_ROLL) {
         const p = msg.payload as unknown as FateRollPayload;
         if (!Array.isArray(p.dice) || p.dice.length !== 4) {
           console.error('[useStateMirror] malformed FATE_ROLL payload — ignoring', p);
           continue;
         }
-        fateRoll = p;
+        latestFateRoll = p;
         continue;
       }
 
@@ -404,9 +407,11 @@ export function useStateMirror(messages: GameMessage[]): void {
     // snapshot otherwise. Same always-replace shape as questsData above.
     current = { ...current, fateState };
 
-    // Story 118-6 / ADR-144 F3f: latest 4dF roll. Always mirrored — null until the
-    // first FATE_ROLL arrives, the latest roll otherwise (event, not a snapshot).
-    current = { ...current, fateRoll };
+    // Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: latest-roll slice. Always
+    // mirrored — null until the first FATE_ROLL arrives, the most recent roll
+    // otherwise (event, not snapshot). Drives the FateDiceTray mount (panel) and
+    // the Fate conflict surface.
+    current = { ...current, latestFateRoll };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

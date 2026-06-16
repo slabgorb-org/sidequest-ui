@@ -159,7 +159,9 @@ export function DashboardApp() {
             turnCount={view.turns.length}
           />
         )}
-        {live.activeTab === 3 && <TimingTab turns={view.turns} />}
+        {live.activeTab === 3 && (
+          <TimingTab turns={view.turns} allEvents={view.allEvents} />
+        )}
         {live.activeTab === 4 && <ConsoleTab allEvents={view.allEvents} />}
         {live.activeTab === 5 && <PromptTab promptEvents={view.promptEvents} />}
         {live.activeTab === 6 && <LoreTab loreEvents={view.loreEvents} />}

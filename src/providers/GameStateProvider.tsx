@@ -92,11 +92,14 @@ export interface ClientGameState {
    */
   fateState?: FateStatePayload | null;
   /**
-   * Story 118-6 / ADR-144 F3f: the latest resolved 4dF roll. An EVENT (the
-   * DICE_RESULT analog, latest-wins) — null until the first FATE_ROLL arrives.
-   * Consumed by the Fate conflict surface to render the FateDiceTray.
+   * Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll,
+   * mirrored from the FATE_ROLL EVENT (the most recent roll wins — unlike the
+   * FATE_STATE snapshot above). Null until the first roll arrives. One slice,
+   * two consumers: the FateDiceTray mount in the Fate panel (F3g) and the Fate
+   * conflict surface (F3f). Like fateState it only ever arrives on a
+   * ruleset=='fate' pack (server gate).
    */
-  fateRoll?: FateRollPayload | null;
+  latestFateRoll?: FateRollPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -120,7 +123,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   relationships: null,
   questsData: null,
   fateState: null,
-  fateRoll: null,
+  latestFateRoll: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

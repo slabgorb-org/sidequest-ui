@@ -201,11 +201,13 @@ export interface GameBoardProps {
    */
   fateData?: FateStatePayload | null;
   /**
-   * Story 118-6 / ADR-144 F3f: the latest resolved 4dF roll (state.fateRoll),
-   * surfaced via the Fate conflict surface's composed FateDiceTray. Null until a
-   * FATE_ROLL event arrives.
+   * Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll
+   * (state.latestFateRoll). Null until a FATE_ROLL event arrives (only ever on a
+   * ruleset=='fate' pack). One slice, two consumers: the Fate panel's FateWidget
+   * threads it so the FateDiceTray mounts (F3g), and the Fate conflict surface
+   * composes it (F3f).
    */
-  fateRoll?: FateRollPayload | null;
+  latestFateRoll?: FateRollPayload | null;
   /**
    * Story 118-6 / ADR-144 F3f: the player committed a Fate action from the
    * conflict surface (a proactive tile, an invoke-bearing action, or a concede).
@@ -319,7 +321,7 @@ export function GameBoard({
   relationshipsData = null,
   questsData = null,
   fateData = null,
-  fateRoll = null,
+  latestFateRoll = null,
   onFateAction,
   confrontationData,
   confrontationOutcome,
@@ -609,13 +611,24 @@ export function GameBoard({
         // Story 118-2 / ADR-144 F3b: the Fate sheet. The tab only exists when
         // fateData is present (dataGated:true gate above), but render
         // defensively — FatePanel shows an empty state for null/empty data.
-        return <FateWidget data={fateData ?? null} />;
+        // Story 118-7 / ADR-144 F3g: thread the latest 4dF roll + the ruleset so
+        // the FateDiceTray mounts. The tab is reachable only when fateData !=
+        // null (a ruleset=='fate' pack), so the ruleset is "fate" here — which
+        // keeps the roll surface off the WN/native ConfrontationOverlay.
+        return (
+          <FateWidget
+            data={fateData ?? null}
+            latestRoll={latestFateRoll ?? null}
+            ruleset={fateData != null ? "fate" : ""}
+          />
+        );
       case "fate-conflict": {
         // Story 118-6 / ADR-144 F3f: the Fate conflict surface. Reachable only
         // while a Fate conflict is active (gated in availableWidgets). actorName is
         // the local PC's character name — it drives whose sheet powers the Invoke
         // economy. ``ruleset="fate"`` is honest here: the surface is conflict-gated
         // upstream, and a Fate conflict only ever exists on a ruleset=='fate' pack.
+        // The shared latestFateRoll slice (F3g) feeds the surface's own fateRoll prop.
         const fateActor =
           characters?.find((c) => c.player_id === currentPlayerId)?.character_name ??
           characters?.find((c) => c.player_id === currentPlayerId)?.name ??
@@ -624,7 +637,7 @@ export function GameBoard({
         return (
           <FateConflictSurface
             fateState={fateData ?? null}
-            fateRoll={fateRoll ?? null}
+            fateRoll={latestFateRoll ?? null}
             ruleset="fate"
             actorName={fateActor}
             sealedWaiting={fateSealed}
@@ -691,11 +704,11 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, latestFateRoll, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      fateRoll, onFateAction,
+      onFateAction,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, lastOrbitalError,
       sendOrbitalIntent, sessionBoundEpoch,
       // Story 85-3: confrontation-mode panel inputs.

@@ -14,9 +14,8 @@
  *     required paired negative — it can never sit beside the WN/native
  *     ConfrontationOverlay, because a WN pack never emits FATE_STATE)
  *
- * `fate-conflict` is not yet a WidgetId and `fateData`/`fateRoll` are not yet
- * GameBoard props, so both are reached through widened types — the RED signal is
- * the missing registry entry / render path at runtime, not a type error.
+ * The conflict surface consumes the shared `latestFateRoll` mirror slice (118-7
+ * F3g) — one field, two consumers (the Fate panel's FateWidget and this surface).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -53,11 +52,9 @@ beforeEach(() => {
 
 const REGISTRY = WIDGET_REGISTRY as Record<string, WidgetDef | undefined>;
 
-// Widen GameBoardProps with the not-yet-wired fateData/fateRoll props so this RED
-// test compiles before they land and stays correct after.
 type BoardOverrides = Partial<GameBoardProps> & {
   fateData?: FateStatePayload | null;
-  fateRoll?: FateRollPayload | null;
+  latestFateRoll?: FateRollPayload | null;
 };
 
 function renderBoard(overrides: BoardOverrides = {}) {
@@ -163,7 +160,7 @@ describe("GameBoard — fate conflict surface wiring (Story 118-6)", () => {
 
 describe("GameBoard — fate conflict surface is conflict-gated (Story 118-6 paired test)", () => {
   it("reaches the conflict surface from the render path when a conflict is active", () => {
-    renderBoard({ fateData: inConflict, fateRoll: roll });
+    renderBoard({ fateData: inConflict, latestFateRoll: roll });
     expect(conflictTab()).toBeInTheDocument();
   });
 
