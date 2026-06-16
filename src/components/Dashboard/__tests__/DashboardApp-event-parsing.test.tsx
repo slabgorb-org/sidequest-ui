@@ -49,13 +49,21 @@ async function loadDashboard() {
   return mod.DashboardApp;
 }
 
+// The Tufte-redesigned header renders a small-caps "turns" label followed by
+// the count in a separate value node; the wrapper's textContent is "turns{N}".
+// (Case-sensitive "turns" avoids colliding with the Timeline sidebar's "Turns"
+// section title.)
+function headerTurnsText(): string {
+  return screen.getByText("turns").parentElement?.textContent ?? "";
+}
+
 describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
   it("increments Turns counter when a turn_complete event arrives", async () => {
     const DashboardApp = await loadDashboard();
     render(<DashboardApp />);
 
     // Header starts at Turns: 0
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*0/);
+    expect(headerTurnsText()).toMatch(/turns\s*0/);
 
     const event: WatcherEvent = {
       timestamp: "2026-04-23T17:00:00.000Z",
@@ -78,7 +86,7 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
       onEventCapture.fn!(event);
     });
 
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+    expect(headerTurnsText()).toMatch(/turns\s*1/);
   });
 
   it("routes agent_span_close events through the reducer without incrementing Turns", async () => {
@@ -110,7 +118,7 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
     // turn.agent_llm.inference alone is NOT a turn boundary — it's a
     // contributing signal, but the aggregator waits for
     // orchestrator.process_action before synthesizing a turn.
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*0/);
+    expect(headerTurnsText()).toMatch(/turns\s*0/);
     // But it DOES land in allEvents → the Console tab surfaces it.
     expect(
       screen.getByText(/turn\.agent_llm\.inference/),
@@ -171,7 +179,7 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
       },
     };
 
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*0/);
+    expect(headerTurnsText()).toMatch(/turns\s*0/);
 
     act(() => {
       onEventCapture.fn!(leakAudit);
@@ -180,7 +188,7 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
     });
 
     // The aggregator synthesized a turn_complete from the span closes.
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+    expect(headerTurnsText()).toMatch(/turns\s*1/);
   });
 
   it("does not double-count when a real turn_complete follows a synthesized one for the same turn_id", async () => {
@@ -233,13 +241,13 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
       onEventCapture.fn!(leakAudit);
       onEventCapture.fn!(processAction);
     });
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+    expect(headerTurnsText()).toMatch(/turns\s*1/);
 
     act(() => {
       onEventCapture.fn!(semanticTurnComplete);
     });
     // Still 1 — the real turn_complete replaced the synthesized entry
     // instead of appending a duplicate.
-    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+    expect(headerTurnsText()).toMatch(/turns\s*1/);
   });
 });

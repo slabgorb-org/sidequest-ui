@@ -70,14 +70,16 @@ export function DashboardApp() {
     (e) => e.severity === "error",
   ).length;
 
-  const durations = view.turns
+  // Chronological agent-duration sequence (seconds, turn order preserved) — the
+  // p95 header sparkline reads the trend; p95 itself is read from the sorted copy.
+  const p95Series = view.turns
     .map((t) => (t.fields as TurnCompleteFields).agent_duration_ms ?? 0)
     .filter((d) => d > 0)
-    .sort((a, b) => a - b);
+    .map((ms) => ms / 1000);
+  const durations = [...p95Series].sort((a, b) => a - b);
   const p95 =
     durations.length > 0
-      ? (durations[Math.floor(durations.length * 0.95)] / 1000).toFixed(1) +
-        "s"
+      ? durations[Math.floor(durations.length * 0.95)].toFixed(1) + "s"
       : "—";
 
   return (
@@ -95,6 +97,7 @@ export function DashboardApp() {
         turnCount={view.turns.length}
         errorCount={errorCount}
         p95={p95}
+        p95Series={p95Series}
         paused={live.paused}
         onTogglePause={live.togglePause}
         onClear={live.clear}
@@ -102,9 +105,9 @@ export function DashboardApp() {
       />
       <div
         style={{
-          padding: "6px 12px",
-          background: THEME.surface,
-          borderBottom: `1px solid ${THEME.border}`,
+          padding: "7px 26px",
+          background: THEME.bg,
+          borderBottom: `1px solid ${THEME.rule}`,
         }}
       >
         <SessionPicker
