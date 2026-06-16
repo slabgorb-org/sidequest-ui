@@ -76,7 +76,9 @@ export interface CharacterCreationProps {
   scene: CreationScene | null;
   loading: boolean;
   onRespond: (payload: Record<string, unknown>) => void;
-  portraits?: PortraitOption[];
+  // `null` = roster still loading; `[]` = fetched, none available. Passed
+  // straight through to PortraitPanel, which renders the two states distinctly.
+  portraits?: PortraitOption[] | null;
 }
 
 export function CharacterCreation({ scene, loading, onRespond, portraits }: CharacterCreationProps) {
@@ -166,7 +168,7 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
     return (
       <div className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
         <PortraitPanel
-          portraits={portraits ?? []}
+          portraits={portraits ?? null}
           suggestArchetype={scene.suggest_archetype ?? null}
           onConfirm={(slug) => onRespond({ phase: "portrait_confirm", selected_portrait_ref: slug })}
           onSkip={() => onRespond({ phase: "portrait_confirm", selected_portrait_ref: null })}

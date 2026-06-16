@@ -295,12 +295,28 @@ function AppInner() {
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>(initialPhase);
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
-  const [creationPortraits, setCreationPortraits] = useState<PortraitOption[]>([]);
+  // `null` = the picker roster is still being fetched (loading sentinel); `[]` =
+  // fetch resolved with no portraits for this world. PortraitPanel renders the
+  // two states distinctly so the empty-state can never flash before the fetch
+  // lands (sq-playtest 2026-06-16).
+  const [creationPortraits, setCreationPortraits] = useState<PortraitOption[] | null>([]);
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
   const [currentWorld, setCurrentWorld] = useState<string | null>(null);
+  // Ref bridge for handleMessage: it's a stable useCallback whose deps
+  // deliberately exclude genre/world (the documented ref-bridge pattern). The
+  // portrait-picker fetch must gate on the CURRENT genre/world; reading the
+  // captured state gave a STALE (often null) value, so the fetch silently hit
+  // its else-branch and the picker showed "No sample portraits" even when the
+  // world ships a full roster (sq-playtest 2026-06-16).
+  const currentGenreRef = useRef<string | null>(null);
+  const currentWorldRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentGenreRef.current = currentGenre;
+    currentWorldRef.current = currentWorld;
+  }, [currentGenre, currentWorld]);
   // Server-announced orbital capability (GameResponse.orbital — the world
   // ships an orbits.yaml). Gates MapWidget's OrbitalChartView; replaces the
   // per-world frontend allowlist that left perseus_cloud's orrery
@@ -874,23 +890,44 @@ function AppInner() {
         // shows a calm empty/skip state, so chargen is never blocked.
         // The console.error keeps it diagnosable (not a silent fallback).
         if ((msg.payload as Record<string, unknown>).input_type === "pick_portrait") {
-          const genre = currentGenre;
-          const world = currentWorld;
-          if (genre && world) {
-            fetch(`/api/chargen/portraits/${encodeURIComponent(genre)}/${encodeURIComponent(world)}`)
-              .then((res) => {
-                if (!res.ok) throw new Error(`portraits fetch ${res.status}`);
-                return res.json() as Promise<{ portraits: PortraitOption[] }>;
-              })
-              .then((body) => {
-                setCreationPortraits(body.portraits);
-              })
-              .catch((err) => {
-                console.error("Failed to fetch chargen portraits:", err);
-                setCreationPortraits([]);
-              });
-          } else {
+          // `portraits_available` is the server's authoritative signal
+          // (chargen_mixin._render_portrait_scene): false => this world ships no
+          // picker portraits, so render the empty/skip state and skip the wasted
+          // fetch. Otherwise mark loading (null) and fetch — distinguishing
+          // "still fetching" from "fetched, none" so the empty-state can never
+          // flash or stick before the 200 lands.
+          const portraitsAvailable = (msg.payload as Record<string, unknown>)
+            .portraits_available;
+          if (portraitsAvailable === false) {
             setCreationPortraits([]);
+          } else {
+            setCreationPortraits(null);
+            // Read genre/world from the ref bridge, NOT the captured state —
+            // handleMessage's deps exclude them, so the closure value is stale.
+            const genre = currentGenreRef.current;
+            const world = currentWorldRef.current;
+            if (genre && world) {
+              fetch(`/api/chargen/portraits/${encodeURIComponent(genre)}/${encodeURIComponent(world)}`)
+                .then((res) => {
+                  if (!res.ok) throw new Error(`portraits fetch ${res.status}`);
+                  return res.json() as Promise<{ portraits: PortraitOption[] }>;
+                })
+                .then((body) => {
+                  setCreationPortraits(body.portraits);
+                })
+                .catch((err) => {
+                  console.error("Failed to fetch chargen portraits:", err);
+                  setCreationPortraits([]);
+                });
+            } else {
+              // portraits_available wasn't false yet we have no genre/world to
+              // fetch with — a real inconsistency, not a normal empty world. Fail
+              // loud in the console (No Silent Fallbacks); don't block chargen.
+              console.error(
+                "pick_portrait scene but genre/world unknown; cannot fetch portraits",
+              );
+              setCreationPortraits([]);
+            }
           }
         }
       } else if (phase === "complete") {

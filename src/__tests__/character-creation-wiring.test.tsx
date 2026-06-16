@@ -193,6 +193,7 @@ function sceneMessage(overrides: {
   allows_freeform?: boolean;
   input_type?: string;
   character_preview?: Record<string, unknown>;
+  portraits_available?: boolean;
 }): GameMessage {
   return {
     type: MessageType.CHARACTER_CREATION,
@@ -339,6 +340,25 @@ beforeEach(() => {
           genre_slug: "low_fantasy",
           world_slug: "shimmering_dale",
           mode: "solo",
+        }),
+      } as Response);
+    }
+    // GET /api/chargen/portraits/:genre/:world — the picker roster endpoint
+    // fired when a pick_portrait scene arrives (sq-playtest 2026-06-16 wiring).
+    if (url.includes("/api/chargen/portraits")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          portraits: [
+            {
+              slug: "noir_pi",
+              portrait_url: "/noir_pi.png",
+              culture: "street",
+              archetype: "detective",
+              sex: "male",
+              role: "Private Eye",
+            },
+          ],
         }),
       } as Response);
     }
@@ -1073,5 +1093,86 @@ describe("103-2: stock step wiring", () => {
     expect(screen.getByRole("button", { name: /cortex booster/i })).toBeInTheDocument();
     // The stock step is gone — no lingering stock UI on the branch scene.
     expect(screen.queryByTestId("stock-option-sleeper")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Portrait picker fetch wiring (sq-playtest 2026-06-16)
+//
+// Regression guard for the empty-state bug: when a pick_portrait scene arrived,
+// the fetch was gated on currentGenre/currentWorld read from handleMessage's
+// STALE closure (its deps exclude them), so it silently hit the no-fetch
+// else-branch and the picker showed "No sample portraits" even though the world
+// ships a full roster. The fix reads genre/world via a ref bridge. This test
+// drives a real pick_portrait message and asserts the fetch fires for the
+// CURRENT genre/world, then that the resolved roster reconciles to tiles.
+// ---------------------------------------------------------------------------
+describe("portrait picker fetch wiring", () => {
+  it("fetches portraits for the current genre/world on pick_portrait, then renders the roster", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderApp();
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    await connectPlayer(user);
+
+    await act(async () => {
+      latestSocket().simulateMessage(sessionConnectedMessage());
+    });
+
+    await act(async () => {
+      latestSocket().simulateMessage(
+        sceneMessage({
+          prompt: "Choose a portrait for your character — or skip to continue.",
+          input_type: "pick_portrait",
+          portraits_available: true,
+        }),
+      );
+    });
+
+    // The fetch must target the CURRENT genre/world (hydrated by the
+    // /api/games/:slug mock → low_fantasy / shimmering_dale). A stale-null
+    // closure would skip the fetch entirely, failing this assertion.
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/chargen/portraits/low_fantasy/shimmering_dale"),
+    );
+
+    // Flush the fetch promise chain; the loading sentinel reconciles to the grid.
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+    });
+    expect(screen.getByTestId("portrait-tile-noir_pi")).toBeInTheDocument();
+    expect(screen.queryByTestId("portrait-empty")).not.toBeInTheDocument();
+  });
+
+  it("renders the empty/skip state without fetching when portraits_available is false", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderApp();
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    await connectPlayer(user);
+
+    await act(async () => {
+      latestSocket().simulateMessage(sessionConnectedMessage());
+    });
+
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+
+    await act(async () => {
+      latestSocket().simulateMessage(
+        sceneMessage({
+          prompt: "Choose a portrait for your character — or skip to continue.",
+          input_type: "pick_portrait",
+          portraits_available: false,
+        }),
+      );
+    });
+
+    // No portraits for this world → empty/skip state, and no wasted fetch.
+    expect(screen.getByTestId("portrait-empty")).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/chargen/portraits"),
+    );
   });
 });

@@ -10,7 +10,11 @@ export interface PortraitOption {
 }
 
 export interface PortraitPanelProps {
-  portraits: PortraitOption[];
+  // `null` means the portrait roster is still being fetched (loading); `[]`
+  // means the fetch resolved with no portraits for this world. The two render
+  // differently — a loading sentinel must NEVER show the permanent
+  // "no portraits" empty-state (sq-playtest 2026-06-16).
+  portraits: PortraitOption[] | null;
   suggestArchetype: string | null;
   onConfirm: (slug: string) => void;
   onSkip: () => void;
@@ -27,6 +31,7 @@ export function PortraitPanel({
   // Soft-suggest: stable sort putting archetype-matching portraits first.
   // Never filter or sort by sex — gender is never a selection filter.
   const sorted = useMemo(() => {
+    if (!portraits) return [];
     if (!suggestArchetype) return portraits;
     return [...portraits].sort((a, b) => {
       const aMatch = a.archetype === suggestArchetype ? 0 : 1;
@@ -34,6 +39,31 @@ export function PortraitPanel({
       return aMatch - bMatch;
     });
   }, [portraits, suggestArchetype]);
+
+  // Loading: the roster fetch is in flight. Show a calm status (with Skip, so a
+  // slow/failed fetch never traps the player) — NOT the empty-state.
+  if (portraits === null) {
+    return (
+      <div data-testid="portrait-panel" className="flex flex-col gap-4 w-full max-w-xl">
+        <p
+          data-testid="portrait-loading"
+          role="status"
+          className="text-sm text-muted-foreground/60 italic"
+        >
+          Loading portraits…
+        </p>
+        <div className="flex justify-end border-t border-border/40 pt-3">
+          <button
+            data-testid="portrait-skip"
+            onClick={onSkip}
+            className="text-sm px-4 py-2 rounded border border-border/50 hover:border-border text-muted-foreground hover:text-foreground"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (portraits.length === 0) {
     return (
