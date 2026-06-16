@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { MagicState } from '@/types/magic';
 import type {
+  FateRollPayload,
   FateStatePayload,
   LocationDescriptionPayload,
   QuestsPayload,
@@ -90,6 +91,14 @@ export interface ClientGameState {
    * which is what keeps the Fate tab off WN/native packs.
    */
   fateState?: FateStatePayload | null;
+  /**
+   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll, mirrored from the
+   * FATE_ROLL EVENT (the most recent roll wins — unlike the FATE_STATE snapshot
+   * above). Null until the first roll arrives. Drives the FateDiceTray mount in
+   * the Fate panel; like fateState it only ever arrives on a ruleset=='fate'
+   * pack (server gate).
+   */
+  latestFateRoll?: FateRollPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -113,6 +122,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   relationships: null,
   questsData: null,
   fateState: null,
+  latestFateRoll: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({
