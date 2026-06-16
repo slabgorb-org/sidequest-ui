@@ -1,7 +1,9 @@
 import type {
   FateAspectEntry,
+  FateRollPayload,
   FateStatePayload,
 } from "@/types/payloads";
+import { FateDiceTray } from "@/dice/FateDiceTray";
 
 // Folio palette — mirrors QuestsPanel / RelationshipsPanel / LocationPanel so
 // every dock panel reads as the same artifact. Resolved via CSS custom
@@ -33,6 +35,15 @@ const PANEL_LABEL = "Fate sheet";
 // carries a label. This is a player-UI mandate, not OTEL/GM observability.
 export interface FatePanelProps {
   data: FateStatePayload | null;
+  /**
+   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll. When present (and
+   * the pack is Fate), the FateDiceTray mounts above the sheet so the table sees
+   * the soloist's roll. Null/absent → no roll surface.
+   */
+  latestRoll?: FateRollPayload | null;
+  /** The active pack's ruleset; the roll surface renders only when "fate"
+   *  (FateDiceTray self-gates — never co-renders with the WN/native overlay). */
+  ruleset?: string;
 }
 
 // snake_case wire kind → human display label. Canonical render order matches the
@@ -123,7 +134,7 @@ function AspectGroups({ aspects }: { aspects: FateAspectEntry[] }) {
   );
 }
 
-export function FatePanel({ data }: FatePanelProps) {
+export function FatePanel({ data, latestRoll, ruleset }: FatePanelProps) {
   const characters = data?.characters ?? [];
   if (!data || characters.length === 0) {
     return (
@@ -160,6 +171,13 @@ export function FatePanel({ data }: FatePanelProps) {
         minHeight: "100%",
       }}
     >
+      {/* Story 118-7 / ADR-144 F3g: the 4dF roll surface. Mounts only when a
+          roll has arrived; FateDiceTray self-gates on ruleset==="fate" so it
+          never co-renders with the WN/native ConfrontationOverlay. */}
+      {latestRoll && (
+        <FateDiceTray roll={latestRoll} ruleset={ruleset ?? ""} />
+      )}
+
       {characters.map((ch) => {
         const skills = ch.skills ?? [];
         const aspects = ch.aspects ?? [];

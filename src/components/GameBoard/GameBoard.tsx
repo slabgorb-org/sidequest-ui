@@ -52,6 +52,7 @@ import type {
   RelationshipEntryPayload,
   QuestsPayload,
   FateStatePayload,
+  FateRollPayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -195,6 +196,12 @@ export interface GameBoardProps {
    * it never co-renders with the WN/native ConfrontationOverlay (epic 118).
    */
   fateData?: FateStatePayload | null;
+  /**
+   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll (state.latestFateRoll),
+   * threaded into the Fate panel so the FateDiceTray mounts when a roll arrives.
+   * Null until the first FATE_ROLL — only ever on a ruleset=='fate' pack.
+   */
+  latestFateRoll?: FateRollPayload | null;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -301,6 +308,7 @@ export function GameBoard({
   relationshipsData = null,
   questsData = null,
   fateData = null,
+  latestFateRoll = null,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -575,7 +583,17 @@ export function GameBoard({
         // Story 118-2 / ADR-144 F3b: the Fate sheet. The tab only exists when
         // fateData is present (dataGated:true gate above), but render
         // defensively — FatePanel shows an empty state for null/empty data.
-        return <FateWidget data={fateData ?? null} />;
+        // Story 118-7 / ADR-144 F3g: thread the latest 4dF roll + the ruleset so
+        // the FateDiceTray mounts. The tab is reachable only when fateData !=
+        // null (a ruleset=='fate' pack), so the ruleset is "fate" here — which
+        // keeps the roll surface off the WN/native ConfrontationOverlay.
+        return (
+          <FateWidget
+            data={fateData ?? null}
+            latestRoll={latestFateRoll ?? null}
+            ruleset={fateData != null ? "fate" : ""}
+          />
+        );
       case "location": {
         // Story 85-2: the Location-tab header reads as a "Region — Subregion"
         // breadcrumb. The region is the shared LOCATION_DESCRIPTION payload;
@@ -635,7 +653,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, nowPlaying, volumes, muted,
+      currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, latestFateRoll, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
