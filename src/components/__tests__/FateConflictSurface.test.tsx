@@ -193,3 +193,46 @@ describe("FateConflictSurface — freeform text rides the tile", () => {
     expect(call?.player_action ?? "").toBe("");
   });
 });
+
+describe("FateConflictSurface — the attack names an opponent (rework: Reviewer HIGH #1)", () => {
+  // The server's _resolve_attack HARD-raises "an attack must name a target" when
+  // commit.target is None (fate_conflict.py:500, No Silent Fallbacks). An Attack tile
+  // that dispatches no target therefore ALWAYS errors at exchange time — the core verb
+  // of a *conflict* surface can never land. The attack MUST carry an opponent-side
+  // participant as its target.
+  it("dispatches an opponent-side participant as the target when Attack is clicked", () => {
+    const { onFateAction } = renderSurface();
+    fireEvent.click(screen.getByTestId("fate-action-attack"));
+    expect(onFateAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "attack", target: "The Fat Man" }),
+    );
+  });
+
+  it("never targets a player-side participant (the target is the Other, not the self)", () => {
+    // Guard: the chosen target must come from the opponent side, never the acting PC
+    // or an ally. With Sam (player) vs The Fat Man (opponent), the only legal attack
+    // target is The Fat Man.
+    const { onFateAction } = renderSurface();
+    fireEvent.click(screen.getByTestId("fate-action-attack"));
+    const call = onFateAction.mock.calls[0]?.[0];
+    expect(call?.target).toBe("The Fat Man");
+    expect(call?.target).not.toBe("Sam Spadework");
+  });
+
+  it("still carries the freeform rider alongside the target", () => {
+    // The target fix must not drop the freeform-rides-the-tile behavior: an attack
+    // carries BOTH the opponent target AND the player_action flourish.
+    const { onFateAction } = renderSurface();
+    fireEvent.change(screen.getByTestId("fate-freeform-input"), {
+      target: { value: "I swing from the chandelier and fire" },
+    });
+    fireEvent.click(screen.getByTestId("fate-action-attack"));
+    expect(onFateAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "attack",
+        target: "The Fat Man",
+        player_action: "I swing from the chandelier and fire",
+      }),
+    );
+  });
+});
