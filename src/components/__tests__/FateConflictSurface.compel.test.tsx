@@ -27,8 +27,9 @@ import { FateConflictSurface } from "../FateConflictSurface";
 
 // `pending_compels` is the field this story adds to FateConflictEntry. Typed as an
 // intersection so the fixture is honest in RED (the base type lacks it) and stays
-// correct once Dev lands the field in GREEN — no `as any`.
-type PendingCompel = { aspect: string; target: string; reason: string };
+// correct once Dev lands the field in GREEN — no `as any`. `offered_delta` is the
+// server-sent SRD accept reward (+1) the Accept control renders.
+type PendingCompel = { aspect: string; target: string; reason: string; offered_delta: number };
 type ConflictWithCompels = FateConflictEntry & { pending_compels: PendingCompel[] };
 
 const NO_ROLL: FateRollPayload | null = null;
@@ -63,6 +64,7 @@ const COMPEL: PendingCompel = {
   aspect: "Cornered Rat",
   target: "Sam Spadework",
   reason: "The exits are blocked — panic costs you the initiative",
+  offered_delta: 1,
 };
 
 function renderSurface(
@@ -122,6 +124,7 @@ describe("FateConflictSurface — the compel accept/refuse control", () => {
       aspect: "Last Honest Cop",
       target: "Sam Spadework",
       reason: "Internal Affairs wants your badge",
+      offered_delta: 1,
     };
     renderSurface({ fateState: fateState([COMPEL, second]) });
     expect(screen.getAllByTestId(/^fate-compel-accept-/)).toHaveLength(2);

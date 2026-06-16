@@ -1070,12 +1070,16 @@ export interface FateConflictParticipant {
 
 /** A narrator-offered compel awaiting the player's accept/refuse (ADR-144 F3e).
  *  `aspect` is the compelled aspect, `target` the compelled PC, `reason` the
- *  proposed complication the player reads before deciding. The ±1 fate-point
- *  economics are SRD-fixed and rendered client-side. */
+ *  proposed complication the player reads before deciding. `offered_delta` is the
+ *  SRD accept reward (+1) the server sends so the Accept control renders a real
+ *  delta, not a hardcoded literal. The refuse cost (−1) is the separate SRD-fixed
+ *  constant the client renders directly (it has no field — the cost is never
+ *  variable). */
 export interface FatePendingCompel {
   aspect: string;
   target: string;
   reason: string;
+  offered_delta: number;
 }
 
 /** The active Fate conflict's participants by side, in seating order.

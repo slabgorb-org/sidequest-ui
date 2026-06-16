@@ -1,17 +1,20 @@
 /**
- * Story 118-5 (ADR-144 F3e) — compel control wiring (RED).
+ * Story 118-5 (ADR-144 F3e) — compel control wiring.
  *
- * The mandatory wiring test: proves the compel Accept/Refuse control is reachable
- * from the PRODUCTION render path (App -> GameBoard `onFateAction` ->
- * FateConflictSurface), not merely a component that exists in isolation. It
- * renders the real GameBoard, activates the Fate Conflict tab on a Fate pack with
- * a pending compel, clicks Accept, and asserts the `onFateAction` callback
- * GameBoard threads down fires the compel verb — the same prop App.tsx wires to
- * handleFateAction (App.tsx:2727 -> GameBoard.tsx:644).
+ * The mandatory wiring test, scoped to what it actually exercises: the
+ * GameBoard -> FateConflictSurface path. It renders the REAL GameBoard, activates
+ * the Fate Conflict tab on a Fate pack with a pending compel, clicks Accept, and
+ * asserts the `onFateAction` callback GameBoard threads down to the surface fires
+ * the compel verb. This proves GameBoard wires `onFateAction` through to the compel
+ * control through the real component tree (not the surface in isolation).
  *
- * Behavioral, not source-grep: it drives the click through the real component
- * tree and asserts the callback. FAIL today: no compel control renders, so the
- * Accept button is never found.
+ * What this does NOT cover: the App -> GameBoard link. The test injects
+ * `onFateAction` as a prop rather than mounting <App>, so the App.tsx:2727 ->
+ * GameBoard.tsx:644 wiring (App passing handleFateAction down to GameBoard) is the
+ * remaining untested seam — close it by mounting <App> if that link ever regresses.
+ *
+ * Behavioral, not source-grep: it drives the click through the real component tree
+ * and asserts the callback.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -24,7 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-type PendingCompel = { aspect: string; target: string; reason: string };
+type PendingCompel = { aspect: string; target: string; reason: string; offered_delta: number };
 type ConflictWithCompels = FateConflictEntry & { pending_compels: PendingCompel[] };
 type BoardOverrides = Partial<GameBoardProps> & { fateData?: FateStatePayload | null };
 
@@ -36,7 +39,12 @@ function fateWithCompel(): FateStatePayload {
       { name: "The Fat Man", side: "opponent" },
     ],
     pending_compels: [
-      { aspect: "Cornered Rat", target: "Sam Spadework", reason: "The exits are blocked" },
+      {
+        aspect: "Cornered Rat",
+        target: "Sam Spadework",
+        reason: "The exits are blocked",
+        offered_delta: 1,
+      },
     ],
   };
   return {

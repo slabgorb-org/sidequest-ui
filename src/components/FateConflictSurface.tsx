@@ -195,7 +195,9 @@ export function FateConflictSurface({
 
       {/* ADR-144 F3e: the narrator's offered compels. Each is a decision gate —
           Accept earns a fate point and takes the complication; Refuse pays one to
-          decline (SRD). The ±1 delta is shown on the control (mechanics-first
+          decline (SRD). The Accept delta is the server-sent `offered_delta` (a real
+          datum, not a hardcoded literal that could drift from the SRD); the Refuse
+          cost is the SRD-fixed −1 constant. Both shown on the control (mechanics-first
           legibility). Disabled while a sealed round resolves. */}
       {compels.length > 0 && (
         <div data-testid="fate-compel-rack" className="flex flex-col gap-2">
@@ -215,7 +217,7 @@ export function FateConflictSurface({
                   disabled={sealedWaiting}
                   onClick={() => resolveCompel(c.aspect, "compel_accept")}
                 >
-                  Accept (+1 FP)
+                  Accept (+{c.offered_delta} FP)
                 </button>
                 <button
                   type="button"
