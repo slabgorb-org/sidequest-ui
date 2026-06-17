@@ -55,6 +55,8 @@ const SUCCEED: FateRollPayload = {
   shifts: 2,
   tier: "Succeed",
   succeeded_with_style: false,
+  throw_params: { velocity: [1, 2, -0.5], angular: [0.5, 0.5, 0.5], position: [0.5, 0.5] },
+  seed: 4242,
 };
 
 const STYLE: FateRollPayload = {
@@ -66,6 +68,8 @@ const STYLE: FateRollPayload = {
   shifts: 3,
   tier: "SucceedWithStyle",
   succeeded_with_style: true,
+  throw_params: { velocity: [-2, 1, 3], angular: [-1, 2, -0.5], position: [0.7, 0.3] },
+  seed: 2002,
 };
 
 describe("useStateMirror — FATE_ROLL (Story 118-6 / ADR-144 F3f)", () => {

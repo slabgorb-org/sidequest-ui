@@ -13,7 +13,7 @@
  */
 
 import { Canvas } from "@react-three/fiber";
-import { DiceScene, DEFAULT_DICE_THEME } from "@local/dice-lib";
+import { DiceScene, DEFAULT_DICE_THEME, replayThrowParams, D6_RADIUS } from "@local/dice-lib";
 import type { FateRollPayload } from "@/types/payloads";
 
 export interface FateDiceTrayProps {
@@ -39,14 +39,17 @@ export function FateDiceTray({ roll, ruleset }: FateDiceTrayProps) {
   // The fate-ruleset gate: never co-render with the WN/native overlay.
   if (ruleset !== "fate") return null;
 
+  // Replay the server's roll as a 3D tumble (Story 125-4 / ADR-144 F3g): convert
+  // the wire gesture + seed into scene-space ThrowParams exactly as InlineDiceTray
+  // does for DICE_RESULT (dF is a d6 cube → D6_RADIUS). The seed both drives the
+  // dice' initial rotation AND keys the re-throw, so a new roll re-animates.
+  const throwParams = replayThrowParams(roll.throw_params, roll.seed, D6_RADIUS);
+
   return (
     <div data-testid="fate-dice-tray" className="flex flex-col">
-      {/* Four dF dice on the table. NOTE: the 3D dice currently render the idle
-          pickup row (throwParams=null) — they do NOT yet animate to the rolled
-          faces, because FATE_ROLL carries no throw_params/seed to replay (unlike
-          DICE_RESULT). The authoritative result is the text readout below; the
-          3D faces are decorative until the roll carries replay params (follow-up
-          alongside the F3b mount). */}
+      {/* Four dF dice tumble to replay the roll. throwParams + rollKey come from
+          the roll's throw_params/seed (mirroring DICE_RESULT); the legible text
+          readout below stays authoritative regardless of the 3D flourish. */}
       <div data-testid="fate-dice-frame" style={{ position: "relative", height: 200 }}>
         <Canvas
           camera={{ position: [0, 2.3, 0], rotation: [-Math.PI / 2, 0, 0], up: [0, 0, -1], fov: 42 }}
@@ -56,8 +59,8 @@ export function FateDiceTray({ roll, ruleset }: FateDiceTrayProps) {
           <DiceScene
             kind="dF"
             count={4}
-            throwParams={null}
-            rollKey={0}
+            throwParams={throwParams}
+            rollKey={roll.seed}
             onThrow={() => {}}
             onAllSettle={() => {}}
             theme={DEFAULT_DICE_THEME}

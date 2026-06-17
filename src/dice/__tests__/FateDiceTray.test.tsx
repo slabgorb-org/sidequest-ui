@@ -33,6 +33,10 @@ vi.mock("@react-three/drei", () => ({
 const { sceneProps } = vi.hoisted(() => ({
   sceneProps: { current: null as null | Record<string, unknown> },
 }));
+// `replayThrowParams` is dice-lib's pure, deterministic wire→scene converter
+// (its own unit-tested concern). FateDiceTray depends on it (Story 125-4), so the
+// mock provides a faithful stub: passthrough velocity/angular, seed-keyed rotation
+// — same differs-by-input contract the assertions below rely on, no WebGL needed.
 vi.mock("@local/dice-lib", () => ({
   DiceScene: (props: Record<string, unknown>) => {
     sceneProps.current = props;
@@ -40,6 +44,16 @@ vi.mock("@local/dice-lib", () => ({
   },
   D6_RADIUS: 0.36,
   DEFAULT_DICE_THEME: { dieColor: "#4a1a3a", labelColor: "#d4af37" },
+  replayThrowParams: (
+    wire: { velocity: number[]; angular: number[]; position: number[] },
+    seed: number,
+    radius: number,
+  ) => ({
+    position: [wire.position[0] - 0.5, radius + 0.5, wire.position[1] * 1.6 - 0.8],
+    rotation: [seed, seed, seed],
+    linearVelocity: [...wire.velocity],
+    angularVelocity: [...wire.angular],
+  }),
 }));
 
 import { FateDiceTray } from "../FateDiceTray";

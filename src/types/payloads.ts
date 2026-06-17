@@ -583,6 +583,11 @@ export interface FateRollPayload {
   /** One of Fail / Tie / Succeed / SucceedWithStyle. */
   tier: string;
   succeeded_with_style: boolean;
+  /** Drag-and-flick gesture for the 3D dice animation (animation only, not
+   * outcome). Mirrors DiceResultPayload — Story 125-4 / ADR-144 F3g. */
+  throw_params: DiceThrowParams;
+  /** Deterministic physics seed so every seat replays the same tumble. */
+  seed: number;
 }
 
 // ---------------------------------------------------------------------------
