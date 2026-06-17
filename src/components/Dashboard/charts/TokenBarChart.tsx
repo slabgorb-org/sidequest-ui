@@ -61,9 +61,15 @@ export function TokenBarChart({ data }: Props) {
       if (t.cached === null) return null;
       const denom = (t.cached ?? 0) + t.tokensIn;
       const rate = denom > 0 ? (t.cached ?? 0) / denom : 0;
-      return { x: xAt(i) + bw / 2, rate, cold: t.cacheState === "cold" };
+      // Carry the turn's REAL index — the dot label must read the true turn, not
+      // this array's post-filter position (null turns are dropped above, so the
+      // two diverge whenever a null precedes a known turn). Story 125-1.
+      return { x: xAt(i) + bw / 2, rate, cold: t.cacheState === "cold", turnIndex: t.turnIndex };
     })
-    .filter((p): p is { x: number; rate: number; cold: boolean } => p !== null);
+    .filter(
+      (p): p is { x: number; rate: number; cold: boolean; turnIndex: number } =>
+        p !== null,
+    );
 
   return (
     <ChartSvg width={W} height={H}>
@@ -140,18 +146,27 @@ export function TokenBarChart({ data }: Props) {
           fill={p.cold ? THEME.accent : THEME.steel}
         >
           <title>
-            {p.cold ? `T${i + 1} cold-start miss` : `T${i + 1} ${Math.round(p.rate * 100)}% from cache`}
+            {p.cold
+              ? `T${p.turnIndex} cold-start miss`
+              : `T${p.turnIndex} ${Math.round(p.rate * 100)}% from cache`}
           </title>
         </circle>
       ))}
 
-      {/* summary line: real cache_read served, and cold-start count */}
-      {knownTurns.length > 0 && (
+      {/* summary line: real cache_read served, and cold-start count. When every
+          turn is non-SDK (no cache_usage at all), the savings line would be a lie,
+          so show a VISIBLE n/a caption instead — the per-bar hover <title> n/a
+          alone is too easy to miss when scanning the chart (Story 125-2). */}
+      {knownTurns.length > 0 ? (
         <text x={xl} y={H - 4} fill={THEME.steel} fontFamily={MONO} fontSize={10}>
           served from cache {savedFromCache} tokens
           {coldTurns.length > 0
             ? ` · ${coldTurns.length} cold-start miss${coldTurns.length > 1 ? "es" : ""}`
             : ""}
+        </text>
+      ) : (
+        <text x={xl} y={H - 4} fill={THEME.muted} fontFamily={MONO} fontSize={10}>
+          cache: n/a (non-SDK)
         </text>
       )}
     </ChartSvg>
