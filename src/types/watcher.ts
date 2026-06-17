@@ -42,6 +42,15 @@ export interface TurnSpan {
   component: string;
   start_ms: number;
   duration_ms: number;
+  /** Dependency-tree depth (0 = the turn-root container). Added 124-2 so the
+   *  flame chart can nest caller▸callee. Absent on older servers — the chart
+   *  falls back to a flat one-row-per-span Gantt when no span carries it. */
+  depth?: number;
+  /** False for container spans (work that nests deeper), true for leaf work.
+   *  Drives the Tufte container-vs-leaf opacity layering. Absent ⇒ treated as
+   *  leaf (the flat fallback). Read with `=== false`, never `||` — a real
+   *  `leaf: false` container must not collapse to a leaf. */
+  leaf?: boolean;
 }
 
 /** Fields on a TurnComplete event. */
