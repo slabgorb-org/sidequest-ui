@@ -395,7 +395,19 @@ export function GameBoard({
     available.add("character");
     available.add("relationships");
     available.add("quests");
-    available.add("inventory");
+    // Story 126-3 (ADR-144): hide the native Inventory tab on Fate packs. Fate
+    // has no carried inventory and no economy — the 114-10 migration (#472)
+    // deleted inventory.yaml for the four Fate packs and gear dissolves into
+    // aspects (via source_gear), so a Fate PC who opened Inventory would only
+    // see an empty native panel (items:[], gold:0). `fateData == null` is the
+    // ruleset!='fate' signal: the server emits FATE_STATE only on a Fate pack
+    // (server #880), the same gate the Fate tab uses below. Both the desktop
+    // dockview and MobileTabView read this set, so this one gate covers both
+    // surfaces. UI-only — no inventory data is touched (ADR-144 keeps
+    // inventory.items/gold unpopulated server-side).
+    if (fateData == null) {
+      available.add("inventory");
+    }
     available.add("map");
     available.add("knowledge");
     available.add("gallery");
