@@ -121,7 +121,10 @@ export interface ResourcePoolPayload {
   min: number;
   max: number;
   voluntary: boolean;
-  thresholds: ResourceThresholdPayload[];
+  /** Optional on the wire: ProtocolBase omits this field when the pool's
+   *  thresholds list is empty (matches its default — Rust `is_empty` parity).
+   *  Consumers must treat an absent list as "no thresholds". */
+  thresholds?: ResourceThresholdPayload[];
 }
 
 export interface RolledStat {

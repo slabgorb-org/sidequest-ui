@@ -14,7 +14,10 @@ type TabId = "stats" | "abilities" | "status";
 export interface ResourcePool {
   value: number;
   max: number;
-  thresholds: ResourceThreshold[];
+  /** Optional: the PARTY_STATUS wire omits this when a pool declares no
+   *  thresholds (ProtocolBase drops empty-default lists). Absent ⇒ no
+   *  thresholds; GenericResourceBar treats it as `[]`. */
+  thresholds?: ResourceThreshold[];
 }
 
 interface CharacterPanelPrefs {
