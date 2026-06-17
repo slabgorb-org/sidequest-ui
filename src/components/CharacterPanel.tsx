@@ -4,8 +4,10 @@ import type { CharacterSheetData, AbilityDefinition, ClassMove } from "./Charact
 import { PortraitFrame } from "./PortraitFrame";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
+import { FateCharacterSheet } from "./FatePanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
+import type { FateCharacterEntry } from "@/types/payloads";
 import { getCharacterBars, type MagicState } from "@/types/magic";
 import { SensitivitiesSection } from "./SensitivitiesSection";
 
@@ -110,6 +112,16 @@ export interface CharacterPanelProps {
    *  ledger lookup is character.name (matches server add_character() contract).
    */
   magicState?: MagicState | null;
+  /**
+   * Story 118-2 / playtest 2026-06-17 [BUG]: the local PC's Fate sheet (fate
+   * points, ladder skills, aspects, stress, consequences). Threaded from
+   * GameBoard's fateData (the FATE_STATE projection, emitted only on a
+   * ruleset=='fate' pack) so the Stats tab renders the shared FateCharacterSheet
+   * — the same legibility surface as the dock FateWidget — instead of the
+   * "No stats available." empty state (native `stats` is empty on a Fate pack).
+   * Null on WN/native packs ⇒ the native StatsContent path is unchanged.
+   */
+  fateSheet?: FateCharacterEntry | null;
 }
 
 function toDisplayName(id: string): string {
@@ -137,6 +149,7 @@ export function CharacterPanel({
   activePlayerId,
   submittedPlayerIds,
   magicState = null,
+  fateSheet = null,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
     "sq-character-panel",
@@ -387,7 +400,19 @@ export function CharacterPanel({
       </div>
 
       <div role="tabpanel" className="flex-1 overflow-auto p-4">
-        {activeTab === "stats" && <StatsContent stats={character.stats} />}
+        {activeTab === "stats" &&
+          (fateSheet ? (
+            // Fate pack: render the player's Fate sheet (aspects / ladder skills /
+            // stress / consequences) with the SAME renderer the dock FateWidget
+            // uses, so a Fate PC sees their mechanics where they look for them
+            // (the Sebastien/Jade "show me the math in the player UI" mandate),
+            // not only in a separate dock tab. showDivider=false — a single sheet
+            // needs no trailing rule. (playtest 2026-06-17: the Stats tab showed
+            // "No stats available." because native `stats` is empty on a Fate pack.)
+            <FateCharacterSheet character={fateSheet} showDivider={false} />
+          ) : (
+            <StatsContent stats={character.stats} />
+          ))}
         {activeTab === "abilities" && (
           <AbilitiesContent
             abilities={character.abilities}
