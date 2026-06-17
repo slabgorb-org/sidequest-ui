@@ -195,9 +195,10 @@ export function StateTab({ debugState, onRefresh }: Props) {
     );
   }
 
-  // Pick the most-recently-touched session (playtest 2026-04-24 — see history
-  // below). The server sorts newest-first and exposes `last_activity_ts`; we
-  // sort defensively so older/unsorted servers still land on the active save.
+  // Pick the most-recently-touched session (playtest 2026-04-24: the State tab
+  // defaulted to index 0, which was the oldest save, not the active one). The
+  // server sorts newest-first and exposes `last_activity_ts`; we sort
+  // defensively so older/unsorted servers still land on the active save.
   const session = [...debugState].sort((a, b) => {
     const aTs = a.last_activity_ts ?? 0;
     const bTs = b.last_activity_ts ?? 0;

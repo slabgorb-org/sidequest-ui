@@ -41,7 +41,7 @@ function makeNpc(over: Partial<NpcRegistryEntry> = {}): NpcRegistryEntry {
     last_seen_turn: 42,
     age: "ageless",
     appearance: "veiled",
-    ocean_summary: null as unknown as string | undefined,
+    ocean_summary: null,
     ocean: ocean(8, 7, 3.5, 6.2, 4.8),
     hp: 18,
     max_hp: 18,
@@ -141,7 +141,7 @@ describe("StateTab Tufte — OCEAN sparkline fingerprint", () => {
     // Production always sends ocean_summary=None (rest.py:495); the data lives
     // in `ocean`. The tab must read `ocean`, not the dead summary field.
     const view = makeView({
-      npc_registry: [makeNpc({ ocean: ocean(9, 6, 7, 2, 8), ocean_summary: null as never })],
+      npc_registry: [makeNpc({ ocean: ocean(9, 6, 7, 2, 8), ocean_summary: null })],
     });
     const { container } = render(<StateTab debugState={[view]} onRefresh={noop} />);
 
@@ -153,7 +153,7 @@ describe("StateTab Tufte — OCEAN sparkline fingerprint", () => {
     // never invent a personality fingerprint.
     const view = makeView({
       npc_registry: [
-        makeNpc({ name: "Marya the Drawn", ocean: undefined, ocean_summary: null as never }),
+        makeNpc({ name: "Marya the Drawn", ocean: undefined, ocean_summary: null }),
       ],
       // nothing else graphical in the tree, so any 5-bar svg would be a bug
     });
