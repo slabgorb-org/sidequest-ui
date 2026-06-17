@@ -73,6 +73,7 @@ export function toCharacterSheetData(
     abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
     class_moves: (sheetFacet.class_moves as ClassMove[]) ?? [],
     backstory: (sheetFacet.backstory as string) ?? "",
+    appearance: (sheetFacet.appearance as string) || undefined,
     portrait_url: (rawLocal.portrait_url as string) || undefined,
     current_location: (rawLocal.current_location as string) ?? "",
     player_id: isMultiplayer

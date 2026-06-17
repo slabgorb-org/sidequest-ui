@@ -68,6 +68,9 @@ export interface CharacterSheetData {
    *  these used to render as raw snake_case ids. */
   class_moves: ClassMove[];
   backstory: string;
+  /** Player-authored physical appearance from chargen (Story 126-5). Absent/
+   *  empty ⇒ the Appearance section is NOT rendered. */
+  appearance?: string;
   portrait_url?: string;
   current_location?: string;
   /** Controlling player's name (== PARTY_STATUS `member.player_id` as
@@ -278,6 +281,13 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {data.appearance && (
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Appearance</h3>
+          <p className="text-sm font-[var(--font-narrative)]">{data.appearance}</p>
         </div>
       )}
 
