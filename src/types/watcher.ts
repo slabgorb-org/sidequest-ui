@@ -25,6 +25,14 @@ export interface WatcherEvent {
   component: string;
   event_type: WatcherEventType;
   severity: Severity;
+  /** Live-view partition key: the slug (== SessionStateView.session_key) of the
+   *  session that produced this event. The /ws/watcher stream fans out EVERY
+   *  session's spans to EVERY dashboard, so the Live view scopes on this to keep
+   *  concurrent worlds from bleeding into one timeline (OTEL-INSPECTOR,
+   *  2026-06-16). `null`/absent = session-less infra (watcher.connected, replay
+   *  markers) — global, shown in every session view. NOT the integer
+   *  `session_id` row id, which lives in `fields` on some spans. */
+  session_slug?: string | null;
   fields: Record<string, unknown>;
 }
 
