@@ -50,9 +50,22 @@ export function computeSubmittedPlayerIds(
 
 /**
  * Merge TURN_STATUS authoritative submitted status into the ACTION_REVEAL
- * peer-reveal map. If TURN_STATUS says a player has sealed but the
- * ACTION_REVEAL still has them "composing", override to "submitted" so
- * the row label matches the banner.
+ * peer-reveal map. Two concerns, both serving ADR-036 WAIT-phase visibility:
+ *
+ *   1. **Status override.** If TURN_STATUS says a player has sealed but the
+ *      ACTION_REVEAL still has them "composing", override to "submitted" so
+ *      the row label matches the banner.
+ *
+ *   2. **Text recovery (Story 126-4).** The peer's action text has exactly one
+ *      best-effort carrier — the ACTION_REVEAL frame. A submitted-only turn
+ *      (fast typist / paste-and-Enter, no preceding `composing`) rides a single
+ *      frame; if it is missed (the `broadcast.recipient_dropped` "seal frame
+ *      vanished" churn, etc.) the row never exists and the WAIT strip shows the
+ *      `✓ Sealed` chip with no text. The authoritative roster carries the
+ *      sealed action text (server sources it from `pending_actions`); when a
+ *      sealed player has text on the roster but NO reveal row, synthesize a
+ *      display row so the strip recovers the text. This makes peer text
+ *      reliable, not best-effort-only.
  *
  * Returns the input map identity-unchanged when no overrides are needed —
  * lets the caller's `useMemo` dep array keep referential stability.
@@ -65,11 +78,38 @@ export function mergePeerRevealsWithSubmittedStatus(
   if (submitted.size === 0) return reveals as Map<string, PeerReveal>;
 
   let merged: Map<string, PeerReveal> | null = null;
+  const ensureMerged = (): Map<string, PeerReveal> => {
+    if (merged === null) merged = new Map(reveals);
+    return merged;
+  };
+
+  // (1) Upgrade an existing row whose ACTION_REVEAL status lags the seal.
   for (const [pid, reveal] of reveals) {
     if (submitted.has(pid) && reveal.status !== "submitted") {
-      if (merged === null) merged = new Map(reveals);
-      merged.set(pid, { ...reveal, status: "submitted" });
+      ensureMerged().set(pid, { ...reveal, status: "submitted" });
     }
   }
+
+  // (2) Recover the action text for a sealed peer with no reveal row. Only when
+  // the roster actually carries text — never synthesize a blank row.
+  for (const entry of entries) {
+    if (
+      (entry.status === "submitted" || entry.status === "auto_resolved") &&
+      entry.action &&
+      entry.action.length > 0 &&
+      !reveals.has(entry.player_id)
+    ) {
+      ensureMerged().set(entry.player_id, {
+        player_id: entry.player_id,
+        character_name: entry.character_name,
+        status: "submitted",
+        action: entry.action,
+        aside: false,
+        seq: 0,
+        round: 0,
+      });
+    }
+  }
+
   return merged ?? (reveals as Map<string, PeerReveal>);
 }
