@@ -28,14 +28,6 @@ import type {
 // cleanly RED until Dev implements the Tufte glyphs.
 // ---------------------------------------------------------------------------
 
-const OCEAN_KEYS = [
-  "openness",
-  "conscientiousness",
-  "extraversion",
-  "agreeableness",
-  "neuroticism",
-] as const;
-
 function ocean(o: number, c: number, e: number, a: number, n: number): Record<string, number> {
   return { openness: o, conscientiousness: c, extraversion: e, agreeableness: a, neuroticism: n };
 }
