@@ -13,13 +13,19 @@ const LABEL_W = 132;
 const DUR_W = 64;
 const TOP = 6;
 const AXIS_H = 22;
+const INDENT = 14; // left inset per depth level — shows caller▸callee nesting
+const CONTAINER_OPACITY = 0.34; // faded container (non-leaf) work
+const LEAF_OPACITY = 0.82; // solid leaf work
 
-// Span timeline for one turn. The telemetry ships FLAT spans (name, component,
-// start_ms, duration_ms) with no parent/depth, so this is an honest time-
-// proportional Gantt — one row per span, positioned by start, width by
-// duration — NOT the design's caller▸callee nesting (that needs hierarchical
-// trace data the server doesn't emit; deferred to a follow-up story). Tufte:
-// muted component hues, hairline time axis, the slowest span outlined in accent.
+// Span timeline for one turn. When the server emits dependency hierarchy
+// (depth + leaf per span, 124-2) each row is left-inset by its depth so a
+// caller's children nest beneath it, and container spans (leaf=false) are
+// faded against solid leaf work (Tufte layering); the slowest LEAF stays
+// outlined in accent. Older servers emit flat spans (no depth) — every span
+// then renders at depth 0, reproducing the original one-row-per-span Gantt.
+// The bar's right edge is always the true end time; only its left edge is
+// inset, so durations stay honest. depth/leaf are read with `??`/`=== false`
+// (never `||`) so a real depth-0 / leaf-false span is not defaulted away.
 export function FlameChart({ spans, totalMs }: Props) {
   if (spans.length === 0) {
     return <div style={{ color: THEME.muted, fontSize: 12, fontStyle: "italic" }}>Select a turn to view spans</div>;
@@ -30,11 +36,12 @@ export function FlameChart({ spans, totalMs }: Props) {
   const x = (v: number) => LABEL_W + (v / maxTime) * plotW;
   const H = TOP + spans.length * ROW_H + AXIS_H;
 
-  // Critical span = longest single span (honest bottleneck from flat data).
+  // Critical span = longest LEAF (honest bottleneck). The turn-root container
+  // is the whole turn, so it must never be flagged as the bottleneck.
   let critIdx = -1;
   let critDur = -1;
   spans.forEach((s, i) => {
-    if ((s.duration_ms || 0) > critDur) {
+    if (s.leaf !== false && (s.duration_ms || 0) > critDur) {
       critDur = s.duration_ms || 0;
       critIdx = i;
     }
@@ -46,9 +53,12 @@ export function FlameChart({ spans, totalMs }: Props) {
     <ChartSvg width={W} height={H}>
       {spans.map((s, i) => {
         const isCrit = i === critIdx;
+        const isContainer = s.leaf === false;
+        const indent = (s.depth ?? 0) * INDENT;
         const by = TOP + i * ROW_H;
-        const bx = x(s.start_ms || 0);
-        const bw = Math.max(2, x((s.start_ms || 0) + (s.duration_ms || 0)) - bx);
+        const bx = x(s.start_ms || 0) + indent;
+        const bEnd = x((s.start_ms || 0) + (s.duration_ms || 0));
+        const bw = Math.max(2, bEnd - bx);
         const col = SPAN_COLORS[s.name] || SPAN_COLORS[s.component] || THEME.muted;
         return (
           <g key={`${s.name}-${i}`}>
@@ -61,7 +71,7 @@ export function FlameChart({ spans, totalMs }: Props) {
               width={bw}
               height={ROW_H - 6}
               fill={col}
-              opacity={0.82}
+              opacity={isContainer ? CONTAINER_OPACITY : LEAF_OPACITY}
               stroke={isCrit ? THEME.accent : THEME.bg}
               strokeWidth={isCrit ? 1.5 : 0.5}
             >
