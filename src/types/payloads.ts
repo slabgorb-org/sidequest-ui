@@ -590,6 +590,30 @@ export interface FateRollPayload {
   seed: number;
 }
 
+/**
+ * Client → server: a player's PROACTIVE Fate roll (ADR-148 / Story 126-7).
+ *
+ * Physics-is-the-roll, the Fate analog of DiceThrowPayload: the four settled dF
+ * faces ARE the roll. The server resolves the action from `face` and never rolls
+ * 4dF on the player path; `throw_params` is the thrower's gesture, echoed on the
+ * broadcast FATE_ROLL so every seat replays the same tumble. `action` is a ROLL
+ * verb only — the non-roll verbs (concede / compel_*) stay on FATE_ACTION.
+ */
+export interface FateThrowPayload {
+  request_id: string;
+  action: "overcome" | "create_advantage" | "attack";
+  skill?: string;
+  target?: string | null;
+  difficulty?: number;
+  invoke_aspect?: string;
+  invoke_mode?: "bonus" | "reroll";
+  aspect_text?: string;
+  player_action?: string;
+  throw_params: DiceThrowParams;
+  /** Exactly 4 settled dF faces, each -1 / 0 / +1. */
+  face: number[];
+}
+
 // ---------------------------------------------------------------------------
 // Discriminated union
 // ---------------------------------------------------------------------------
@@ -706,6 +730,12 @@ export interface DiceThrowMessage extends BaseMessage {
 export interface DiceResultMessage extends BaseMessage {
   type: typeof MessageType.DICE_RESULT;
   payload: DiceResultPayload;
+}
+
+/** Client → server: a player's proactive Fate roll (ADR-148 / Story 126-7). */
+export interface FateThrowMessage extends BaseMessage {
+  type: typeof MessageType.FATE_THROW;
+  payload: FateThrowPayload;
 }
 
 export interface FateRollMessage extends BaseMessage {

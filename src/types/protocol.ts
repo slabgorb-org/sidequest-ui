@@ -114,6 +114,12 @@ export const MessageType = {
   // invoke_mode, aspect_text, player_action). The server's FateActionHandler is
   // the economy + validation authority (No Silent Fallbacks — the client mirrors).
   FATE_ACTION: "FATE_ACTION",
+  // ADR-148 / Story 126-7: OUTBOUND — a player's PROACTIVE Fate roll verb
+  // (overcome / create_advantage / attack). Physics-is-the-roll: carries the four
+  // settled dF faces + the throw_params gesture (the Fate analog of DICE_THROW).
+  // The server resolves from the faces and never rolls 4dF on the player path.
+  // Distinct from FATE_ACTION (the non-roll verbs: concede / compel_*).
+  FATE_THROW: "FATE_THROW",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

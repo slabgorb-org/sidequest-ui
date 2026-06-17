@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   FateCharacterEntry,
   FateRollPayload,
   FateStatePayload,
+  FateThrowPayload,
 } from "@/types/payloads";
 import { FateDiceTray } from "@/dice/FateDiceTray";
 
@@ -61,6 +62,11 @@ export interface FateConflictSurfaceProps {
    *  submit-and-wait barrier — never act mid-resolution). */
   sealedWaiting?: boolean;
   onFateAction?: (action: FateActionInput) => void;
+  /** ADR-148 / Story 126-7: a proactive roll verb (overcome / create_advantage /
+   *  attack) is physics-is-the-roll — clicking it mounts the dF thrower and defers
+   *  the send until the dice settle, then submits a FATE_THROW carrying the four
+   *  settled faces. The non-roll verbs (concede / compel_*) stay on onFateAction. */
+  onFateThrow?: (payload: FateThrowPayload) => void;
 }
 
 const FOLIO = {
@@ -74,11 +80,28 @@ const FOLIO = {
 const FONT_DISPLAY = "'Pirata One', serif";
 const FONT_BODY = "'EB Garamond', serif";
 
-const PROACTIVE: { verb: Exclude<FateActionVerb, "concede">; label: string }[] = [
+/** The three proactive ROLL verbs — physics-is-the-roll under ADR-148 (these mount
+ *  the dF thrower); distinct from the non-roll FateActionVerb members. */
+type RollVerb = "overcome" | "create_advantage" | "attack";
+
+const PROACTIVE: { verb: RollVerb; label: string }[] = [
   { verb: "overcome", label: "Overcome" },
   { verb: "create_advantage", label: "Create Advantage" },
   { verb: "attack", label: "Attack" },
 ];
+
+/** The armed throw context captured when a roll verb is clicked — held while the
+ *  player throws the dF, then merged into the FATE_THROW on settle. */
+interface ArmedThrow {
+  verb: RollVerb;
+  skill: string;
+  target?: string;
+  invoke_aspect?: string;
+  invoke_mode?: "bonus" | "reroll";
+  aspect_text?: string;
+  player_action?: string;
+  request_id: string;
+}
 
 /** Can this PC pay for an invocation of `aspect`? A free invocation on the aspect,
  *  or at least one fate point. Server-authoritative — the panel only reflects it. */
@@ -94,11 +117,15 @@ export function FateConflictSurface({
   actorName,
   sealedWaiting = false,
   onFateAction,
+  onFateThrow,
 }: FateConflictSurfaceProps) {
   const [freeform, setFreeform] = useState("");
   const [skill, setSkill] = useState("");
   const [target, setTarget] = useState("");
   const [pending, setPending] = useState<{ aspect: string; mode: "bonus" | "reroll" } | null>(null);
+  // ADR-148: the throw armed by a roll-verb click, mounting the dF thrower below.
+  const [armed, setArmed] = useState<ArmedThrow | null>(null);
+  const throwSeq = useRef(0);
 
   // The ruleset + conflict gates: never co-render with the WN/native overlay, and
   // show nothing outside an active conflict (the surface is conflict-scoped; the
@@ -119,27 +146,48 @@ export function FateConflictSurface({
   // server is the economy authority; the panel only reflects FATE_STATE.
   const compels = conflict.pending_compels ?? [];
 
-  function dispatch(verb: Exclude<FateActionVerb, "concede">) {
-    onFateAction?.({
-      action: verb,
+  // ADR-148 / Story 126-7: a roll verb no longer dispatches synchronously — it ARMS
+  // a throw and mounts the dF tray. The four faces the player settles ARE the roll;
+  // the send is deferred to ``onTrayThrow`` (below). The invoke/freeform context is
+  // captured here so it survives the throw and rides the FATE_THROW.
+  function armThrow(verb: RollVerb) {
+    const rider = freeform.trim();
+    setArmed({
+      verb,
       skill: activeSkill,
-      player_action: freeform.trim(),
       // An attack MUST name its target (the server's _resolve_attack rejects a null
-      // target loudly); overcome/create_advantage resolve against passive opposition
-      // and carry no opponent target.
-      ...(verb === "attack" ? { target: activeTarget } : {}),
-      // The armed invoke (if any) rides the action — the F3d affordance. mode is
-      // 'bonus' (+2) or 'reroll'; both are server-authoritative now (Story 118-6
-      // AC#1 made reroll real, so offering it is not Illusionism).
-      ...(pending
-        ? { invoke_aspect: pending.aspect, invoke_mode: pending.mode }
-        : {}),
-      ...(verb === "create_advantage" && freeform.trim()
-        ? { aspect_text: freeform.trim() }
-        : {}),
+      // target loudly); overcome/create_advantage resolve against passive opposition.
+      target: verb === "attack" ? activeTarget : undefined,
+      // The armed invoke (if any) rides the throw — the F3d affordance. mode is
+      // 'bonus' (+2) or 'reroll'; under determinism a reroll means the client re-throws
+      // (the server does the fate-point accounting only — ADR-148 §5).
+      invoke_aspect: pending?.aspect,
+      invoke_mode: pending ? pending.mode : undefined,
+      aspect_text: verb === "create_advantage" && rider ? rider : undefined,
+      player_action: rider || undefined,
+      request_id: `fate-throw-${throwSeq.current++}`,
     });
+  }
+
+  // Called by the dF thrower on settle: the tray supplies action / skill / target /
+  // request_id / throw_params / face; merge the armed invoke + freeform (which the
+  // tray does not carry) and emit the FATE_THROW.
+  function onTrayThrow(thrown: FateThrowPayload) {
+    onFateThrow?.({
+      ...thrown,
+      ...(armed?.invoke_aspect
+        ? { invoke_aspect: armed.invoke_aspect, invoke_mode: armed.invoke_mode }
+        : {}),
+      ...(armed?.aspect_text ? { aspect_text: armed.aspect_text } : {}),
+      ...(armed?.player_action ? { player_action: armed.player_action } : {}),
+    });
+    setArmed(null);
     setFreeform("");
     setPending(null);
+  }
+
+  function cancelThrow() {
+    setArmed(null);
   }
 
   function concede() {
@@ -323,15 +371,18 @@ export function FateConflictSurface({
         </select>
       )}
 
-      {/* Proactive-action tiles + the Concede control. */}
+      {/* Proactive-action tiles + the Concede control. A roll verb ARMS the dF
+          thrower (ADR-148) rather than dispatching synchronously; Concede stays a
+          pre-roll FATE_ACTION. Disabled while a sealed round resolves OR while a
+          throw is already armed (the player is mid-throw). */}
       <div className="flex gap-2">
         {PROACTIVE.map(({ verb, label }) => (
           <button
             key={verb}
             type="button"
             data-testid={`fate-action-${verb}`}
-            disabled={sealedWaiting}
-            onClick={() => dispatch(verb)}
+            disabled={sealedWaiting || armed !== null}
+            onClick={() => armThrow(verb)}
           >
             {label}
           </button>
@@ -339,12 +390,32 @@ export function FateConflictSurface({
         <button
           type="button"
           data-testid="fate-action-concede"
-          disabled={sealedWaiting}
+          disabled={sealedWaiting || armed !== null}
           onClick={concede}
         >
           Concede
         </button>
       </div>
+
+      {/* ADR-148 / Story 126-7: the dF thrower for an armed proactive roll. The
+          player throws four Fudge dice; on settle the tray submits the FATE_THROW
+          (the settled faces ARE the roll). Mounted only while armed. */}
+      {armed && (
+        <div data-testid="fate-throw-armed" className="flex flex-col gap-2">
+          <FateDiceTray
+            mode="thrower"
+            action={armed.verb}
+            skill={armed.skill}
+            requestId={armed.request_id}
+            target={armed.target ?? null}
+            ruleset={ruleset}
+            onThrow={onTrayThrow}
+          />
+          <button type="button" data-testid="fate-throw-cancel" onClick={cancelThrow}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       {sealedWaiting && (
         <p data-testid="fate-sealed-hint" style={{ color: FOLIO.inkSoft }}>

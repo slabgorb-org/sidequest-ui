@@ -7,6 +7,8 @@ import { CharacterCreation, type CreationScene } from "@/components/CharacterCre
 import type { PortraitOption } from "@/components/CharacterCreation/PortraitPanel";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
 import type { FateActionInput } from "@/components/FateConflictSurface";
+import { makeFateThrowMessage } from "@/lib/fateThrow";
+import type { FateThrowPayload } from "@/types/payloads";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -1998,6 +2000,19 @@ function AppInner() {
     [send],
   );
 
+  // ADR-148 / Story 126-7: a player's PROACTIVE Fate roll is physics-is-the-roll.
+  // The conflict surface mounts the dF thrower; on settle it hands us the full
+  // FateThrowPayload (the four settled faces ARE the roll + the throw gesture),
+  // which we forward as a FATE_THROW. The server resolves from the faces and never
+  // rolls 4dF on the player path. Mirrors handleDiceThrow / handleFateAction.
+  const handleFateThrow = useCallback(
+    (payload: FateThrowPayload) => {
+      send(makeFateThrowMessage(payload));
+      localTurnInFlightRef.current = true;
+    },
+    [send],
+  );
+
   const navigate = useNavigate();
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby.
@@ -2725,6 +2740,7 @@ function AppInner() {
                 fateData={gameState.fateState ?? null}
                 latestFateRoll={gameState.latestFateRoll ?? null}
                 onFateAction={handleFateAction}
+                onFateThrow={handleFateThrow}
                 audio={audio}
                 nowPlaying={nowPlaying}
                 knowledgeEntries={gameState.knowledge}
