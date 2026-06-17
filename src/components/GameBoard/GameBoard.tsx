@@ -53,6 +53,7 @@ import type {
   QuestsPayload,
   FateStatePayload,
   FateRollPayload,
+  FateThrowPayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -215,6 +216,9 @@ export interface GameBoardProps {
    * explicit channel — the server is the economy + validation authority).
    */
   onFateAction?: (action: FateActionInput) => void;
+  /** ADR-148 / Story 126-7: forward a player's PROACTIVE Fate throw (the four
+   * settled dF faces + gesture) up to App, which sends it as a FATE_THROW. */
+  onFateThrow?: (payload: FateThrowPayload) => void;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -323,6 +327,7 @@ export function GameBoard({
   fateData = null,
   latestFateRoll = null,
   onFateAction,
+  onFateThrow,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -654,6 +659,7 @@ export function GameBoard({
             actorName={fateActor}
             sealedWaiting={fateSealed}
             onFateAction={onFateAction}
+            onFateThrow={onFateThrow}
           />
         );
       }
@@ -720,7 +726,7 @@ export function GameBoard({
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      onFateAction,
+      onFateAction, onFateThrow,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, lastOrbitalError,
       sendOrbitalIntent, sessionBoundEpoch,
       // Story 85-3: confrontation-mode panel inputs.

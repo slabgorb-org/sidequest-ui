@@ -22,7 +22,7 @@
  * mocked exactly as FateDiceTray.test.tsx mocks them (no WebGL in jsdom).
  */
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { FateStatePayload, FateRollPayload } from "@/types/payloads";
 
 // R3F + drei + dice-lib mocks (the FateDiceTray the surface mounts needs them).
@@ -36,8 +36,17 @@ vi.mock("@react-three/fiber", () => ({
 vi.mock("@react-three/drei", () => ({
   Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
+// Capture the props the thrower-mode FateDiceTray hands DiceScene so a test can
+// drive the dF throw gesture + settle (ADR-148 / Story 126-7). The most-recently
+// mounted DiceScene wins — in thrower mode that is the interactive tray.
+const { sceneProps } = vi.hoisted(() => ({
+  sceneProps: { current: null as null | Record<string, unknown> },
+}));
 vi.mock("@local/dice-lib", () => ({
-  DiceScene: () => <div data-testid="dice-scene" />,
+  DiceScene: (props: Record<string, unknown>) => {
+    sceneProps.current = props;
+    return <div data-testid="dice-scene" />;
+  },
   D6_RADIUS: 0.36,
   DEFAULT_DICE_THEME: { dieColor: "#4a1a3a", labelColor: "#d4af37" },
   // FateDiceTray replays the roll via dice-lib's converter (Story 125-4).
@@ -48,6 +57,22 @@ vi.mock("@local/dice-lib", () => ({
     angularVelocity: [0.5, 0.5, 0.5],
   }),
 }));
+
+// Scene-space ThrowParams as PhysicsDie reports them on settle.
+const SCENE_PARAMS = {
+  linearVelocity: [0, 4, -1],
+  angularVelocity: [0.5, 0.5, 0.5],
+  position: [0, 0.36, 0],
+};
+
+/** Drive the armed dF thrower to settle on `faces`, returning what FATE_THROW the
+ *  surface emitted (the gesture + settle are the physics-is-the-roll path). */
+function throwDice(faces: number[]) {
+  act(() => {
+    (sceneProps.current!.onThrow as (p: unknown) => void)(SCENE_PARAMS);
+    (sceneProps.current!.onAllSettle as (f: number[]) => void)(faces);
+  });
+}
 
 import { FateConflictSurface } from "../FateConflictSurface";
 
@@ -98,6 +123,7 @@ function fateState(opts: {
 
 function renderSurface(props: Partial<React.ComponentProps<typeof FateConflictSurface>> = {}) {
   const onFateAction = vi.fn();
+  const onFateThrow = vi.fn();
   const utils = render(
     <FateConflictSurface
       fateState={fateState()}
@@ -105,10 +131,11 @@ function renderSurface(props: Partial<React.ComponentProps<typeof FateConflictSu
       ruleset="fate"
       actorName="Sam Spadework"
       onFateAction={onFateAction}
+      onFateThrow={onFateThrow}
       {...props}
     />,
   );
-  return { ...utils, onFateAction };
+  return { ...utils, onFateAction, onFateThrow };
 }
 
 describe("FateConflictSurface — the live exchange", () => {
@@ -180,13 +207,38 @@ describe("FateConflictSurface — the sealed-commit barrier", () => {
   });
 });
 
-describe("FateConflictSurface — freeform text rides the tile", () => {
-  it("carries the typed flourish as player_action when a verb tile is clicked", () => {
+describe("FateConflictSurface — a roll verb mounts the dF thrower (ADR-148 / Story 126-7)", () => {
+  // The proactive roll verbs are physics-is-the-roll: clicking one ARMS the dF
+  // thrower and DEFERS the send until the dice settle, then emits FATE_THROW with
+  // the four settled faces (NOT a synchronous FATE_ACTION). The non-roll verbs
+  // (concede / compel_*) stay on FATE_ACTION (asserted in the .compel suite).
+  it("arms the thrower instead of dispatching FATE_ACTION synchronously", () => {
     const { onFateAction } = renderSurface();
-    const input = screen.getByTestId("fate-freeform-input");
-    fireEvent.change(input, { target: { value: "I swing from the chandelier and fire" } });
+    fireEvent.click(screen.getByTestId("fate-action-overcome"));
+    expect(screen.getByTestId("fate-throw-armed")).toBeInTheDocument();
+    // No synchronous FATE_ACTION — the roll is sent only after the throw settles.
+    expect(onFateAction).not.toHaveBeenCalled();
+  });
+
+  it("submits FATE_THROW with the settled faces when the dice land", () => {
+    const { onFateThrow } = renderSurface();
+    fireEvent.click(screen.getByTestId("fate-action-overcome"));
+    throwDice([1, 0, -1, 1]);
+    expect(onFateThrow).toHaveBeenCalledTimes(1);
+    expect(onFateThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "overcome", face: [1, 0, -1, 1] }),
+    );
+    expect(onFateThrow.mock.calls[0][0].throw_params).toBeTruthy();
+  });
+
+  it("carries the typed flourish as player_action through the throw", () => {
+    const { onFateThrow } = renderSurface();
+    fireEvent.change(screen.getByTestId("fate-freeform-input"), {
+      target: { value: "I swing from the chandelier and fire" },
+    });
     fireEvent.click(screen.getByTestId("fate-action-attack"));
-    expect(onFateAction).toHaveBeenCalledWith(
+    throwDice([1, 1, 0, -1]);
+    expect(onFateThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "attack",
         player_action: "I swing from the chandelier and fire",
@@ -194,10 +246,11 @@ describe("FateConflictSurface — freeform text rides the tile", () => {
     );
   });
 
-  it("dispatches a bare action (no rider) when nothing is typed", () => {
-    const { onFateAction } = renderSurface();
+  it("submits no rider when nothing is typed", () => {
+    const { onFateThrow } = renderSurface();
     fireEvent.click(screen.getByTestId("fate-action-overcome"));
-    const call = onFateAction.mock.calls[0]?.[0];
+    throwDice([0, 0, 0, 0]);
+    const call = onFateThrow.mock.calls[0]?.[0];
     expect(call).toMatchObject({ action: "overcome" });
     expect(call?.player_action ?? "").toBe("");
   });
@@ -205,38 +258,35 @@ describe("FateConflictSurface — freeform text rides the tile", () => {
 
 describe("FateConflictSurface — the attack names an opponent (rework: Reviewer HIGH #1)", () => {
   // The server's _resolve_attack HARD-raises "an attack must name a target" when
-  // commit.target is None (fate_conflict.py:500, No Silent Fallbacks). An Attack tile
-  // that dispatches no target therefore ALWAYS errors at exchange time — the core verb
-  // of a *conflict* surface can never land. The attack MUST carry an opponent-side
-  // participant as its target.
-  it("dispatches an opponent-side participant as the target when Attack is clicked", () => {
-    const { onFateAction } = renderSurface();
+  // commit.target is None (fate_conflict.py, No Silent Fallbacks). An Attack throw
+  // that carries no target therefore ALWAYS errors at exchange time. The attack
+  // MUST carry an opponent-side participant as its target (now on the FATE_THROW).
+  it("submits an opponent-side participant as the target when Attack is thrown", () => {
+    const { onFateThrow } = renderSurface();
     fireEvent.click(screen.getByTestId("fate-action-attack"));
-    expect(onFateAction).toHaveBeenCalledWith(
+    throwDice([1, 1, 0, -1]);
+    expect(onFateThrow).toHaveBeenCalledWith(
       expect.objectContaining({ action: "attack", target: "The Fat Man" }),
     );
   });
 
   it("never targets a player-side participant (the target is the Other, not the self)", () => {
-    // Guard: the chosen target must come from the opponent side, never the acting PC
-    // or an ally. With Sam (player) vs The Fat Man (opponent), the only legal attack
-    // target is The Fat Man.
-    const { onFateAction } = renderSurface();
+    const { onFateThrow } = renderSurface();
     fireEvent.click(screen.getByTestId("fate-action-attack"));
-    const call = onFateAction.mock.calls[0]?.[0];
+    throwDice([1, 1, 0, -1]);
+    const call = onFateThrow.mock.calls[0]?.[0];
     expect(call?.target).toBe("The Fat Man");
     expect(call?.target).not.toBe("Sam Spadework");
   });
 
   it("still carries the freeform rider alongside the target", () => {
-    // The target fix must not drop the freeform-rides-the-tile behavior: an attack
-    // carries BOTH the opponent target AND the player_action flourish.
-    const { onFateAction } = renderSurface();
+    const { onFateThrow } = renderSurface();
     fireEvent.change(screen.getByTestId("fate-freeform-input"), {
       target: { value: "I swing from the chandelier and fire" },
     });
     fireEvent.click(screen.getByTestId("fate-action-attack"));
-    expect(onFateAction).toHaveBeenCalledWith(
+    throwDice([1, 1, 0, -1]);
+    expect(onFateThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "attack",
         target: "The Fat Man",
