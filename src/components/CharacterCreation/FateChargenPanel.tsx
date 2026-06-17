@@ -145,6 +145,15 @@ export function FateSkillPyramidPanel({
   const [allocation, setAllocation] = useState<Record<string, number>>({
     ...currentAllocation,
   });
+  // The `legal`/`violations` props are the server's verdict for the INITIAL
+  // allocation; the live mirror isn't re-fetched per change (no preview
+  // round-trip is wired). Once the player edits, those props are stale — and
+  // we must NOT recompute legality client-side (the panel mirrors the server,
+  // it does not adjudicate — No Silent Fallbacks). So after the first edit we
+  // stop showing the stale verdict and defer to the server's authority on
+  // Confirm (which re-validates and re-prompts). The per-rung counters below
+  // carry the live shape signal in the meantime. (playtest [FATE/UX-LOW])
+  const [edited, setEdited] = useState(false);
 
   const ratings = Array.from({ length: apexRating }, (_, i) => apexRating - i); // apex..1
   const labelFor = (r: number) => ladderLabels[String(r)] ?? ladderLabels[r] ?? `+${r}`;
@@ -154,8 +163,10 @@ export function FateSkillPyramidPanel({
   const placedAt = (r: number) =>
     Object.values(allocation).filter((rating) => rating === r).length;
 
-  const setRating = (skill: string, rating: number) =>
+  const setRating = (skill: string, rating: number) => {
+    setEdited(true);
     setAllocation((prev) => ({ ...prev, [skill]: rating }));
+  };
 
   const placed = Object.fromEntries(
     Object.entries(allocation).filter(([, r]) => r > 0),
@@ -202,9 +213,15 @@ export function FateSkillPyramidPanel({
 
       <p
         data-testid="fate-pyramid-legality"
-        className={`text-sm ${legal ? "text-emerald-500" : "text-destructive"}`}
+        className={`text-sm ${
+          edited ? "text-muted-foreground" : legal ? "text-emerald-500" : "text-destructive"
+        }`}
       >
-        {legal ? "Legal pyramid" : violations.join("; ")}
+        {edited
+          ? "Match each rung to its budget above, then Confirm to validate."
+          : legal
+            ? "Legal pyramid"
+            : violations.join("; ")}
       </p>
 
       <button
