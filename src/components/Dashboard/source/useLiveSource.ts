@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect, useMemo } from "react";
 import { useWatcherSocket } from "@/hooks/useWatcherSocket";
 import type { WatcherEvent, SessionStateView } from "@/types/watcher";
 
@@ -118,6 +118,9 @@ function synthesizeTurnComplete(
     component: "orchestrator",
     event_type: "turn_complete",
     severity: "info",
+    // Carry the closing span's session slug so the synthesized turn survives the
+    // Live view's per-session filter (OTEL-INSPECTOR, 2026-06-16).
+    session_slug: closingEvent.session_slug ?? null,
     fields,
   };
 }
@@ -314,8 +317,9 @@ export function useLiveSource(): LiveSourceState {
   }, [state.turns.length, refreshState]);
 
   // Derive the active session slug from debugState (same sort logic as StateTab).
-  // Used by EncounterTab to fetch encounter events for the live session.
-  const activeSlug: string | null = (() => {
+  // Used by EncounterTab to fetch encounter events for the live session AND as
+  // the partition key the Live view scopes its span stream to.
+  const activeSlug = useMemo<string | null>(() => {
     if (!state.debugState || state.debugState.length === 0) return null;
     const sorted = [...state.debugState].sort((a, b) => {
       const aTs = a.last_activity_ts ?? 0;
@@ -323,24 +327,97 @@ export function useLiveSource(): LiveSourceState {
       return bTs - aTs;
     });
     return sorted[0].session_key;
-  })();
+  }, [state.debugState]);
+
+  // --- Per-session scoping (OTEL-INSPECTOR fix, sq-playtest 2026-06-16) ---
+  // The reducer accumulates EVERY session's events (so switching the active
+  // session is lossless), but the RETURNED view is scoped to the active slug so
+  // a concurrent world's narration/patches don't bleed into the Live timeline.
+  // Session-less infra events (no session_slug) are global and always shown.
+  const scopedAllEvents = useMemo(
+    () => state.allEvents.filter((e) => inActiveSession(e, activeSlug)),
+    [state.allEvents, activeSlug],
+  );
+  const scopedTurns = useMemo(
+    () => state.turns.filter((e) => inActiveSession(e, activeSlug)),
+    [state.turns, activeSlug],
+  );
+  const scopedPromptEvents = useMemo(
+    () => state.promptEvents.filter((e) => inActiveSession(e, activeSlug)),
+    [state.promptEvents, activeSlug],
+  );
+  const scopedLoreEvents = useMemo(
+    () => state.loreEvents.filter((e) => inActiveSession(e, activeSlug)),
+    [state.loreEvents, activeSlug],
+  );
+  const scopedComponentMap = useMemo(() => {
+    const m: Record<string, WatcherEvent[]> = {};
+    for (const ev of scopedAllEvents) {
+      const comp = ev.component || "unknown";
+      (m[comp] ??= []).push(ev);
+    }
+    return m;
+  }, [scopedAllEvents]);
+
+  // selectedTurn lives in the reducer as an index into the UNFILTERED turns.
+  // Translate it to an index into the scoped turns the timeline actually
+  // renders; fall back to the active session's latest turn (auto-follow) when
+  // the reducer's selection points at another session's turn.
+  const selectedTurn = useMemo<number | null>(() => {
+    if (scopedTurns.length === 0) return null;
+    const sel = state.selectedTurn;
+    if (sel !== null && state.turns[sel]) {
+      const idx = scopedTurns.indexOf(state.turns[sel]);
+      if (idx >= 0) return idx;
+    }
+    return scopedTurns.length - 1;
+  }, [scopedTurns, state.selectedTurn, state.turns]);
+
+  // The timeline hands back a scoped index; translate it to the unfiltered
+  // index the reducer stores.
+  const selectTurn = useCallback(
+    (i: number | null) => {
+      if (i === null) {
+        dispatch({ type: "SELECT_TURN", index: null });
+        return;
+      }
+      const ev = scopedTurns[i];
+      const idx = ev ? state.turns.indexOf(ev) : null;
+      dispatch({ type: "SELECT_TURN", index: idx });
+    },
+    [scopedTurns, state.turns],
+  );
 
   return {
     activeTab: state.activeTab,
-    turns: state.turns,
-    allEvents: state.allEvents,
-    componentMap: state.componentMap,
-    promptEvents: state.promptEvents,
-    loreEvents: state.loreEvents,
+    turns: scopedTurns,
+    allEvents: scopedAllEvents,
+    componentMap: scopedComponentMap,
+    promptEvents: scopedPromptEvents,
+    loreEvents: scopedLoreEvents,
     debugState: state.debugState,
-    selectedTurn: state.selectedTurn,
+    selectedTurn,
     paused: state.paused,
     connected,
     activeSlug,
     setTab: (tab) => dispatch({ type: "SET_TAB", tab }),
-    selectTurn: (i) => dispatch({ type: "SELECT_TURN", index: i }),
+    selectTurn,
     togglePause: () => dispatch({ type: "TOGGLE_PAUSE" }),
     clear: () => dispatch({ type: "CLEAR" }),
     refreshState,
   };
+}
+
+/** Live-view session scoping predicate (OTEL-INSPECTOR fix, 2026-06-16).
+ *  Keep an event if no active session is resolved yet (don't hide anything),
+ *  if it's session-less infra (global), or if it belongs to the active
+ *  session. */
+function inActiveSession(
+  ev: WatcherEvent,
+  activeSlug: string | null,
+): boolean {
+  if (!activeSlug) return true;
+  const sid = ev.session_slug;
+  if (sid == null || sid === "") return true;
+  return sid === activeSlug;
 }
