@@ -271,9 +271,18 @@ export function useStateMirror(messages: GameMessage[]): void {
       // FateDiceTray's `roll.dice.map(...)` (panel) or the conflict surface and
       // white-screen them — drop it and keep the last valid roll. Mirrors the
       // FATE_STATE boundary guard above.
+      //
+      // Story 125-5: also validate each FACE, not just the tuple length. A Fudge
+      // die only ever reads -1, 0, or +1; a 2/-5 is a corrupt or replayed payload
+      // that FateDiceTray's faceGlyph would silently degrade to '0' (wrong glyph).
+      // Drop it the same loud way as the missing/wrong-length case.
       if (msg.type === MessageType.FATE_ROLL) {
         const p = msg.payload as unknown as FateRollPayload;
-        if (!Array.isArray(p.dice) || p.dice.length !== 4) {
+        if (
+          !Array.isArray(p.dice) ||
+          p.dice.length !== 4 ||
+          !p.dice.every((d) => d === -1 || d === 0 || d === 1)
+        ) {
           console.error('[useStateMirror] malformed FATE_ROLL payload — ignoring', p);
           continue;
         }
