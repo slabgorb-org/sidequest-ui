@@ -147,6 +147,25 @@ describe("CharacterCreation: Fate skill pyramid (121-8)", () => {
     expect(screen.getByTestId("fate-pyramid-legality")).toHaveTextContent(/incomplete|illegal|rung/i);
   });
 
+  it("drops the stale server verdict once the player edits the allocation (playtest [FATE/UX-LOW])", () => {
+    // The server's `fate_violations` describe the INITIAL allocation; they are
+    // not re-fetched per change. Showing that frozen red against a pyramid the
+    // player has since filled is the bug. After an edit the panel must stop
+    // asserting the stale verdict and defer to the server (which validates on
+    // Confirm) — WITHOUT computing legality client-side (it does not adjudicate).
+    renderScene(pyramidScene());
+    const legality = screen.getByTestId("fate-pyramid-legality");
+    expect(legality).toHaveTextContent(/incomplete|illegal|rung/i); // initial: server verdict
+
+    // Player fills the remaining rungs.
+    fireEvent.change(screen.getByTestId("fate-skill-Notice"), { target: { value: "2" } });
+
+    // The stale "rung … has 0" red is gone; a neutral defer-to-Confirm prompt shows.
+    expect(legality).not.toHaveTextContent(/has 0/i);
+    expect(legality).toHaveTextContent(/Confirm to validate/i);
+    expect(legality.className).not.toMatch(/text-destructive/);
+  });
+
   it("confirm sends the current allocation as fate_pyramid_confirm", () => {
     const onRespond = renderScene(
       pyramidScene({
