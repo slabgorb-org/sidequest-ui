@@ -6,7 +6,7 @@
 // Wiring Test."
 
 import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
-import type { CreationAnswer } from "@/types/payloads";
+import type { CreationAnswer, FateAspectEntry } from "@/types/payloads";
 import type { CharacterSummary } from "@/types/party";
 
 /**
@@ -106,5 +106,8 @@ export function toCharacterSheetData(
         ? (sheetFacet.skills as Record<string, number>)
         : undefined,
     foci: Array.isArray(sheetFacet.foci) ? (sheetFacet.foci as string[]) : undefined,
+    fate_aspects: Array.isArray(sheetFacet.fate_aspects)
+      ? (sheetFacet.fate_aspects as FateAspectEntry[])
+      : undefined,
   };
 }

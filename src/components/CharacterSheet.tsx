@@ -1,4 +1,4 @@
-import type { CreationAnswer, LinkedLoreFragment } from "@/types/payloads";
+import type { CreationAnswer, FateAspectEntry, LinkedLoreFragment } from "@/types/payloads";
 import { PortraitFrame } from "./PortraitFrame";
 
 export type AbilitySource = "Race" | "Class" | "Item" | "Play";
@@ -106,6 +106,9 @@ export interface CharacterSheetData {
   /** WN-family focus ids (ADR-143 Task 11). Absent/empty for non-WN
    *  characters — Foci section is NOT rendered when empty. */
   foci?: string[];
+  /** Named Fate aspects (high_concept / trouble / character) — Deliverable B1.
+   *  Absent/empty for non-Fate characters ⇒ the Aspects section is NOT rendered. */
+  fate_aspects?: FateAspectEntry[];
 }
 
 export interface CharacterSheetProps {
@@ -295,6 +298,20 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <h3 className="text-sm font-semibold mb-1">Backstory</h3>
         <p className="text-sm font-[var(--font-narrative)]">{data.backstory}</p>
       </div>
+
+      {data.fate_aspects && data.fate_aspects.length > 0 && (
+        <div data-testid="character-aspects">
+          <h3 className="text-sm font-semibold mb-1">Aspects</h3>
+          <ul className="space-y-1">
+            {data.fate_aspects.map((aspect, i) => (
+              <li key={`${aspect.kind}-${i}`} className="text-sm font-[var(--font-narrative)]">
+                <span className="text-muted-foreground">{toDisplayName(aspect.kind)}: </span>
+                {aspect.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* History — story 93-3. Reads the durable chargen provenance
           (creation_answers) and lists, per scene, the prompt the player saw and
