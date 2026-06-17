@@ -19,7 +19,7 @@
  * Drives the REAL hook via renderHook over a GameStateProvider wrapper —
  * identical harness to useStateMirror.fate.test.ts.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import {
@@ -108,5 +108,55 @@ describe("useStateMirror — FATE_ROLL (Story 118-7 / ADR-144 F3g)", () => {
     ]);
     // The malformed roll is ignored; the last VALID roll stands.
     expect(result.current.state.latestFateRoll?.tier).toBe("Succeed");
+  });
+});
+
+// Story 125-5 (ADR-144 F3g, deferred from 118-7): the guard must reject a
+// payload that has the right SHAPE (4-element dice tuple) but an out-of-range
+// FACE. A Fudge die face is only ever -1, 0, or +1; a 2 or -5 means the wire
+// payload is corrupt/replayed and would render a wrong glyph (FateDiceTray's
+// faceGlyph degrades any out-of-range value to '0'). Drop it loudly, same as
+// the missing/wrong-length case — No-Silent-Fallbacks.
+describe("useStateMirror — FATE_ROLL face-value boundary (Story 125-5)", () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  function rollWithDice(dice: number[]): FateRollPayload {
+    return { ...roll(4, "Succeed"), dice };
+  }
+
+  it("rejects a FATE_ROLL with a face of 2 (out of range), not storing it", () => {
+    const result = mirror([rollMsg(rollWithDice([2, 1, 0, -1]))]);
+    expect(result.current.state.latestFateRoll).toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("rejects a FATE_ROLL with a face of -5 (out of range), not storing it", () => {
+    const result = mirror([rollMsg(rollWithDice([-5, 0, 1, 1]))]);
+    expect(result.current.state.latestFateRoll).toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("accepts a FATE_ROLL with all faces in {-1,0,1} and stores it", () => {
+    const result = mirror([rollMsg(rollWithDice([-1, 0, 0, 1]))]);
+    expect(result.current.state.latestFateRoll).not.toBeNull();
+    expect(result.current.state.latestFateRoll?.dice).toEqual([-1, 0, 0, 1]);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps the prior valid roll when a face-range violation is rejected", () => {
+    const result = mirror([
+      rollMsg(rollWithDice([0, 0, 1, -1])),
+      rollMsg(rollWithDice([3, 0, 0, 0])),
+    ]);
+    // The out-of-range second roll is dropped; the last VALID roll stands.
+    expect(result.current.state.latestFateRoll?.dice).toEqual([0, 0, 1, -1]);
   });
 });

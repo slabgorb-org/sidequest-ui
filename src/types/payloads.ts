@@ -622,6 +622,11 @@ export interface FateThrowPayload {
   throw_params: DiceThrowParams;
   /** Exactly 4 settled dF faces, each -1 / 0 / +1. */
   face: number[];
+  // Story 125-5: index signature so a FateThrowMessage is assignable to the
+  // GameMessage union (payload: Record<string, unknown>) at App.tsx's send()
+  // call — sibling sent payloads carry this; FateThrowPayload (126-7/ADR-148)
+  // shipped without it and red-built develop's tsc -b.
+  [key: string]: unknown;
 }
 
 // ---------------------------------------------------------------------------
