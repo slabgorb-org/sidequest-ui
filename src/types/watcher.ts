@@ -118,7 +118,7 @@ export interface NpcRegistryEntry {
   last_seen_turn: number;
   age: string;
   appearance: string;
-  ocean_summary?: string;
+  ocean_summary?: string | null;
   ocean?: Record<string, unknown>;
   hp: number;
   max_hp: number;
