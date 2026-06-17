@@ -194,6 +194,56 @@ describe("25-10 AC-2: Status tab renders resource bars", () => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// Regression (playtest 2026-06-17): a pool with the `thresholds` key
+// OMITTED (the PARTY_STATUS wire drops empty-default lists — ProtocolBase
+// `is_empty` parity) must NOT crash the GameBoard. pulp_noir's `heat` pool
+// declares no thresholds, so the deserialized pool has `thresholds ===
+// undefined`; the old `for (const t of thresholds)` in GenericResourceBar
+// threw `TypeError: thresholds is not iterable` and the error boundary ate
+// the whole <Game>. This is the wiring test for that path
+// (CharacterPanel → StatusContent → GenericResourceBar).
+// ═══════════════════════════════════════════════════════════
+
+describe("Regression: pool with omitted thresholds does not crash the panel", () => {
+  // Exactly what the wire delivers for pulp_noir `heat`: no `thresholds` key.
+  // Cast through unknown because the absent-key shape is what the deserialized
+  // payload produces at runtime even though the (now-optional) type allows it.
+  const HEAT_NO_THRESHOLDS = { value: 3, max: 5 } as ResourcePool;
+
+  it("renders the Status tab with a thresholds-less pool without throwing", () => {
+    expect(() =>
+      render(
+        <CharacterPanel
+          character={CHARACTER}
+          resources={{ Heat: HEAT_NO_THRESHOLDS }}
+          genreSlug="pulp_noir"
+        />,
+      ),
+    ).not.toThrow();
+    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    expect(screen.getByTestId("resource-bar")).toBeInTheDocument();
+    expect(screen.getByText("Heat")).toBeInTheDocument();
+    expect(screen.getByText(/3\s*\/\s*5/)).toBeInTheDocument();
+    // No thresholds ⇒ no markers, but the bar (and the board) survive.
+    expect(screen.queryAllByTestId("threshold-marker")).toHaveLength(0);
+  });
+
+  it("renders a mix of thresholds-bearing and thresholds-less pools", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        resources={{ Luck: LUCK_RESOURCE, Heat: HEAT_NO_THRESHOLDS }}
+        genreSlug="pulp_noir"
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    expect(screen.getAllByTestId("resource-bar")).toHaveLength(2);
+    // Only Luck contributes markers (2); Heat contributes none.
+    expect(screen.getAllByTestId("threshold-marker")).toHaveLength(2);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
 // AC-3: Resource state updates (data mapping)
 // ═══════════════════════════════════════════════════════════
 

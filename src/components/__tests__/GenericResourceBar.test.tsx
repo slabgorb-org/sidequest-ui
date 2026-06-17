@@ -417,3 +417,50 @@ describe('AC9: Edge cases', () => {
     expect(fill).toHaveStyle({ width: '100%' });
   });
 });
+
+// ═══════════════════════════════════════════════════════════
+// AC10: Omitted thresholds — the board must NOT crash (playtest 2026-06-17)
+//
+// The PARTY_STATUS wire OMITS the `thresholds` key entirely when a pool
+// declares none (ProtocolBase drops empty-default lists — Rust `is_empty`
+// parity). pulp_noir's `heat` pool has no thresholds, so the UI received a
+// pool object with `thresholds === undefined`, and `for (const t of
+// thresholds)` threw `TypeError: thresholds is not iterable`, killing the
+// whole GameBoard via the error boundary. `thresholds: []` (covered above)
+// did NOT reproduce it — only the OMITTED case does. Guard the omitted case.
+// ═══════════════════════════════════════════════════════════
+
+describe('AC10: Omitted thresholds (wire omits empty list) must not crash', () => {
+  // Mirror exactly what the deserialized PARTY_STATUS pool looks like when the
+  // server omitted the empty `thresholds` list: the key is simply absent.
+  const OMITTED: ResourceBarProps = {
+    name: 'Heat',
+    value: 3,
+    max: 5,
+    genre_slug: 'pulp_noir',
+  };
+
+  it('renders the bar when thresholds is omitted entirely', () => {
+    render(<GenericResourceBar {...OMITTED} />);
+    expect(screen.getByTestId('resource-bar')).toBeInTheDocument();
+    expect(screen.getByText('Heat')).toBeInTheDocument();
+    expect(screen.getByText(/3\s*\/\s*5/)).toBeInTheDocument();
+  });
+
+  it('renders no threshold markers when thresholds is omitted', () => {
+    render(<GenericResourceBar {...OMITTED} />);
+    expect(screen.queryAllByTestId('threshold-marker')).toHaveLength(0);
+  });
+
+  it('does not pulse or toast when thresholds is omitted', () => {
+    render(<GenericResourceBar {...OMITTED} />);
+    expect(screen.getByTestId('resource-bar')).not.toHaveClass('threshold-pulse');
+    expect(screen.queryByTestId('threshold-toast')).not.toBeInTheDocument();
+  });
+
+  it('explicit undefined thresholds behaves like omitted (no crash)', () => {
+    render(<GenericResourceBar {...OMITTED} thresholds={undefined} />);
+    expect(screen.getByTestId('resource-bar')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('threshold-marker')).toHaveLength(0);
+  });
+});

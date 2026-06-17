@@ -15,12 +15,25 @@ export interface ResourceBarProps {
   value: number;
   max: number;
   genre_slug: string;
-  thresholds: ResourceThreshold[];
+  /**
+   * Optional. The PARTY_STATUS wire OMITS this field entirely when a pool
+   * declares no thresholds — `ProtocolBase` drops empty lists that match
+   * their default (Rust `is_empty` parity; see
+   * sidequest-server/sidequest/protocol/base.py). So a pool like pulp_noir's
+   * `heat` arrives with no `thresholds` key at all. A missing list means
+   * "this pool has no thresholds" — render a plain bar with no markers, never
+   * crash the board. Treated as `[]` when absent.
+   */
+  thresholds?: ResourceThreshold[];
   onThresholdCrossed?: (info: {
     resource: string;
     threshold: ResourceThreshold;
   }) => void;
 }
+
+/** Stable empty reference so the `useMemo` dep identity doesn't churn each
+ *  render when `thresholds` is absent. */
+const NO_THRESHOLDS: ResourceThreshold[] = [];
 
 // ═══════════════════════════════════════════════════════════
 // Component
@@ -34,18 +47,23 @@ export function GenericResourceBar({
   thresholds,
   onThresholdCrossed,
 }: ResourceBarProps) {
+  // A pool with no thresholds arrives with the field omitted (see the
+  // `thresholds` doc above) — normalize to a stable empty array so neither the
+  // crossing scan nor the marker map blows up on `undefined`.
+  const thresholdList = thresholds ?? NO_THRESHOLDS;
+
   const fillPct = max > 0
     ? Math.max(0, Math.min(100, (value / max) * 100))
     : 0;
 
   // Determine which threshold (if any) is currently crossed
   const crossedThreshold = useMemo(() => {
-    for (const t of thresholds) {
+    for (const t of thresholdList) {
       if (t.direction === 'low' && value <= t.value) return t;
       if (t.direction === 'high' && value >= t.value) return t;
     }
     return null;
-  }, [thresholds, value]);
+  }, [thresholdList, value]);
 
   // Fire callback when a threshold is crossed
   useEffect(() => {
@@ -86,7 +104,7 @@ export function GenericResourceBar({
         />
 
         {/* Threshold markers */}
-        {thresholds.map((t) => {
+        {thresholdList.map((t) => {
           const position = max > 0 ? (t.value / max) * 100 : 0;
           return (
             <div
