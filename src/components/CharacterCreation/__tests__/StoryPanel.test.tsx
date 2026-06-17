@@ -99,7 +99,7 @@ describe("StoryPanel", () => {
     const labels = container.querySelectorAll("div.text-xs");
     const labelTexts = Array.from(labels).map((el) => el.textContent ?? "");
     expect(labelTexts.some((t) => /background.*optional/i.test(t))).toBe(true);
-    expect(labelTexts.some((t) => /description.*optional/i.test(t))).toBe(true);
+    expect(labelTexts.some((t) => /appearance.*optional/i.test(t))).toBe(true);
   });
 
   it("hides 'optional' badge when the flag is false", () => {
@@ -113,7 +113,7 @@ describe("StoryPanel", () => {
     const labels = container.querySelectorAll("div.text-xs");
     const labelTexts = Array.from(labels).map((el) => el.textContent ?? "");
     expect(labelTexts.some((t) => /background.*optional/i.test(t))).toBe(false);
-    expect(labelTexts.some((t) => /description.*optional/i.test(t))).toBe(false);
+    expect(labelTexts.some((t) => /appearance.*optional/i.test(t))).toBe(false);
   });
 
   it("uses freeform pronouns when 'other' is selected", () => {
@@ -129,5 +129,21 @@ describe("StoryPanel", () => {
       background: "",
       description: "",
     });
+  });
+
+  it("labels the appearance input 'Appearance', not 'Description'", () => {
+    render(
+      <StoryPanel
+        pronounsOptions={["she/her", "he/him", "they/them"]}
+        pronounsAllowFreeform
+        backgroundOptional
+        descriptionOptional
+        autogenAvailable={false}
+        onAutogen={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+    expect(screen.getByText("Appearance")).toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
   });
 });
