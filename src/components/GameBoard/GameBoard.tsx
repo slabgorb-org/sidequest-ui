@@ -593,6 +593,18 @@ export function GameBoard({
               (characters?.length ?? 0) > 1 ? sealedPlayerIds : undefined
             }
             magicState={magicState}
+            // Playtest 2026-06-17 [BUG]: surface the local PC's Fate sheet in the
+            // Character panel's Stats tab. fateData is the FATE_STATE projection,
+            // emitted only on a ruleset=='fate' pack — match the local PC by
+            // character name. Null on WN/native packs (fateData == null) ⇒ the
+            // panel keeps its native StatsContent path. The Fate sheet otherwise
+            // lived only in the dock FateWidget; a Fate player opening Character
+            // saw "No stats available." (native `stats` is empty on a Fate pack).
+            fateSheet={
+              fateData?.characters.find(
+                (c) => c.name === characterSheet.name,
+              ) ?? null
+            }
           />
         ) : null;
       case "inventory":

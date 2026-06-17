@@ -1,5 +1,6 @@
 import type {
   FateAspectEntry,
+  FateCharacterEntry,
   FateRollPayload,
   FateStatePayload,
 } from "@/types/payloads";
@@ -134,6 +135,146 @@ function AspectGroups({ aspects }: { aspects: FateAspectEntry[] }) {
   );
 }
 
+/**
+ * One PC's Fate sheet — fate points + refresh, ladder skills (name + adjective +
+ * signed rating), aspects grouped by kind, stress tracks, and consequence slots.
+ * Extracted from FatePanel's per-character block (playtest 2026-06-17) so the
+ * SAME renderer powers both the dock FateWidget AND the in-game Character panel's
+ * Stats tab — a Fate player must see their sheet where they look for it, not only
+ * in a separate dock tab (the Sebastien/Jade "show me the math in the player UI"
+ * mandate). Pure presentational; markup is byte-identical to the prior inline
+ * block so the existing FatePanel tests still cover it.
+ *
+ * `showDivider` draws the inter-PC separator rule — true when FatePanel stacks
+ * several PCs, false when the Character panel renders a single sheet (no trailing
+ * rule under one sheet).
+ */
+export function FateCharacterSheet({
+  character,
+  showDivider = true,
+}: {
+  character: FateCharacterEntry;
+  showDivider?: boolean;
+}) {
+  const ch = character;
+  const skills = ch.skills ?? [];
+  const aspects = ch.aspects ?? [];
+  const stress = ch.stress ?? {};
+  const consequences = ch.consequences ?? [];
+  return (
+    <div
+      data-testid="fate-character"
+      style={{
+        borderBottom: showDivider ? `1px solid ${FOLIO.rule}` : undefined,
+        paddingBottom: "0.75rem",
+        marginBottom: "0.75rem",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: "0.5rem",
+        }}
+      >
+        <span style={{ fontFamily: FONT_DISPLAY, fontSize: "1.1rem", flex: 1 }}>
+          {ch.name}
+        </span>
+        <span data-testid="fate-points">Fate Points: {ch.fate_points}</span>
+        <span style={{ color: FOLIO.inkSoft }}>(Refresh {ch.refresh})</span>
+      </div>
+
+      {skills.length > 0 && (
+        <div style={{ marginTop: "0.4rem" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+            Skills
+          </div>
+          {skills.map((s) => (
+            <div
+              key={s.name}
+              data-testid="fate-skill"
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: "0.5rem",
+              }}
+            >
+              <span style={{ flex: 1 }}>{s.name}</span>
+              <span style={{ color: FOLIO.inkSoft }}>{s.ladder}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatRating(s.rating)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AspectGroups aspects={aspects} />
+
+      {Object.keys(stress).length > 0 && (
+        <div style={{ marginTop: "0.4rem" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+            Stress
+          </div>
+          {Object.entries(stress).map(([track, boxes]) => (
+            <div
+              key={track}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              <span style={{ textTransform: "capitalize", color: FOLIO.inkSoft }}>
+                {track}
+              </span>
+              {boxes.map((b, i) => (
+                <span
+                  key={`${track}-${i}`}
+                  data-testid="fate-stress-box"
+                  data-checked={b.checked ? "true" : "false"}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "1.4rem",
+                    height: "1.4rem",
+                    border: `1px solid ${FOLIO.rule}`,
+                    background: b.checked ? FOLIO.accent : "transparent",
+                    color: b.checked ? FOLIO.paper : FOLIO.ink,
+                  }}
+                >
+                  {b.value}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {consequences.length > 0 && (
+        <div style={{ marginTop: "0.4rem" }}>
+          <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
+            Consequences
+          </div>
+          {consequences.map((c) => (
+            <div
+              key={c.level}
+              data-testid="fate-consequence"
+              data-filled={c.filled ? "true" : "false"}
+              style={{ color: c.filled ? FOLIO.ink : FOLIO.inkSoft }}
+            >
+              <span style={{ textTransform: "capitalize" }}>{c.level}</span> (
+              {c.value})
+              {c.filled ? `: ${c.text}` : " — open"}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FatePanel({ data, latestRoll, ruleset }: FatePanelProps) {
   const characters = data?.characters ?? [];
   if (!data || characters.length === 0) {
@@ -178,125 +319,9 @@ export function FatePanel({ data, latestRoll, ruleset }: FatePanelProps) {
         <FateDiceTray roll={latestRoll} ruleset={ruleset ?? ""} />
       )}
 
-      {characters.map((ch) => {
-        const skills = ch.skills ?? [];
-        const aspects = ch.aspects ?? [];
-        const stress = ch.stress ?? {};
-        const consequences = ch.consequences ?? [];
-        return (
-          <div
-            key={ch.name}
-            data-testid="fate-character"
-            style={{
-              borderBottom: `1px solid ${FOLIO.rule}`,
-              paddingBottom: "0.75rem",
-              marginBottom: "0.75rem",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: "0.5rem",
-              }}
-            >
-              <span style={{ fontFamily: FONT_DISPLAY, fontSize: "1.1rem", flex: 1 }}>
-                {ch.name}
-              </span>
-              <span data-testid="fate-points">Fate Points: {ch.fate_points}</span>
-              <span style={{ color: FOLIO.inkSoft }}>(Refresh {ch.refresh})</span>
-            </div>
-
-            {skills.length > 0 && (
-              <div style={{ marginTop: "0.4rem" }}>
-                <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
-                  Skills
-                </div>
-                {skills.map((s) => (
-                  <div
-                    key={s.name}
-                    data-testid="fate-skill"
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <span style={{ flex: 1 }}>{s.name}</span>
-                    <span style={{ color: FOLIO.inkSoft }}>{s.ladder}</span>
-                    <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {formatRating(s.rating)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <AspectGroups aspects={aspects} />
-
-            {Object.keys(stress).length > 0 && (
-              <div style={{ marginTop: "0.4rem" }}>
-                <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
-                  Stress
-                </div>
-                {Object.entries(stress).map(([track, boxes]) => (
-                  <div
-                    key={track}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.4rem",
-                    }}
-                  >
-                    <span style={{ textTransform: "capitalize", color: FOLIO.inkSoft }}>
-                      {track}
-                    </span>
-                    {boxes.map((b, i) => (
-                      <span
-                        key={`${track}-${i}`}
-                        data-testid="fate-stress-box"
-                        data-checked={b.checked ? "true" : "false"}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: "1.4rem",
-                          height: "1.4rem",
-                          border: `1px solid ${FOLIO.rule}`,
-                          background: b.checked ? FOLIO.accent : "transparent",
-                          color: b.checked ? FOLIO.paper : FOLIO.ink,
-                        }}
-                      >
-                        {b.value}
-                      </span>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {consequences.length > 0 && (
-              <div style={{ marginTop: "0.4rem" }}>
-                <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
-                  Consequences
-                </div>
-                {consequences.map((c) => (
-                  <div
-                    key={c.level}
-                    data-testid="fate-consequence"
-                    data-filled={c.filled ? "true" : "false"}
-                    style={{ color: c.filled ? FOLIO.ink : FOLIO.inkSoft }}
-                  >
-                    <span style={{ textTransform: "capitalize" }}>{c.level}</span> (
-                    {c.value})
-                    {c.filled ? `: ${c.text}` : " — open"}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {characters.map((ch) => (
+        <FateCharacterSheet key={ch.name} character={ch} />
+      ))}
 
       {sceneAspects.length > 0 && (
         <div data-testid="fate-scene-aspects" style={{ marginBottom: "0.75rem" }}>

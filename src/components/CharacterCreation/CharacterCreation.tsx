@@ -612,11 +612,28 @@ export function CharacterCreation({ scene, loading, onRespond, portraits }: Char
             role="textbox"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Or describe it in your own words..."
+            placeholder={
+              // Playtest 2026-06-17 [UX]: when the box sits beside real choices it is
+              // an "or" alternative — narrative color only (it shapes prose via
+              // background/origin_label, never an aspect / item / skill). Don't word
+              // it as if it authors your character. A pure freeform / name step IS the
+              // answer, so it keeps the direct prompt.
+              scene.choices && scene.choices.length > 0 && scene.input_type !== "name"
+                ? "Add a detail in your own words..."
+                : "Or describe it in your own words..."
+            }
             className="flex-1 rounded-md border border-input bg-background text-sm px-3 py-2 placeholder:italic placeholder:text-muted-foreground/50"
           />
             <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50">Submit</button>
           </form>
+          {scene.choices && scene.choices.length > 0 && scene.input_type !== "name" && (
+            <p
+              data-testid="freeform-flavor-note"
+              className="w-full max-w-lg -mt-1 text-xs italic text-muted-foreground/60"
+            >
+              Optional — narrative flavor that colors the story, not your sheet.
+            </p>
+          )}
         </>
       )}
 
