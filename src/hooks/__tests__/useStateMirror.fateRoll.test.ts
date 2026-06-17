@@ -63,6 +63,8 @@ function roll(ladderTotal: number, tier: string): FateRollPayload {
     shifts: 2,
     tier,
     succeeded_with_style: tier === "SucceedWithStyle",
+    throw_params: { velocity: [1, 2, -0.5], angular: [0.5, 0.5, 0.5], position: [0.5, 0.5] },
+    seed: 4242,
   };
 }
 

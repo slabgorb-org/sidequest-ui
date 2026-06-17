@@ -40,6 +40,13 @@ vi.mock("@local/dice-lib", () => ({
   DiceScene: () => <div data-testid="dice-scene" />,
   D6_RADIUS: 0.36,
   DEFAULT_DICE_THEME: { dieColor: "#4a1a3a", labelColor: "#d4af37" },
+  // FateDiceTray replays the roll via dice-lib's converter (Story 125-4).
+  replayThrowParams: () => ({
+    position: [0, 0.86, 0],
+    rotation: [0, 0, 0],
+    linearVelocity: [0, 4, -1],
+    angularVelocity: [0.5, 0.5, 0.5],
+  }),
 }));
 
 import { FateConflictSurface } from "../FateConflictSurface";
@@ -53,6 +60,8 @@ const ROLL: FateRollPayload = {
   shifts: 2,
   tier: "Succeed",
   succeeded_with_style: false,
+  throw_params: { velocity: [1, 2, -0.5], angular: [0.5, 0.5, 0.5], position: [0.5, 0.5] },
+  seed: 4242,
 };
 
 /** A Fate state with an ACTIVE conflict. `heroFatePoints` / `heroFreeInvokes`

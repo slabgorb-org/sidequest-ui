@@ -22,6 +22,8 @@ const PAYLOAD: FateRollPayload = {
   shifts: 2,
   tier: "Succeed",
   succeeded_with_style: false,
+  throw_params: { velocity: [1, 2, -0.5], angular: [0.5, 0.5, 0.5], position: [0.5, 0.5] },
+  seed: 4242,
 };
 
 const FATE_ROLL_MSG: FateRollMessage = {

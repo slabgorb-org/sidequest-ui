@@ -33,6 +33,10 @@ vi.mock("@react-three/drei", () => ({
 const { sceneProps } = vi.hoisted(() => ({
   sceneProps: { current: null as null | Record<string, unknown> },
 }));
+// `replayThrowParams` is dice-lib's pure, deterministic wire→scene converter
+// (its own unit-tested concern). FateDiceTray depends on it (Story 125-4), so the
+// mock provides a faithful stub: passthrough velocity/angular, seed-keyed rotation
+// — same differs-by-input contract the assertions below rely on, no WebGL needed.
 vi.mock("@local/dice-lib", () => ({
   DiceScene: (props: Record<string, unknown>) => {
     sceneProps.current = props;
@@ -40,11 +44,25 @@ vi.mock("@local/dice-lib", () => ({
   },
   D6_RADIUS: 0.36,
   DEFAULT_DICE_THEME: { dieColor: "#4a1a3a", labelColor: "#d4af37" },
+  replayThrowParams: (
+    wire: { velocity: number[]; angular: number[]; position: number[] },
+    seed: number,
+    radius: number,
+  ) => ({
+    position: [wire.position[0] - 0.5, radius + 0.5, wire.position[1] * 1.6 - 0.8],
+    rotation: [seed, seed, seed],
+    linearVelocity: [...wire.velocity],
+    angularVelocity: [...wire.angular],
+  }),
 }));
 
 import { FateDiceTray } from "../FateDiceTray";
 import type { FateRollPayload } from "@/types/payloads";
 
+// Story 125-4 (ADR-144 F3g follow-up): FATE_ROLL now carries the dice-animation
+// replay fields throw_params + seed (mirroring DICE_RESULT) so FateDiceTray can
+// animate the dice instead of rendering the idle pickup row (throwParams=null).
+// Distinct gesture + seed per fixture so the re-throw assertion below is real.
 const SUCCEED: FateRollPayload = {
   dice: [1, 1, 0, -1],
   roll_total: 1,
@@ -54,6 +72,8 @@ const SUCCEED: FateRollPayload = {
   shifts: 2,
   tier: "Succeed",
   succeeded_with_style: false,
+  throw_params: { velocity: [1.5, 3, -0.5], angular: [2, -1, 0.5], position: [0.4, 0.6] },
+  seed: 1001,
 };
 
 const STYLE: FateRollPayload = {
@@ -65,6 +85,8 @@ const STYLE: FateRollPayload = {
   shifts: 3,
   tier: "SucceedWithStyle",
   succeeded_with_style: true,
+  throw_params: { velocity: [-2, 1, 3], angular: [-1, 2, -0.5], position: [0.7, 0.3] },
+  seed: 2002,
 };
 
 describe("FateDiceTray", () => {
@@ -104,5 +126,35 @@ describe("FateDiceTray", () => {
     );
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByTestId("dice-scene")).toBeNull();
+  });
+
+  // -- AC-U4 (Story 125-4): the dice animate the roll, not the idle row --------
+
+  it("passes the roll's throw gesture to DiceScene instead of the idle (null) render", () => {
+    // Was hardcoded `throwParams={null}` → the idle pickup row. With the roll now
+    // carrying throw_params + seed, FateDiceTray must hand DiceScene a real gesture
+    // so the dice tumble (the legibility mandate — show what was rolled).
+    render(<FateDiceTray roll={SUCCEED} ruleset="fate" genreSlug="pulp_noir" />);
+    expect(sceneProps.current).not.toBeNull();
+    expect(sceneProps.current!.throwParams).not.toBeNull();
+    expect(typeof sceneProps.current!.throwParams).toBe("object");
+  });
+
+  it("derives throwParams + rollKey from the payload — a new roll re-throws", () => {
+    const { rerender } = render(
+      <FateDiceTray roll={SUCCEED} ruleset="fate" genreSlug="pulp_noir" />,
+    );
+    const firstThrow = JSON.stringify(sceneProps.current!.throwParams);
+    const firstKey = sceneProps.current!.rollKey;
+
+    rerender(<FateDiceTray roll={STYLE} ruleset="fate" genreSlug="pulp_noir" />);
+    const secondThrow = JSON.stringify(sceneProps.current!.throwParams);
+    const secondKey = sceneProps.current!.rollKey;
+
+    // A different roll (different throw_params + seed) must produce a different
+    // gesture AND a new rollKey, so DiceScene re-mounts and re-throws. The pre-125-4
+    // surface hardcoded `rollKey={0}`, which would pin both to a constant.
+    expect(secondThrow).not.toBe(firstThrow);
+    expect(secondKey).not.toBe(firstKey);
   });
 });
