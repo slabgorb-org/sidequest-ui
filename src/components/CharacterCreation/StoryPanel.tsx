@@ -116,10 +116,11 @@ export function StoryPanel({
         />
       </div>
 
-      {/* Description */}
+      {/* Appearance — "what you look like". Wire field stays `description`
+          (OQ3 wire rename deferred); only the player-facing label changed. */}
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground/60 mb-1 flex items-baseline gap-2">
-          <span>Description</span>
+          <span>Appearance</span>
           {descriptionOptional && (
             <span className="normal-case tracking-normal text-[10px] text-muted-foreground/45 italic">
               optional

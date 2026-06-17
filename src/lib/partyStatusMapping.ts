@@ -6,7 +6,7 @@
 // Wiring Test."
 
 import type { CharacterSheetData, AbilityDefinition, ClassMove } from "@/components/CharacterSheet";
-import type { CreationAnswer } from "@/types/payloads";
+import type { CreationAnswer, FateAspectEntry } from "@/types/payloads";
 import type { CharacterSummary } from "@/types/party";
 
 /**
@@ -73,6 +73,7 @@ export function toCharacterSheetData(
     abilities: (sheetFacet.abilities as AbilityDefinition[]) ?? [],
     class_moves: (sheetFacet.class_moves as ClassMove[]) ?? [],
     backstory: (sheetFacet.backstory as string) ?? "",
+    appearance: (sheetFacet.appearance as string) || undefined,
     portrait_url: (rawLocal.portrait_url as string) || undefined,
     current_location: (rawLocal.current_location as string) ?? "",
     player_id: isMultiplayer
@@ -105,5 +106,8 @@ export function toCharacterSheetData(
         ? (sheetFacet.skills as Record<string, number>)
         : undefined,
     foci: Array.isArray(sheetFacet.foci) ? (sheetFacet.foci as string[]) : undefined,
+    fate_aspects: Array.isArray(sheetFacet.fate_aspects)
+      ? (sheetFacet.fate_aspects as FateAspectEntry[])
+      : undefined,
   };
 }
