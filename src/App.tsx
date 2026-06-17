@@ -1095,6 +1095,10 @@ function AppInner() {
             player_id: (e.player_id as string) ?? "",
             character_name: (e.character_name as string) ?? (e.player_name as string) ?? "",
             status: (e.status as TurnStatusEntry["status"]) ?? "pending",
+            // Story 126-4: the sealed action text rides the authoritative
+            // roster so the WAIT strip can recover it when the best-effort
+            // ACTION_REVEAL frame is missed (see mergePeerRevealsWithSubmittedStatus).
+            action: e.action as string | undefined,
           })),
         );
       }

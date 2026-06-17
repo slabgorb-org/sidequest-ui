@@ -69,6 +69,16 @@ export interface TurnStatusEntry {
   player_id: string;
   character_name: string;
   status: "pending" | "submitted" | "auto_resolved";
+  /**
+   * The player's sealed action text, carried on the authoritative roster for
+   * submitted/auto_resolved players (server sources it from its pending_actions
+   * buffer). ADR-036: peer action text is visible during WAIT. This is the
+   * recovery channel — when the best-effort ACTION_REVEAL frame is missed
+   * (e.g. a submitted-only fast-typist turn), the WAIT strip recovers the text
+   * from here rather than depending solely on the best-effort frame. Absent on
+   * the wire for pending players (ProtocolBase drops empty defaults).
+   */
+  action?: string;
 }
 
 export interface StateDelta {
