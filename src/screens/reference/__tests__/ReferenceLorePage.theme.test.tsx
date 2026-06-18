@@ -91,8 +91,10 @@ describe("ReferenceLorePage — theme injector wiring (C3)", () => {
     fetchMock.mockResolvedValue(makeJsonResponse(loreFixtureWithTheme()));
     renderLoreRoute();
 
-    // Content lands first…
-    await screen.findByText("The first forge was lit beneath the mountain.");
+    // Content lands first… (2026-06-17: sections collapse by default, so the
+    // projection's arrival is proven by the section label/trigger, not the
+    // now-collapsed body prose).
+    await screen.findByRole("heading", { name: /Legends/ });
     // …then the theme tokens are applied to :root.
     await waitFor(() => expect(rootVar("--primary")).toBe("#c0392b"));
     expect(rootVar("--background")).toBe("#1a1a1a");

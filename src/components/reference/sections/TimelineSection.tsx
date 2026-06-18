@@ -9,16 +9,16 @@
 // `temporal` renders the era label "Within living memory" (redesign decision)
 // so every spine entry keeps its diamond marker — never the literal "null".
 
-import { slugify } from "@/components/reference/nodeShape";
 import type { TimelineSectionData } from "@/types/reference";
 
+// Headless renderer (2026-06-17 shell-accordion refactor): the section wrapper
+// (`section-{id}` deep-link anchor) and the `.reference-section__label` heading
+// now live on the shell's section accordion (ReferenceDocument). This component
+// returns ONLY its inner body so it can drop into an accordion panel without
+// double chrome.
 export function TimelineSection({ section }: { section: TimelineSectionData }) {
   return (
-    <section
-      className="reference-section reference-section--timeline"
-      id={`section-${slugify(section.id)}`}
-    >
-      <h2 className="reference-section__label">{section.label}</h2>
+    <div className="reference-section--timeline">
       {section.preamble !== null && (
         <p className="timeline-section__preamble">{section.preamble}</p>
       )}
@@ -33,6 +33,6 @@ export function TimelineSection({ section }: { section: TimelineSectionData }) {
           </li>
         ))}
       </ol>
-    </section>
+    </div>
   );
 }

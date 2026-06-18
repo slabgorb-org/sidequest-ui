@@ -11,16 +11,16 @@
 // placeholder is aria-hidden (the name is adjacent text).
 
 import { FolioPlaceholder } from "@/components/reference/FolioPlaceholder";
-import { slugify } from "@/components/reference/nodeShape";
 import type { CastSectionData } from "@/types/reference";
 
+// Headless renderer (2026-06-17 shell-accordion refactor): the section wrapper
+// (`section-{id}` deep-link anchor) and the `.reference-section__label` heading
+// now live on the shell's section accordion (ReferenceDocument). This component
+// returns ONLY its inner body so it can drop into an accordion panel without
+// double chrome.
 export function CastSection({ section }: { section: CastSectionData }) {
   return (
-    <section
-      className="reference-section reference-section--cast"
-      id={`section-${slugify(section.id)}`}
-    >
-      <h2 className="reference-section__label">{section.label}</h2>
+    <div className="reference-section--cast">
       <ul className="cast-section__list">
         {section.members.map((member) => (
           <li key={member.slug} className="cast-section__member">
@@ -43,6 +43,6 @@ export function CastSection({ section }: { section: CastSectionData }) {
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }

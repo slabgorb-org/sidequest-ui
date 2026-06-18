@@ -58,10 +58,10 @@ const sorted: TimelineSectionData = {
 };
 
 describe("TimelineSection — dedicated Timeline renderer (100-11)", () => {
-  it("renders the section label as a heading", () => {
-    render(<TimelineSection section={sorted} />);
-    expect(screen.getByRole("heading", { name: "Timeline" })).toBeInTheDocument();
-  });
+  // NOTE (2026-06-17 shell-accordion refactor): the section label heading and the
+  // `section-timeline` deep-link anchor moved UP to the shell's section accordion
+  // (ReferenceDocument); they are asserted there now (ReferenceShell.test.tsx).
+  // This renderer is headless — it returns only the Timeline body.
 
   it("renders every entry name and summary", () => {
     render(<TimelineSection section={sorted} />);
@@ -139,16 +139,7 @@ describe("TimelineSection — era label (2026-06-09 redesign)", () => {
     render(<TimelineSection section={undated} />);
     expect(screen.getByText("Within living memory")).toBeInTheDocument();
   });
-
-  it("anchors the section for TOC deep links", () => {
-    const empty: TimelineSectionData = {
-      id: "timeline",
-      label: "Timeline",
-      sort_mode: "sorted",
-      preamble: null,
-      entries: [],
-    };
-    render(<TimelineSection section={empty} />);
-    expect(document.getElementById("section-timeline")).not.toBeNull();
-  });
+  // The `section-timeline` deep-link anchor moved to the shell accordion item
+  // (2026-06-17) — asserted in ReferenceShell.test.tsx, not on the headless
+  // renderer.
 });

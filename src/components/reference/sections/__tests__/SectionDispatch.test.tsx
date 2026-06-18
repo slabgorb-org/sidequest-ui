@@ -27,6 +27,7 @@
 //   src/screens/reference/ReferenceDocument.tsx → widened to dispatch sections.
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { SectionDispatch } from "@/components/reference/sections/SectionDispatch";
 import { ReferenceDocument } from "@/screens/reference/ReferenceDocument";
@@ -151,7 +152,11 @@ describe("SectionDispatch — routes a section to its renderer by id (100-11)", 
 });
 
 describe("ReferenceDocument WIRING — dispatch reaches the production shell (100-11)", () => {
-  it("renders poi, cast, timeline AND generic sections together via the dispatch", () => {
+  // 2026-06-17 shell-accordion refactor: sections are collapsed by default, so a
+  // section's body is not mounted until its trigger is expanded. These wiring
+  // tests expand each section, then assert the dedicated renderer fired.
+  it("renders poi, cast, timeline AND generic sections together via the dispatch", async () => {
+    const user = userEvent.setup();
     const sections: ReferenceSection[] = [
       timelineSection,
       poiSection,
@@ -168,8 +173,14 @@ describe("ReferenceDocument WIRING — dispatch reaches the production shell (10
       />,
     );
 
+    // Expand each section via its trigger (section labels are the trigger names).
+    await user.click(screen.getByRole("button", { name: /Points of Interest/i }));
+    await user.click(screen.getByRole("button", { name: /^Cast$/i }));
+    await user.click(screen.getByRole("button", { name: /^Timeline$/i }));
+    await user.click(screen.getByRole("button", { name: /^Factions$/i }));
+
     // Dedicated renderers fired (images are produced only by the dedicated path).
-    expect(screen.getByRole("img", { name: /Long Foundry/i })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /Long Foundry/i })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Marshal Vex/i })).toBeInTheDocument();
     // Timeline dedicated content.
     expect(screen.getByText("The First Casting")).toBeInTheDocument();
@@ -177,9 +188,11 @@ describe("ReferenceDocument WIRING — dispatch reaches the production shell (10
     expect(screen.getByText("The northern foundries.")).toBeInTheDocument();
   });
 
-  it("no longer drops cast/poi/timeline sections (regression vs the 100-8 node-only filter)", () => {
+  it("no longer drops cast/poi/timeline sections (regression vs the 100-8 node-only filter)", async () => {
     // The 100-8 ReferenceDocument filtered to `section.node` only, silently
-    // dropping cast/poi/timeline. After 100-11 they must render.
+    // dropping cast/poi/timeline. After 100-11 they must render (here: once the
+    // collapsed section is expanded).
+    const user = userEvent.setup();
     render(
       <ReferenceDocument
         docType="lore"
@@ -189,6 +202,7 @@ describe("ReferenceDocument WIRING — dispatch reaches the production shell (10
         meta={undefined}
       />,
     );
-    expect(screen.getByText("Marshal Vex")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Cast$/i }));
+    expect(await screen.findByText("Marshal Vex")).toBeInTheDocument();
   });
 });

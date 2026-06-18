@@ -57,12 +57,10 @@ const fixture: PoiSectionData = {
 };
 
 describe("PoiSection — dedicated POI renderer (100-11)", () => {
-  it("renders the section label as a heading", () => {
-    render(<PoiSection section={fixture} />);
-    expect(
-      screen.getByRole("heading", { name: "Points of Interest" }),
-    ).toBeInTheDocument();
-  });
+  // NOTE (2026-06-17 shell-accordion refactor): the section label heading and the
+  // `section-poi` deep-link anchor moved UP to the shell's section accordion
+  // (ReferenceDocument); they are asserted there now (ReferenceShell.test.tsx).
+  // This renderer is headless — it returns only the POI body.
 
   it("renders every POI name", () => {
     render(<PoiSection section={fixture} />);

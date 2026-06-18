@@ -20,6 +20,7 @@
 // these tests are how we catch it (per spec C2 testing strategy).
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ReferenceLorePage } from "@/screens/reference/ReferenceLorePage";
@@ -90,19 +91,24 @@ describe("ReferenceLorePage — session-free lore route (AC1/AC2/AC4)", () => {
   });
 
   it("renders fetched lore content WITHOUT any session/WS provider in scope (C2)", async () => {
+    const user = userEvent.setup();
     fetchMock.mockResolvedValue(makeJsonResponse(loreFixture()));
     renderLoreRoute();
+    // The section label (trigger) lands once the projection is fetched…
+    const trigger = await screen.findByRole("button", { name: /Legends/i });
+    // …and expanding it reveals the generic-node-tree body (2026-06-17: collapsed).
+    await user.click(trigger);
     expect(
       await screen.findByText("The first forge was lit beneath the mountain."),
     ).toBeInTheDocument();
-    // Section + entry labels render through the generic node tree.
     expect(screen.getByText("Founding")).toBeInTheDocument();
   });
 
   it("never constructs a game WebSocket while rendering the reference route (C2)", async () => {
     fetchMock.mockResolvedValue(makeJsonResponse(loreFixture()));
     renderLoreRoute();
-    await screen.findByText("The first forge was lit beneath the mountain.");
+    // The projection arriving (section label rendered) is enough — no WS opened.
+    await screen.findByRole("heading", { name: /Legends/ });
     expect(wsCtor).not.toHaveBeenCalled();
   });
 
@@ -124,11 +130,10 @@ describe("ReferenceLorePage — session-free lore route (AC1/AC2/AC4)", () => {
     renderLoreRoute();
     // Pending state: an accessible status node is shown.
     expect(screen.getByRole("status")).toBeInTheDocument();
-    // Resolve and confirm content replaces the loader.
+    // Resolve and confirm content replaces the loader (the section label/trigger
+    // lands; the body sits in a collapsed panel by default — 2026-06-17).
     resolve(makeJsonResponse(loreFixture()));
-    expect(
-      await screen.findByText("The first forge was lit beneath the mountain."),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Legends/ })).toBeInTheDocument();
   });
 
   it("shows an error state (not a white screen) when the fetch rejects (AC4)", async () => {
@@ -166,7 +171,10 @@ describe("ReferenceLorePage — session-free lore route (AC1/AC2/AC4)", () => {
       },
     };
     fetchMock.mockResolvedValue(makeJsonResponse(poisoned));
+    const user = userEvent.setup();
     renderLoreRoute();
+    // Expand the section to mount its body, then assert the keeper firewall holds.
+    await user.click(await screen.findByRole("button", { name: /Legends/i }));
     expect(await screen.findByText("Public legend text.")).toBeInTheDocument();
     expect(screen.queryByText("KEEPER_LEAK_betrayal_arc")).not.toBeInTheDocument();
   });

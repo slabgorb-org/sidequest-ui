@@ -12,6 +12,7 @@
 //   src/screens/reference/ReferenceRulesPage.tsx → export function ReferenceRulesPage()
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ReferenceRulesPage } from "@/screens/reference/ReferenceRulesPage";
@@ -76,12 +77,17 @@ describe("ReferenceRulesPage — session-free rules route (AC1/AC2/AC4)", () => 
   });
 
   it("renders fetched rules content with no session/WS provider in scope (C2)", async () => {
+    const user = userEvent.setup();
     fetchMock.mockResolvedValue(makeJsonResponse(rulesFixture()));
     renderRulesRoute();
+    // The "Rules" section label (trigger) lands once the projection is fetched…
+    const trigger = await screen.findByRole("button", { name: /Rules/i });
+    // …and expanding it reveals the node-tree body (2026-06-17: collapsed by default).
+    await user.click(trigger);
+    expect(await screen.findByText("Combat")).toBeInTheDocument();
     expect(
-      await screen.findByText("Strike resolves on the lethality track."),
+      screen.getByText("Strike resolves on the lethality track."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Combat")).toBeInTheDocument();
     expect(wsCtor).not.toHaveBeenCalled();
   });
 
