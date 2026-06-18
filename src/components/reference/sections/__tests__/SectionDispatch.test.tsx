@@ -138,6 +138,16 @@ describe("SectionDispatch — routes a section to its renderer by id (100-11)", 
     expect(() => render(<SectionDispatch section={unknown} />)).not.toThrow();
     expect(screen.queryByTestId("map-region-graph")).not.toBeInTheDocument();
   });
+
+  it("dispatches ruleset_reference to RulesDocument", () => {
+    const section = {
+      id: "ruleset_reference", type: "rules_document", label: "The Rules of Fate Core", ruleset: "fate",
+      chapters: [{ anchor: "fate-basics", title: "The Basics", order: 1, srd_ref: "B", body_markdown: "Body." }],
+      provenance: { source: "Fate Core System", license: "ccby", attribution: "CC BY 3.0." },
+    } as import("@/types/reference").RulesDocumentSection;
+    const { container } = render(<SectionDispatch section={section} />);
+    expect(container.querySelector("#fate-basics")).not.toBeNull();
+  });
 });
 
 describe("ReferenceDocument WIRING — dispatch reaches the production shell (100-11)", () => {

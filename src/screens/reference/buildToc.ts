@@ -23,6 +23,13 @@ export interface TocItem {
 export function buildToc(sections: ReferenceSection[], mode: NodeTreeMode): TocItem[] {
   return sections.map((section) => {
     const item: TocItem = { id: slugify(section.id), label: section.label, children: [] };
+    if (section.id === "ruleset_reference" && "chapters" in section) {
+      item.children = section.chapters.map((chapter) => ({
+        id: chapter.anchor,
+        label: chapter.title,
+      }));
+      return item;
+    }
     // Ledger mode renders no subsection anchors — top-level entries only.
     if (mode !== "ledger" && "node" in section && section.node && section.node.type === "dict") {
       item.children = visibleEntries(section.node)
