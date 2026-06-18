@@ -123,8 +123,8 @@ export interface MapSectionData {
   dangling: [string, string][];
 }
 
-// Story 126-2 (Phase 1) — rules-document section type, pinned from the
-// server projection (reference_projection.py::build_rules_section). Each
+// ADR-149 (Phase 1) — rules-document section type, pinned from the
+// server projection (reference_projection.py::build_ruleset_reference_section). Each
 // chapter carries its full SRD body as Markdown; provenance tracks source,
 // license, and attribution for verbatim SRD content (ADR-145).
 
@@ -144,7 +144,7 @@ export interface RulesProvenance {
   attribution: string;
 }
 
-/** The `ruleset_reference` section (`build_rules_section`). */
+/** The `ruleset_reference` section (`build_ruleset_reference_section`). */
 export interface RulesDocumentSection {
   id: "ruleset_reference";
   type: "rules_document";
@@ -156,7 +156,7 @@ export interface RulesDocumentSection {
 
 /** Any section the reference document may carry — the generic node-tree section
  * plus the Phase-3 dedicated section types, the Story 104-3 map section, and
- * the Story 126-2 rules-document section. */
+ * the ADR-149 rules-document section. */
 export type ReferenceSection =
   | GenericSection
   | PoiSectionData
