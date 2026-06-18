@@ -30,6 +30,14 @@ import { CharacterCreation, type CreationScene } from "../CharacterCreation";
  *   fate_stunts_confirm   { phase, fate_selected_stunts }
  */
 
+// Pack defaults arrive in `suggestion`; the player's own text arrives in `value`
+// (empty on first visit — server contract, messages.py FateAspectSlot). The
+// aspects panel must show the pack default as a PLACEHOLDER only, never as an
+// accept-on-submit pre-filled value, so a player who just clicks Confirm doesn't
+// silently ship the genre default. (Playtest 2026-06-17 wry_whimsy/oz: HC/Trouble
+// pre-filled with the pack defaults as editable, accept-on-submit values.)
+const DEFAULT_HC = "Sensible Child a Very Long Way from Home";
+const DEFAULT_TROUBLE = "Curiosity Always Gets the Better of Me";
 const HIGH_CONCEPT = "Hard-Boiled Private Eye";
 const TROUBLE = "Can't Walk Away From a Dame in Trouble";
 
@@ -39,8 +47,8 @@ function aspectsScene(overrides: Partial<CreationScene> = {}) {
     input_type: "fate_aspects",
     prompt: "Who are you, gumshoe?",
     fate_aspect_slots: [
-      { kind: "high_concept", label: "High Concept", value: HIGH_CONCEPT, required: true, suggestion: HIGH_CONCEPT },
-      { kind: "trouble", label: "Trouble", value: TROUBLE, required: true, suggestion: TROUBLE },
+      { kind: "high_concept", label: "High Concept", value: "", required: true, suggestion: DEFAULT_HC },
+      { kind: "trouble", label: "Trouble", value: "", required: true, suggestion: DEFAULT_TROUBLE },
       { kind: "character", label: "Aspect", value: "", required: false, suggestion: "" },
       { kind: "character", label: "Aspect", value: "", required: false, suggestion: "" },
       { kind: "character", label: "Aspect", value: "", required: false, suggestion: "" },
@@ -93,19 +101,49 @@ function renderScene(scene: CreationScene, onRespond = vi.fn()) {
 // ---------------------------------------------------------------------------
 
 describe("CharacterCreation: Fate aspects (121-8)", () => {
-  it("renders an editable input per aspect slot, pre-filled from the seed", () => {
+  it("shows the pack default as a placeholder, NOT a pre-filled accept-on-submit value", () => {
+    // Playtest 2026-06-17 (wry_whimsy/oz, DRIVER session 2026-06-17-oz-f9d7524d):
+    // the form pre-populated HC = "Sensible Child a Very Long Way from Home" and
+    // Trouble = "Curiosity Always Gets the Better of Me" (the pack defaults) as
+    // editable, accept-on-submit values — so a player who just clicked Confirm
+    // shipped the genre default sheet. The pack default belongs in the placeholder.
     renderScene(aspectsScene());
     const hc = screen.getByTestId("fate-aspect-high_concept") as HTMLInputElement;
     const trouble = screen.getByTestId("fate-aspect-trouble") as HTMLInputElement;
-    expect(hc).toHaveValue(HIGH_CONCEPT);
-    expect(trouble).toHaveValue(TROUBLE);
+    expect(hc).toHaveValue("");
+    expect(trouble).toHaveValue("");
+    expect(hc).toHaveAttribute("placeholder", DEFAULT_HC);
+    expect(trouble).toHaveAttribute("placeholder", DEFAULT_TROUBLE);
     // Three free aspect slots in addition to the mandatory pair.
     expect(screen.getAllByTestId(/^fate-aspect-free-/)).toHaveLength(3);
   });
 
-  it("does not auto-commit; the explicit confirm sends the edited aspect texts", () => {
+  it("restores the player's prior text (value) when returning to the step", () => {
+    // `value` carries any prior edit from the builder accumulator
+    // (builder.py _fate_aspect_slots); re-visiting the step must restore the
+    // player's own text, not the pack default placeholder.
+    renderScene(
+      aspectsScene({
+        fate_aspect_slots: [
+          { kind: "high_concept", label: "High Concept", value: HIGH_CONCEPT, required: true, suggestion: DEFAULT_HC },
+          { kind: "trouble", label: "Trouble", value: TROUBLE, required: true, suggestion: DEFAULT_TROUBLE },
+          { kind: "character", label: "Aspect", value: "", required: false, suggestion: "" },
+        ],
+      }),
+    );
+    expect(screen.getByTestId("fate-aspect-high_concept")).toHaveValue(HIGH_CONCEPT);
+    expect(screen.getByTestId("fate-aspect-trouble")).toHaveValue(TROUBLE);
+  });
+
+  it("does not auto-commit; the explicit confirm sends the player-typed aspect texts", () => {
     const onRespond = renderScene(aspectsScene());
     expect(onRespond).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("fate-aspect-high_concept"), {
+      target: { value: HIGH_CONCEPT },
+    });
+    fireEvent.change(screen.getByTestId("fate-aspect-trouble"), {
+      target: { value: TROUBLE },
+    });
     fireEvent.change(screen.getByTestId("fate-aspect-free-0"), {
       target: { value: "A Card With No Name On It" },
     });
@@ -117,6 +155,22 @@ describe("CharacterCreation: Fate aspects (121-8)", () => {
         fate_high_concept: HIGH_CONCEPT,
         fate_trouble: TROUBLE,
         fate_free_aspects: ["A Card With No Name On It"],
+      }),
+    );
+  });
+
+  it("a player who just clicks Confirm submits empty HC/Trouble (engine re-prompts loud, no silent default)", () => {
+    // The point of the fix: an untouched form must NOT silently submit the pack
+    // default. Confirm with no input sends empty strings; the server
+    // (chargen_mixin.py:484-496 requires both non-empty) re-prompts rather than
+    // accepting a default sheet.
+    const onRespond = renderScene(aspectsScene());
+    fireEvent.click(screen.getByTestId("fate-aspects-confirm"));
+    expect(onRespond).toHaveBeenCalledWith(
+      expect.objectContaining({
+        phase: "fate_aspects_confirm",
+        fate_high_concept: "",
+        fate_trouble: "",
       }),
     );
   });

@@ -55,7 +55,14 @@ export function FateAspectsPanel({
   const freeSlots = slots.filter(
     (s) => s.kind !== "high_concept" && s.kind !== "trouble",
   );
-  const seed = (s?: FateAspectSlot) => (s?.value || s?.suggestion || "");
+  // `value` is the player's own text (empty on first visit); `suggestion` is the
+  // pack default. HC/Trouble seed ONLY from `value` and render the pack default as
+  // a PLACEHOLDER — never as a pre-filled accept-on-submit value — so a player who
+  // just clicks Confirm submits empty strings and the server re-prompts loud
+  // (chargen_mixin requires both non-empty) instead of silently shipping the genre
+  // default sheet. Returning to the step restores the player's prior `value`. Free
+  // aspects carry no pack default, so seeding from `value` covers them too.
+  const seed = (s?: FateAspectSlot) => s?.value ?? "";
 
   const [hc, setHc] = useState(seed(hcSlot));
   const [trouble, setTrouble] = useState(seed(troubleSlot));
@@ -74,6 +81,7 @@ export function FateAspectsPanel({
             data-testid="fate-aspect-high_concept"
             className={FIELD}
             value={hc}
+            placeholder={hcSlot?.suggestion}
             onChange={(e) => setHc(e.target.value)}
           />
         </label>
@@ -83,6 +91,7 @@ export function FateAspectsPanel({
             data-testid="fate-aspect-trouble"
             className={FIELD}
             value={trouble}
+            placeholder={troubleSlot?.suggestion}
             onChange={(e) => setTrouble(e.target.value)}
           />
         </label>
