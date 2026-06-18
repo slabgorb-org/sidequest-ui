@@ -25,6 +25,13 @@ export interface InventoryData {
 
 export interface InventoryPanelProps {
   data: InventoryData;
+  /**
+   * Whether to render the currency/gold line. Default true (native/WN packs
+   * with an economy). A Fate pack has no economy (sq-playtest 2026-06-17,
+   * wry_whimsy/oz) — the caller passes false so the panel shows the carried
+   * items without the meaningless native "0 coin" framing. Items always render.
+   */
+  showCurrency?: boolean;
 }
 
 interface StackedItem {
@@ -50,7 +57,7 @@ const FOLIO = {
 const FONT_DISPLAY = "'Pirata One', serif";
 const FONT_BODY = "'EB Garamond', serif";
 
-export function InventoryPanel({ data }: InventoryPanelProps) {
+export function InventoryPanel({ data, showCurrency = true }: InventoryPanelProps) {
   // Stack identical items by normalized name, then group by type
   const stacked = new Map<string, StackedItem>();
   for (const item of data.items) {
@@ -107,18 +114,21 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
         >
           Inventory
         </h2>
-        <span
-          className="text-sm font-mono"
-          style={{
-            fontFamily: FONT_BODY,
-            fontVariantNumeric: "tabular-nums oldstyle-nums",
-            color: FOLIO.gold,
-            fontSize: 15,
-            fontStyle: "italic",
-          }}
-        >
-          {data.gold} {data.currency_name ?? "coin"}
-        </span>
+        {showCurrency && (
+          <span
+            data-testid="inventory-currency"
+            className="text-sm font-mono"
+            style={{
+              fontFamily: FONT_BODY,
+              fontVariantNumeric: "tabular-nums oldstyle-nums",
+              color: FOLIO.gold,
+              fontSize: 15,
+              fontStyle: "italic",
+            }}
+          >
+            {data.gold} {data.currency_name ?? "coin"}
+          </span>
+        )}
       </div>
 
       <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>

@@ -1,38 +1,37 @@
 /**
- * Story 126-3 (Epic 126, ADR-144 follow-up): hide the native Inventory tab on
- * a `ruleset: fate` pack (RED).
+ * Fate PC inventory visibility — REVERSES Story 126-3 (sq-playtest 2026-06-17,
+ * wry_whimsy/oz).
  *
- * WHY (sq-playtest 2026-06-16/17 Fate eval): the 114-10 Fate-gear migration
- * (#472) deleted inventory.yaml for the four Fate packs — Fate has no carried
- * inventory and no economy; gear dissolves into aspects via `source_gear`. A
- * Fate PC who opens "Inventory" therefore sees an empty native panel (items:[],
- * gold:0) and never learns their gear became aspects. DECISION (Keith,
- * 2026-06-17): option (a) — HIDE the native Inventory tab for ruleset:fate PCs.
+ * 126-3 HID the native Inventory tab for `ruleset: fate` packs on the premise
+ * that "Fate has no carried inventory" (gear dissolves into aspects via
+ * source_gear, inventory.items unpopulated server-side). PLAY DISPROVED IT: a
+ * Fate PC accumulates real carried items in `core.inventory.items` during play
+ * and the server emits them as `inventoryData`. Harpo's live oz save
+ * (2026-06-17-oz-f9d7524d) holds three Carried items — **Silver Shoes**, Rubber
+ * Horn, Banjo — the silver shoes being an iconic, in-play-acquired item. Hiding
+ * the tab made them invisible.
  *
- * THE DUAL-PATH GOTCHA (the crux of these tests): a GameBoard dock tab is
- * consumed by TWO surfaces — the desktop dockview AND MobileTabView — and BOTH
- * read the SAME `availableWidgets` set GameBoard computes. The correct fix is a
- * single gate in `availableWidgets` (do not add "inventory" when fateData !=
- * null), which both surfaces then honor. A WRONG-LAYER fix that hides inventory
- * only inside MobileTabView.visibleTabs would pass the mobile render test below
- * while the desktop dockview still shows the tab — exactly the half-wiring the
- * epic warns about. So we pin the gate in `availableWidgets` itself (raw-source
- * guard, mirroring the existing `ship` guard in gameboard-wiring.test.tsx) AND
- * assert the user-facing mobile render, AND guard against the other wrong fix
- * (deleting the registry / TABS entry, which native packs still need).
+ * DECISION (Keith, 2026-06-17, reversing his own 126-3 call): "the point is not
+ * to show the inventory tab of the native rule set — the point is to show the
+ * character inventory wherever that comes from." So:
+ *   1. the Inventory ("Items") tab is available for a Fate PC again (the items
+ *      are real); and
+ *   2. Fate has no economy, so the native currency/gold line is suppressed for
+ *      a Fate PC — show the items, not the native-ruleset money framing. Native
+ *      (WN/d20) packs keep their currency line unchanged.
  *
- * The UI ruleset signal is `fateData != null` — the server emits FATE_STATE
- * only on a ruleset=='fate' pack (server #880), the same signal that gates the
- * Fate tab (GameBoard.tsx availableWidgets, Story 118-2). This change is
- * UI-only: it does NOT populate inventory.items/gold (ADR-144 — that would
- * re-introduce the carried inventory the migration deliberately deleted).
+ * Dual-path: a GameBoard dock tab is consumed by BOTH the desktop dockview and
+ * MobileTabView via the shared `availableWidgets` set, so the fix is the single
+ * gate in `availableWidgets` (inventory is added unconditionally now), which
+ * both surfaces honor. The registry + TABS entries must stay (native packs need
+ * them).
  *
- * jsdom note: test-setup.ts mocks matchMedia → "mobile" by default, so
- * renderBoard() renders via MobileTabView (flat, queryable role="tab" buttons).
- * The mobile inventory tab is labeled "Items" (MobileTabView TABS).
+ * jsdom note: test-setup.ts mocks matchMedia → "mobile", so renderBoard()
+ * renders via MobileTabView (flat role="tab" buttons). The Inventory tab is
+ * labeled "Items".
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { GameBoard, type GameBoardProps } from "../GameBoard";
 import { MobileTabView } from "../MobileTabView";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
@@ -52,9 +51,6 @@ beforeEach(() => {
 
 const REGISTRY = WIDGET_REGISTRY as Record<string, WidgetDef | undefined>;
 
-// Widen GameBoardProps in case the named prop surface shifts; all three props
-// used here (fateData, inventoryData, confrontationData) are real GameBoard
-// props today.
 type BoardOverrides = Partial<GameBoardProps> & {
   fateData?: FateStatePayload | null;
 };
@@ -65,9 +61,9 @@ function renderBoard(overrides: BoardOverrides = {}) {
     characters: [
       {
         player_id: "p1",
-        name: "Sam",
-        character_name: "Sam Spadework",
-        class: "Sleuth",
+        name: "Harpo",
+        character_name: "Harpo",
+        class: "Stubborn Skeptic",
         level: 1,
         hp: 10,
         hp_max: 10,
@@ -87,8 +83,7 @@ function renderBoard(overrides: BoardOverrides = {}) {
   );
 }
 
-// The mobile Inventory tab is labeled "Items"; the query is unambiguous (no
-// other tab label contains "items").
+// The Inventory tab is labeled "Items"; the query is unambiguous.
 function inventoryTab() {
   return screen.queryByRole("tab", { name: /items/i });
 }
@@ -96,12 +91,12 @@ function inventoryTab() {
 const seededFate: FateStatePayload = {
   characters: [
     {
-      name: "Sam Spadework",
+      name: "Harpo",
       fate_points: 3,
       refresh: 3,
-      skills: [{ name: "Investigate", rating: 4, ladder: "Great" }],
+      skills: [{ name: "Provoke", rating: 4, ladder: "Great" }],
       aspects: [
-        { text: "Hard-boiled detective", kind: "high_concept", free_invokes: 0 },
+        { text: "Stubborn Skeptic Who Argues With Doorknobs", kind: "high_concept", free_invokes: 0 },
       ],
       stress: { physical: [{ value: 1, checked: false }], mental: [] },
       consequences: [{ level: "mild", value: 2, filled: false, text: "" }],
@@ -111,13 +106,22 @@ const seededFate: FateStatePayload = {
   conflict: null,
 };
 
-// A NON-empty inventory deliberately handed to the Fate PC: proves the gate is
-// ruleset-based (fateData present), not "hide when inventory happens to be
-// empty". Even a populated inventory must stay hidden on a Fate pack.
-const nonEmptyInventory: InventoryData = {
+// The Fate PC's real, in-play-acquired inventory (mirrors Harpo's live oz save).
+// gold:0 / no currency_name is what the server actually sends for a Fate pack;
+// the native "0 coin" line that would otherwise render is the native-ruleset
+// framing Keith does not want on a Fate sheet.
+const fateInventory: InventoryData = {
   items: [
-    { name: "Service Revolver", type: "weapon", description: "Blued steel." },
+    { name: "Silver Shoes", type: "gear", description: "Charmed witch-treasure of the Munchkin country." },
+    { name: "Rubber Horn", type: "gear", description: "Honk." },
+    { name: "Banjo", type: "gear", description: "Plink." },
   ],
+  gold: 0,
+};
+
+// A native (WN/d20) inventory WITH an economy — the currency line must survive.
+const nativeInventory: InventoryData = {
+  items: [{ name: "Service Revolver", type: "weapon", description: "Blued steel." }],
   gold: 100,
   currency_name: "Francs",
 };
@@ -127,7 +131,7 @@ const activeConfrontation: ConfrontationData = {
   label: "Cantina Standoff",
   category: "combat",
   actors: [
-    { name: "Sam Spadework", role: "protagonist", side: "player" },
+    { name: "Harpo", role: "protagonist", side: "player" },
     { name: "The Fat Man", role: "antagonist", side: "opponent" },
   ],
   player_metric: { name: "edge", current: 0, starting: 0, threshold: 3 },
@@ -138,74 +142,52 @@ const activeConfrontation: ConfrontationData = {
   mood: "tense",
 };
 
-describe("GameBoard — native Inventory tab is hidden on a Fate pack (Story 126-3)", () => {
-  it("does NOT show the Inventory ('Items') tab for a Fate PC — even with inventory data present", () => {
-    // RED: today availableWidgets adds "inventory" unconditionally, so the
-    // mobile tab appears. The gate (fateData != null ⇒ no inventory) hides it.
-    // Passing a NON-empty inventory proves the gate is ruleset-based, not
-    // data-based.
-    renderBoard({ fateData: seededFate, inventoryData: nonEmptyInventory });
-    expect(inventoryTab()).not.toBeInTheDocument();
+describe("GameBoard — a Fate PC can see their carried inventory (reverses 126-3)", () => {
+  it("SHOWS the Inventory ('Items') tab for a Fate PC (items are real, acquired in play)", () => {
+    // RED before the fix: the 126-3 gate (`if (fateData == null)`) removed
+    // "inventory" from availableWidgets for a Fate PC, so the tab was absent.
+    renderBoard({ fateData: seededFate, inventoryData: fateInventory });
+    expect(inventoryTab()).toBeInTheDocument();
   });
 
-  it("DOES show the Inventory ('Items') tab for a native (non-Fate) PC", () => {
-    // Negative control: the gate must hide by ruleset only — a WN/native pack
-    // (fateData null) keeps its Inventory tab.
-    renderBoard({ fateData: null, inventoryData: nonEmptyInventory });
+  it("renders the Fate PC's items but NOT the native currency/gold line", () => {
+    // The whole point (Keith): show the character inventory, not the native
+    // ruleset money framing. Click into Items and assert the silver shoes show
+    // while the native "0 coin" line is suppressed for a Fate PC.
+    renderBoard({ fateData: seededFate, inventoryData: fateInventory });
+    fireEvent.click(inventoryTab()!);
+    expect(screen.getByText("Silver Shoes")).toBeInTheDocument();
+    expect(screen.getByText("Banjo")).toBeInTheDocument();
+    // No native economy framing on a Fate sheet (no "0 coin" / currency line).
+    expect(screen.queryByText(/coin/i)).not.toBeInTheDocument();
+  });
+
+  it("still SHOWS the Inventory tab for a native (non-Fate) PC", () => {
+    renderBoard({ fateData: null, inventoryData: nativeInventory });
     expect(inventoryTab()).toBeInTheDocument();
+  });
+
+  it("keeps the native currency line for a native PC (economy framing unchanged off Fate)", () => {
+    // Regression guard: suppressing economy must be ruleset-scoped to Fate, not
+    // applied to native packs that DO have a currency.
+    renderBoard({ fateData: null, inventoryData: nativeInventory });
+    fireEvent.click(inventoryTab()!);
+    expect(screen.getByText(/100 Francs/)).toBeInTheDocument();
   });
 
   it("keeps the Inventory tab for a native PC during a confrontation (gate is ruleset, not encounter state)", () => {
-    // Guards against an over-broad gate: a confrontation must not hide the
-    // native inventory. Only `ruleset: fate` hides it.
-    renderBoard({ fateData: null, confrontationData: activeConfrontation });
+    renderBoard({ fateData: null, confrontationData: activeConfrontation, inventoryData: nativeInventory });
     expect(inventoryTab()).toBeInTheDocument();
   });
 });
 
-describe("GameBoard — the inventory gate lives in the shared availableWidgets set (desktop + mobile)", () => {
-  // The desktop dockview is not reliably renderable in jsdom, so — exactly like
-  // the existing `ship` availableWidgets guards in gameboard-wiring.test.tsx —
-  // we assert the gate at the source level. This forces the fix into the SHARED
-  // `availableWidgets` (which BOTH the dockview and MobileTabView read), not
-  // into MobileTabView's own filter (which would leave the desktop dock broken).
-  it("availableWidgets adds 'inventory' only when fateData is null (not unconditionally)", async () => {
-    const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
-      default: string;
-    };
-    // The add must be guarded by a fateData null-check. Accept ==/===/!fateData.
-    const gated =
-      /(fateData\s*===?\s*null|!\s*fateData)[\s\S]{0,80}?available\.add\(\s*["']inventory["']\s*\)/;
-    expect(
-      src.default,
-      "available.add('inventory') must be gated on a non-Fate ruleset (fateData == null)",
-    ).toMatch(gated);
-  });
-
-  it("availableWidgets useMemo deps include fateData (so the gate recomputes when Fate state arrives)", async () => {
-    const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
-      default: string;
-    };
-    const memoMatch = src.default.match(
-      /const availableWidgets = useMemo\(\(\) => \{[\s\S]*?\}, \[([^\]]*)\]\)/,
-    );
-    expect(memoMatch).not.toBeNull();
-    expect(memoMatch![1]).toContain("fateData");
-  });
-});
-
-describe("GameBoard — inventory is hidden by GATING, not by deletion (native packs still need it)", () => {
-  it("WIDGET_REGISTRY still defines 'inventory' (the desktop dockview entry must remain for native packs)", () => {
-    // The fix must NOT remove the registry entry — that would break inventory
-    // on the 7 WN/native packs. Hide via the availableWidgets gate instead.
+describe("GameBoard — inventory stays GATED-IN by registry, not deleted (native packs still need it)", () => {
+  it("WIDGET_REGISTRY still defines 'inventory'", () => {
     expect(REGISTRY["inventory"], "inventory must remain a registered widget").toBeDefined();
     expect(REGISTRY["inventory"]?.label).toMatch(/inventory/i);
   });
 
-  it("MobileTabView still lists an 'inventory' tab in its TABS array (native mobile still needs it)", async () => {
-    // The fix must NOT delete inventory from the mobile TABS array either — the
-    // mobile tab is hidden by the availableWidgets filter (line: TABS.filter(t
-    // => availableWidgets.has(t.id))), not by removing the TABS entry.
+  it("MobileTabView still lists an 'inventory' tab in its TABS array", async () => {
     const src = (await import("@/components/GameBoard/MobileTabView?raw")) as unknown as {
       default: string;
     };
@@ -215,8 +197,9 @@ describe("GameBoard — inventory is hidden by GATING, not by deletion (native p
 
 describe("MobileTabView — the mobile tab filter honors the availableWidgets gate for inventory", () => {
   // Pins the mobile-path contract independently of GameBoard's gate: whatever
-  // availableWidgets GameBoard hands down, MobileTabView must render/hide the
-  // Items tab accordingly. This is the mobile half of the dual-path AC.
+  // availableWidgets GameBoard hands down, MobileTabView renders/hides the Items
+  // tab accordingly. Inventory is now in availableWidgets for Fate too, so this
+  // proves the shared-gate plumbing both surfaces read.
   const baseAvailable = new Set<WidgetId>(["narrative", "character", "fate"]);
 
   function renderMobile(available: ReadonlySet<WidgetId>) {
@@ -228,12 +211,12 @@ describe("MobileTabView — the mobile tab filter honors the availableWidgets ga
     );
   }
 
-  it("hides the Items tab when 'inventory' is absent from availableWidgets (the Fate case)", () => {
+  it("hides the Items tab when 'inventory' is absent from availableWidgets", () => {
     renderMobile(baseAvailable); // no "inventory"
     expect(screen.queryByRole("tab", { name: /items/i })).not.toBeInTheDocument();
   });
 
-  it("shows the Items tab when 'inventory' is present in availableWidgets (the native case)", () => {
+  it("shows the Items tab when 'inventory' is present in availableWidgets", () => {
     renderMobile(new Set<WidgetId>([...baseAvailable, "inventory"]));
     expect(screen.queryByRole("tab", { name: /items/i })).toBeInTheDocument();
   });
