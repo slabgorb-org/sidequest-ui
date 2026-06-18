@@ -41,6 +41,7 @@
 // imports/types fail to compile and the assertions fail. After GREEN they pass.
 
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { MapSection } from "@/components/reference/sections/MapSection";
 import { SectionDispatch } from "@/components/reference/sections/SectionDispatch";
@@ -130,9 +131,12 @@ describe("SectionDispatch WIRING — the 'map' case completes 100-12's dropped s
     expect(screen.getByTestId("map-region-graph")).toBeInTheDocument();
   });
 
-  it("renders the map section graph + pins end-to-end through the production shell", () => {
+  it("renders the map section graph + pins end-to-end through the production shell", async () => {
     // WIRING TEST: proves the dispatch is reachable from the real lore-page shell,
     // not just in isolation (repo rule: every test suite needs a wiring test).
+    // 2026-06-17: the shell collapses sections by default, so the panel body is
+    // not mounted until the section is expanded — expand it, then assert.
+    const user = userEvent.setup();
     const sections: ReferenceSection[] = [mapSection];
     render(
       <ReferenceDocument
@@ -143,7 +147,11 @@ describe("SectionDispatch WIRING — the 'map' case completes 100-12's dropped s
         meta={undefined}
       />,
     );
-    expect(screen.getByTestId("map-region-graph")).toBeInTheDocument();
+    // Collapsed by default: the graph is not mounted yet.
+    expect(screen.queryByTestId("map-region-graph")).not.toBeInTheDocument();
+    // Expand the Map section via its trigger.
+    await user.click(screen.getByRole("button", { name: /Map/i }));
+    expect(await screen.findByTestId("map-region-graph")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Mendes/i })).toBeInTheDocument();
   });
 });

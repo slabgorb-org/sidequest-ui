@@ -88,8 +88,10 @@ describe("ReferenceRulesPage — theme injector wiring (100-9 deferred finding)"
     fetchMock.mockResolvedValue(makeJsonResponse(rulesFixtureWithTheme()));
     renderRulesRoute();
 
-    // Content lands first…
-    await screen.findByText("Strike resolves on the lethality track.");
+    // Content lands first… (2026-06-17: sections collapse by default, so the
+    // projection's arrival is proven by the section label/trigger, not the
+    // now-collapsed body prose).
+    await screen.findByRole("heading", { name: /Combat/ });
     // …then the theme tokens are applied to :root (the rules page must theme too).
     await waitFor(() => expect(rootVar("--primary")).toBe("#4a90d9"));
     expect(rootVar("--background")).toBe("#0d1117");

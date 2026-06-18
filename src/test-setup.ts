@@ -65,3 +65,12 @@ class ResizeObserverStub {
   disconnect() {}
 }
 (globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
+
+// jsdom does not implement Element.prototype.scrollIntoView. The reference TOC
+// (ReferenceDocument.handleTocNavigate) calls it after opening a collapsed
+// section so the target scrolls into view; without the stub jsdom throws inside
+// the rAF callback ("scrollIntoView is not a function"). A no-op is sufficient —
+// real browsers ship the API; tests only assert the section/chapter opened.
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}

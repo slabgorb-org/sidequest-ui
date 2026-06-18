@@ -14,6 +14,7 @@
 // never appears — RED.
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import {
@@ -76,11 +77,15 @@ describe("App routing — reference shell is wired session-free (AC1/AC2 wiring)
   });
 
   it("mounts the reference rules route through the app router and renders projection content", async () => {
+    const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={[`/reference/rules/${PACK}`]}>
         <App />
       </MemoryRouter>,
     );
+    // 2026-06-17: sections collapse by default — the "Rules" section label lands,
+    // and expanding it reveals the projection body content.
+    await user.click(await screen.findByRole("button", { name: /Rules/i }));
     expect(
       await screen.findByText("Strike resolves on the lethality track."),
     ).toBeInTheDocument();
@@ -92,7 +97,8 @@ describe("App routing — reference shell is wired session-free (AC1/AC2 wiring)
         <App />
       </MemoryRouter>,
     );
-    await screen.findByText("Strike resolves on the lethality track.");
+    // The reference shell mounting (section label rendered) is the load signal.
+    await screen.findByRole("heading", { level: 2, name: /Rules/ });
     // ConnectScreen's player-name field must be absent — the session tree never mounted.
     expect(screen.queryByLabelText(/player name/i)).not.toBeInTheDocument();
   });
@@ -103,7 +109,7 @@ describe("App routing — reference shell is wired session-free (AC1/AC2 wiring)
         <App />
       </MemoryRouter>,
     );
-    await screen.findByText("Strike resolves on the lethality track.");
+    await screen.findByRole("heading", { level: 2, name: /Rules/ });
     expect(wsCtor).not.toHaveBeenCalled();
   });
 });

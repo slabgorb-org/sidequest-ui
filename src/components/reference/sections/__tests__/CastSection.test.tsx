@@ -60,10 +60,10 @@ const fixture: CastSectionData = {
 };
 
 describe("CastSection — dedicated Cast renderer (100-11)", () => {
-  it("renders the section label as a heading", () => {
-    render(<CastSection section={fixture} />);
-    expect(screen.getByRole("heading", { name: "Cast" })).toBeInTheDocument();
-  });
+  // NOTE (2026-06-17 shell-accordion refactor): the section label heading and the
+  // `section-cast` deep-link anchor moved UP to the shell's section accordion
+  // (ReferenceDocument); they are asserted there now (ReferenceShell.test.tsx).
+  // This renderer is headless — it returns only the Cast body.
 
   it("renders every member's display name", () => {
     render(<CastSection section={fixture} />);
@@ -120,9 +120,7 @@ describe("CastSection — Folio placeholder (2026-06-09 redesign)", () => {
     expect(placeholders[0]).toHaveTextContent("GC");
     expect(placeholders[0]).toHaveAttribute("aria-hidden", "true");
   });
-
-  it("anchors the section for TOC deep links", () => {
-    render(<CastSection section={fixture} />);
-    expect(document.getElementById("section-cast")).not.toBeNull();
-  });
+  // The `section-cast` deep-link anchor moved to the shell accordion item
+  // (2026-06-17) — asserted in ReferenceShell.test.tsx, not on the headless
+  // renderer.
 });

@@ -182,6 +182,80 @@ html:has(.reference-page) {
   scroll-margin-top: 1.5rem;
 }
 
+/* ── Section accordion (2026-06-17 — whole page collapses to ~1 screen) ──── */
+/*
+ * Every top-level section is a collapsible panel. The `.reference-section__label`
+ * h2 now wraps the trigger; inside the accordion it loses its own bottom rule and
+ * margin so the trigger button owns the rule + spacing.
+ */
+.reference-section-accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.reference-section--accordion-item {
+  margin-bottom: 1.5rem;
+  scroll-margin-top: 1.5rem;
+}
+
+/* The h2 label is now a wrapper around the trigger button — reset its block chrome */
+.reference-section--accordion-item .reference-section__label {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+/* Full-width clickable trigger row carrying the section label + chevron */
+.reference-section__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem 0.25rem 0.6rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid color-mix(in srgb, var(--primary, #8C3B2E) 35%, transparent);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  transition: color 150ms ease;
+}
+
+.reference-section__trigger:hover {
+  color: color-mix(in srgb, var(--primary, #8C3B2E) 78%, var(--text, #1a1a1a));
+}
+
+.reference-section__trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary, #8C3B2E) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.reference-section__trigger-label {
+  flex: 1 1 auto;
+}
+
+.reference-section__chevron {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: color-mix(in srgb, var(--primary, #8C3B2E) 70%, transparent);
+  transition: transform 180ms ease;
+}
+
+/* Chevron points down when collapsed, flips up when the trigger is expanded.
+   base-ui sets aria-expanded on the trigger. */
+.reference-section__trigger[aria-expanded="true"] .reference-section__chevron {
+  transform: rotate(180deg);
+}
+
+/* Panel spacing — give the disclosed body breathing room under the trigger */
+.reference-section--accordion-item [data-slot="accordion-content"] {
+  padding-top: 1.25rem;
+}
+
 /* ── Subsections (depth-0 dict keys promoted to headings) ──────────────── */
 
 .reference-subsection {
@@ -470,6 +544,178 @@ html:has(.reference-page) {
 .reference-card .reference-prose,
 .reference-card .reference-runin {
   font-size: 0.95rem;
+}
+
+/* ── Rules document — full-width accordion list ─────────────────────────── */
+/*
+ * RulesDocument renders one full-width vertical accordion (the @base-ui/react
+ * shadcn accordion). Long-form verbatim SRD prose reads badly in a narrow card
+ * column, so the chapter index is a stacked collapsible list: trigger = chapter
+ * title (+ a muted one-line preview of the chapter's H2/H3 names), panel = the
+ * verbatim body capped to ~70ch for a comfortable reading measure.
+ *
+ * All color is genre-token derived (--text / --surface / --primary / --accent /
+ * --secondary). The fixed fallbacks (#1a1a1a ink on #f8f0dc parchment ≈ 12.5:1)
+ * guarantee WCAG AA contrast on non-genre pages.
+ */
+
+.rules-document__accordion {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+/* One chapter row — carries the anchor id for deep links / scroll-spy */
+.rules-document__item {
+  border-bottom: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 18%, transparent);
+  scroll-margin-top: 1.5rem;
+}
+
+.rules-document__item:first-child {
+  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 18%, transparent);
+}
+
+/* Trigger row — full width, title + chevron */
+.rules-document__trigger {
+  width: 100%;
+  padding: 1rem 0.25rem;
+  text-decoration: none !important;
+  color: var(--text, #1a1a1a);
+}
+
+.rules-document__trigger:hover {
+  text-decoration: none !important;
+  color: var(--primary, #8C3B2E);
+}
+
+/* Stack the title over the muted section preview inside the trigger */
+.rules-document__trigger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+  min-width: 0;
+}
+
+/* Chapter title — full-width h3 in the trigger row */
+.rules-document__chapter-title {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: inherit;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* Muted one-line preview of the chapter's H2/H3 section names */
+.rules-document__section-preview {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--secondary, #B8893C) 78%, var(--text, #1a1a1a));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Body markdown inside the panel — capped to a comfortable reading measure now
+   that the narrow card column is gone. WCAG AA: --text on --surface ≥ 4.5:1. */
+.rules-document__body {
+  font-family: var(--font-body, 'Baskerville', Georgia, serif);
+  font-size: 1rem; /* 16px */
+  line-height: 1.8;
+  color: var(--text, #1a1a1a);
+  max-width: 42rem; /* ~70ch */
+  text-wrap: pretty;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.rules-document__body h1,
+.rules-document__body h2,
+.rules-document__body h3,
+.rules-document__body h4 {
+  font-family: var(--font-display, Georgia, serif);
+  color: var(--text, #1a1a1a);
+  margin-top: 1.3em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+/* Demoted h1 (leading chapter-restatement in SRD markdown) */
+.rules-document__md-h1-demoted {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: var(--font-display, Georgia, serif);
+  color: var(--text, #1a1a1a);
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Provenance attribution footer */
+.rules-document__provenance {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 18%, transparent);
+  font-size: 0.78rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--text, #1a1a1a) 60%, transparent);
+}
+
+.rules-document__provenance p {
+  margin: 0;
+}
+
+/* ── Archetypes — per-entry accordion (2026-06-18) ──────────────────────── */
+/*
+ * Each archetype is a collapsible row inside the Archetypes section panel: the
+ * name is the trigger, the structured block (rendered by NodeTree headings mode)
+ * is the on-demand body. Same row vocabulary as the SRD chapter accordion.
+ */
+
+.archetypes-section__accordion {
+  display: flex;
+  flex-direction: column;
+}
+
+.archetypes-section__item {
+  border-bottom: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 16%, transparent);
+}
+
+.archetypes-section__item:first-child {
+  border-top: 1px solid color-mix(in srgb, var(--primary, #8C3B2E) 16%, transparent);
+}
+
+.archetypes-section__trigger {
+  width: 100%;
+  padding: 0.85rem 0.25rem;
+  text-align: left;
+  text-decoration: none !important;
+  color: var(--text, #1a1a1a);
+}
+
+.archetypes-section__trigger:hover {
+  text-decoration: none !important;
+  color: var(--primary, #8C3B2E);
+}
+
+.archetypes-section__name {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: inherit;
+}
+
+/* The structured body — capped to a comfortable reading measure; inherits the
+   NodeTree field formatting (pairs, run-ins, lists). WCAG AA: --text on
+   --surface ≥ 4.5:1 via the same genre tokens used across the sheet. */
+.archetypes-section__body {
+  font-size: 1rem; /* 16px */
+  color: var(--text, #1a1a1a);
+  max-width: 48rem;
+  padding: 0.25rem 0 0.75rem;
 }
 
 /* ── Loading / error (unchanged contract) ───────────────────────────────── */

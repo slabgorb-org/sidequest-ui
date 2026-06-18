@@ -18,7 +18,6 @@
 
 import { CartographyMap } from "@/components/map/CartographyMap";
 import type { CartographyMetadata } from "@/components/MapOverlay";
-import { slugify } from "@/components/reference/nodeShape";
 import type { MapSectionData } from "@/types/reference";
 
 /** Adapt the server map section into the shared `CartographyMetadata` shape. */
@@ -39,14 +38,15 @@ function toCartography(section: MapSectionData): CartographyMetadata {
   };
 }
 
+// Headless renderer (2026-06-17 shell-accordion refactor): the section wrapper
+// (`section-{id}` deep-link anchor) and the `.reference-section__label` heading
+// now live on the shell's section accordion (ReferenceDocument). This component
+// returns ONLY its inner body so it can drop into an accordion panel without
+// double chrome.
 export function MapSection({ section }: { section: MapSectionData }) {
   return (
-    <section
-      className="reference-section reference-section--map"
-      id={`section-${slugify(section.id)}`}
-    >
-      <h2 className="reference-section__label">{section.label}</h2>
+    <div className="reference-section--map">
       <CartographyMap cartography={toCartography(section)} />
-    </section>
+    </div>
   );
 }
