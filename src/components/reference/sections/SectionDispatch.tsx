@@ -18,12 +18,14 @@ import { slugify, type NodeTreeMode } from "@/components/reference/nodeShape";
 import { CastSection } from "@/components/reference/sections/CastSection";
 import { MapSection } from "@/components/reference/sections/MapSection";
 import { PoiSection } from "@/components/reference/sections/PoiSection";
+import { RulesDocument } from "@/components/reference/sections/RulesDocument";
 import { TimelineSection } from "@/components/reference/sections/TimelineSection";
 import type {
   CastSectionData,
   MapSectionData,
   PoiSectionData,
   ReferenceSection,
+  RulesDocumentSection,
   TimelineSectionData,
 } from "@/types/reference";
 
@@ -43,6 +45,8 @@ export function SectionDispatch({
       return <TimelineSection section={section as TimelineSectionData} />;
     case "map":
       return <MapSection section={section as MapSectionData} />;
+    case "ruleset_reference":
+      return <RulesDocument section={section as RulesDocumentSection} />;
     default:
       // Generic node-bearing section → NodeTree. A node-less unknown section
       // (a deferred type like "map") degrades to nothing, never a crash.

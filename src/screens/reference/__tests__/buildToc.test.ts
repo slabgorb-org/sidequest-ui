@@ -69,3 +69,19 @@ describe("buildToc (2026-06-09 redesign)", () => {
     expect(toc[0].children).toEqual([]);
   });
 });
+
+describe("buildToc rules_document", () => {
+  it("emits a chapter child per chapter", () => {
+    const section: import("../../../types/reference").RulesDocumentSection = {
+      id: "ruleset_reference", type: "rules_document", label: "The Rules of Fate Core", ruleset: "fate",
+      chapters: [
+        { anchor: "fate-basics", title: "The Basics", order: 1, srd_ref: "B", body_markdown: "x" },
+        { anchor: "fate-skills", title: "Skills", order: 2, srd_ref: "S", body_markdown: "y" },
+      ],
+      provenance: { source: "Fate Core System", license: "ccby", attribution: "CC BY 3.0." },
+    };
+    const [item] = buildToc([section], "cards");
+    expect(item.children.map((c) => c.id)).toEqual(["fate-basics", "fate-skills"]);
+    expect(item.children.map((c) => c.label)).toEqual(["The Basics", "Skills"]);
+  });
+});

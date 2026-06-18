@@ -123,14 +123,47 @@ export interface MapSectionData {
   dangling: [string, string][];
 }
 
+// ADR-149 (Phase 1) — rules-document section type, pinned from the
+// server projection (reference_projection.py::build_ruleset_reference_section). Each
+// chapter carries its full SRD body as Markdown; provenance tracks source,
+// license, and attribution for verbatim SRD content (ADR-145).
+
+/** One chapter (anchor-linked section) in a rules document. */
+export interface RulesChapter {
+  anchor: string;
+  title: string;
+  order: number;
+  srd_ref: string;
+  body_markdown: string;
+}
+
+/** Provenance metadata for a verbatim SRD rules document. */
+export interface RulesProvenance {
+  source: string;
+  license: "wn-free" | "ccby";
+  attribution: string;
+}
+
+/** The `ruleset_reference` section (`build_ruleset_reference_section`). */
+export interface RulesDocumentSection {
+  id: "ruleset_reference";
+  type: "rules_document";
+  label: string;
+  ruleset: string;
+  chapters: RulesChapter[];
+  provenance: RulesProvenance;
+}
+
 /** Any section the reference document may carry — the generic node-tree section
- * plus the Phase-3 dedicated section types and the Story 104-3 map section. */
+ * plus the Phase-3 dedicated section types, the Story 104-3 map section, and
+ * the ADR-149 rules-document section. */
 export type ReferenceSection =
   | GenericSection
   | PoiSectionData
   | CastSectionData
   | TimelineSectionData
-  | MapSectionData;
+  | MapSectionData
+  | RulesDocumentSection;
 
 /** Flat CSS-variable token dict, e.g. `{ "--primary": "#c0392b" }`. */
 export type ReferenceTheme = Record<string, string>;
