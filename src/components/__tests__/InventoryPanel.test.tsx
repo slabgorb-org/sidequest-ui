@@ -70,6 +70,28 @@ describe('InventoryPanel', () => {
     expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
   });
 
+  it('suppresses the currency/gold line when showCurrency is false (Fate has no economy)', () => {
+    // sq-playtest 2026-06-17 (wry_whimsy/oz): a Fate PC's inventory must show
+    // the carried items (silver shoes) WITHOUT the native-ruleset money line —
+    // Fate has no economy, so "0 coin" is meaningless native framing. The items
+    // still render; only the currency span is gated.
+    render(
+      <InventoryPanel
+        data={{ items: [{ name: 'Silver Shoes', type: 'gear', description: 'Charmed.' }], gold: 0 }}
+        showCurrency={false}
+      />,
+    );
+    expect(screen.getByText('Silver Shoes')).toBeInTheDocument();
+    expect(screen.queryByText(/coin/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('inventory-currency')).not.toBeInTheDocument();
+  });
+
+  it('shows the currency line by default (native packs with an economy are unchanged)', () => {
+    render(<InventoryPanel data={{ items: [], gold: 7, currency_name: 'credits' }} />);
+    expect(screen.getByTestId('inventory-currency')).toBeInTheDocument();
+    expect(screen.getByText(/7 credits/)).toBeInTheDocument();
+  });
+
   it('renders item descriptions', () => {
     render(<InventoryPanel data={BASE_INVENTORY} />);
     expect(screen.getByText(/A finely crafted bow/)).toBeInTheDocument();

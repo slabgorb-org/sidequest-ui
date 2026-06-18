@@ -400,19 +400,18 @@ export function GameBoard({
     available.add("character");
     available.add("relationships");
     available.add("quests");
-    // Story 126-3 (ADR-144): hide the native Inventory tab on Fate packs. Fate
-    // has no carried inventory and no economy — the 114-10 migration (#472)
-    // deleted inventory.yaml for the four Fate packs and gear dissolves into
-    // aspects (via source_gear), so a Fate PC who opened Inventory would only
-    // see an empty native panel (items:[], gold:0). `fateData == null` is the
-    // ruleset!='fate' signal: the server emits FATE_STATE only on a Fate pack
-    // (server #880), the same gate the Fate tab uses below. Both the desktop
-    // dockview and MobileTabView read this set, so this one gate covers both
-    // surfaces. UI-only — no inventory data is touched (ADR-144 keeps
-    // inventory.items/gold unpopulated server-side).
-    if (fateData == null) {
-      available.add("inventory");
-    }
+    // Inventory is available for EVERY pack, Fate included. Story 126-3 hid the
+    // tab on Fate packs on the premise that "Fate has no carried inventory" —
+    // play disproved it (sq-playtest 2026-06-17, wry_whimsy/oz): a Fate PC
+    // accumulates real items in core.inventory.items during play (Harpo's save:
+    // Silver Shoes, Rubber Horn, Banjo), and the server emits them as
+    // inventoryData. Hiding the tab made the iconic silver shoes invisible.
+    // Keith (reversing 126-3): "the point is not to show the inventory tab of
+    // the native rule set — the point is to show the character inventory
+    // wherever that comes from." So the tab is unconditional; the native
+    // economy framing (the currency/gold line) is instead suppressed per-pack
+    // at render time via showCurrency (false on Fate — see renderWidget below).
+    available.add("inventory");
     available.add("map");
     available.add("knowledge");
     available.add("gallery");
@@ -608,7 +607,11 @@ export function GameBoard({
           />
         ) : null;
       case "inventory":
-        return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
+        // showCurrency=false on a Fate pack (fateData != null): Fate has no
+        // economy, so show the carried items without the native "0 coin" line.
+        return inventoryData ? (
+          <InventoryWidget data={inventoryData} showCurrency={fateData == null} />
+        ) : null;
       case "map":
         return (
           <MapWidget
