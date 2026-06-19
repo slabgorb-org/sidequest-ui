@@ -122,6 +122,17 @@ export interface CharacterPanelProps {
    * Null on WN/native packs ⇒ the native StatsContent path is unchanged.
    */
   fateSheet?: FateCharacterEntry | null;
+  /**
+   * Story 126-19 / ADR-144 ("Bind the Ruleset, Don't Balance It"): when the bound
+   * ruleset REPLACES the native HP/level/class model (Fate: harm = Stress +
+   * Consequences), suppress the residual native chrome — the header level badge +
+   * HP pill, the body's HP/Vitality edge-ticks, and the party-row class/level/HP.
+   * GameBoard derives this from `fateData != null` (the same ruleset signal that
+   * drives the inventory `showCurrency` gate); it is NOT a per-PC name match, so a
+   * Fate roster-name mismatch can never leak the chrome. Default false ⇒ WN/native
+   * packs render the native chrome unchanged (HP/level/class are legitimate there).
+   */
+  suppressNativeChrome?: boolean;
 }
 
 function toDisplayName(id: string): string {
@@ -150,6 +161,7 @@ export function CharacterPanel({
   submittedPlayerIds,
   magicState = null,
   fateSheet = null,
+  suppressNativeChrome = false,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
     "sq-character-panel",
@@ -300,21 +312,25 @@ export function CharacterPanel({
           </p>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
-          <div
-            data-testid="character-level-badge"
-            className="px-2 py-0.5 rounded-md text-xs border border-[var(--primary)]/40 text-[var(--primary)] font-semibold"
-            style={{
-              borderColor: FOLIO.crimson,
-              color: FOLIO.crimson,
-              fontFamily: FONT_DISPLAY,
-              letterSpacing: 0.5,
-              fontWeight: 400,
-              borderRadius: 2,
-              background: FOLIO.paper2,
-            }}
-          >
-            Lv {character.level}
-          </div>
+          {/* Story 126-19: native level badge — suppressed when the bound ruleset
+              has no levels (Fate). Legitimate on WN/native packs. */}
+          {!suppressNativeChrome && (
+            <div
+              data-testid="character-level-badge"
+              className="px-2 py-0.5 rounded-md text-xs border border-[var(--primary)]/40 text-[var(--primary)] font-semibold"
+              style={{
+                borderColor: FOLIO.crimson,
+                color: FOLIO.crimson,
+                fontFamily: FONT_DISPLAY,
+                letterSpacing: 0.5,
+                fontWeight: 400,
+                borderRadius: 2,
+                background: FOLIO.paper2,
+              }}
+            >
+              Lv {character.level}
+            </div>
+          )}
           {/* HP / Vitality badge — load-bearing for the mechanics-first
               players (Sebastien/Jade). ADR-114 (ablative HP substrate)
               reclaims this pool as HP: the engine logs hp=N/M and this is the
@@ -323,7 +339,7 @@ export function CharacterPanel({
               emits current/max on PARTY_STATUS members as current_hp/max_hp;
               App.tsx fans them into hp/hp_max on CharacterSheetData. Hidden
               when both are absent so we never render a fake "0/0". */}
-          {hasEdge && (
+          {hasEdge && !suppressNativeChrome && (
             <EdgeBadge
               current={character.hp!}
               max={character.hp_max!}
@@ -335,8 +351,9 @@ export function CharacterPanel({
 
       {/* Edge ♦-tick bar — Folio signature. Adds an at-a-glance read of
           composure under the header. Hidden on edge-less genres so we
-          don't paint a row of empty diamonds. */}
-      {hasEdge && (
+          don't paint a row of empty diamonds. Story 126-19: also suppressed when
+          the bound ruleset replaces native HP (Fate). */}
+      {hasEdge && !suppressNativeChrome && (
         <FolioEdgeTicks
           current={character.hp!}
           max={character.hp_max!}
@@ -569,40 +586,45 @@ export function CharacterPanel({
                       </>
                     )}
                   </span>
-                  <span
-                    className="block text-[10px] text-muted-foreground"
-                    style={{ color: FOLIO.inkSoft, fontFamily: FONT_BODY }}
-                  >
-                    {toDisplayName(c.class)} Lv.{c.level}
-                    {/* Inline Edge for party rows so glance value matches the
-                        CharacterPanel header. ADR-014 / ADR-078: HP was
-                        removed in favor of EdgePool — wire field names
-                        (hp/hp_max on CharacterSummary) are kept until a
-                        protocol-level rename. Skip when the genre doesn't
-                        report edge at all (both 0 = uninitialized). */}
-                    {(c.hp_max > 0 || c.hp > 0) && (
-                      <>
-                        {" · "}
-                        <span
-                          data-testid={`party-member-edge-${c.player_id}`}
-                          className={
-                            c.hp_max > 0 && c.hp / c.hp_max <= 0.25
-                              ? "text-destructive font-semibold"
-                              : "text-foreground/80"
-                          }
-                          style={{
-                            color:
+                  {/* Native class · level · HP secondary line. Story 126-19:
+                      suppressed when the bound ruleset replaces all three (Fate) —
+                      the name stays, the native chrome goes. Legitimate on WN. */}
+                  {!suppressNativeChrome && (
+                    <span
+                      className="block text-[10px] text-muted-foreground"
+                      style={{ color: FOLIO.inkSoft, fontFamily: FONT_BODY }}
+                    >
+                      {toDisplayName(c.class)} Lv.{c.level}
+                      {/* Inline Edge for party rows so glance value matches the
+                          CharacterPanel header. ADR-014 / ADR-078: HP was
+                          removed in favor of EdgePool — wire field names
+                          (hp/hp_max on CharacterSummary) are kept until a
+                          protocol-level rename. Skip when the genre doesn't
+                          report edge at all (both 0 = uninitialized). */}
+                      {(c.hp_max > 0 || c.hp > 0) && (
+                        <>
+                          {" · "}
+                          <span
+                            data-testid={`party-member-edge-${c.player_id}`}
+                            className={
                               c.hp_max > 0 && c.hp / c.hp_max <= 0.25
-                                ? FOLIO.crimson
-                                : FOLIO.ink,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {c.survivability_pool_label ?? "HP"} {c.hp}/{c.hp_max}
-                        </span>
-                      </>
-                    )}
-                  </span>
+                                ? "text-destructive font-semibold"
+                                : "text-foreground/80"
+                            }
+                            style={{
+                              color:
+                                c.hp_max > 0 && c.hp / c.hp_max <= 0.25
+                                  ? FOLIO.crimson
+                                  : FOLIO.ink,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {c.survivability_pool_label ?? "HP"} {c.hp}/{c.hp_max}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  )}
                   {c.status_effects.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-0.5">
                       {c.status_effects.map((effect) => (
