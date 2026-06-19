@@ -70,6 +70,40 @@ describe('InventoryPanel', () => {
     expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
   });
 
+  it('shows empty-state copy instead of a blank panel when there are no items', () => {
+    // sq-playtest 2026-06-19 (pulp_noir/annees_folles): a new PC's Inventory tab
+    // rendered just the "Inventory" header over blank space, reading as broken.
+    // Keith: "presenting a blank screen is wrong regardless." There must be
+    // explicit copy that reads as intentional.
+    render(<InventoryPanel data={{ items: [], gold: 0 }} />);
+    expect(screen.getByTestId('inventory-empty')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing in your pockets yet/i)).toBeInTheDocument();
+  });
+
+  it('explains the empty inventory for Fate (aspects, not carried items) when showCurrency is false', () => {
+    // Under Fate signature gear is compiled into the FateSheet as aspects, so a
+    // Fate inventory is LEGITIMATELY empty much of the time. showCurrency=false is
+    // the no-economy signal the GameBoard passes only for Fate packs — when it is
+    // set, the empty state explains *why* it's empty so it doesn't read as broken.
+    render(<InventoryPanel data={{ items: [], gold: 0 }} showCurrency={false} />);
+    expect(screen.getByTestId('inventory-empty')).toBeInTheDocument();
+    expect(screen.getByText(/lives in your aspects/i)).toBeInTheDocument();
+  });
+
+  it('omits the Fate aspects hint for a native (economy) pack with an empty inventory', () => {
+    // The aspects hint is Fate-specific; a native pack (showCurrency default true)
+    // shows the generic empty-state line only — no aspects framing.
+    render(<InventoryPanel data={{ items: [], gold: 0, currency_name: 'credits' }} />);
+    expect(screen.getByText(/Nothing in your pockets yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/aspects/i)).not.toBeInTheDocument();
+  });
+
+  it('does NOT show empty-state copy when the inventory has items', () => {
+    render(<InventoryPanel data={BASE_INVENTORY} />);
+    expect(screen.queryByTestId('inventory-empty')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing in your pockets yet/i)).not.toBeInTheDocument();
+  });
+
   it('suppresses the currency/gold line when showCurrency is false (Fate has no economy)', () => {
     // sq-playtest 2026-06-17 (wry_whimsy/oz): a Fate PC's inventory must show
     // the carried items (silver shoes) WITHOUT the native-ruleset money line —
