@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { CharacterPanel } from "../CharacterPanel";
 import type { CharacterSheetData } from "../CharacterSheet";
@@ -83,5 +83,66 @@ describe("CharacterPanel — Fate sheet in the Stats tab (playtest 2026-06-17)",
     render(<CharacterPanel character={FATE_CHARACTER} />);
     expect(screen.getByText("No stats available.")).toBeInTheDocument();
     expect(screen.queryByTestId("fate-character")).not.toBeInTheDocument();
+  });
+});
+
+// Playtest 150-2 [BUG-LOW]: a player who picked 3 stunts at chargen saw them
+// NOWHERE in game — the Fate sheet rendered no Stunts section, and Character→
+// Abilities showed the native "Class moves" surface instead. Under Fate a PC's
+// special abilities ARE their stunts. Fix: project stunts onto FATE_STATE (server)
+// and render them in the Fate sheet (Stats tab) + the Abilities tab, suppressing the
+// native class-move surface for Fate.
+const FATE_SHEET_WITH_STUNTS: FateCharacterEntry = {
+  ...FATE_SHEET,
+  stunts: [
+    { name: "The Quick Draw", description: "Iron clears leather first." },
+    { name: "Nerves of Cold Iron", description: "+2 Will under a leveled gun." },
+  ],
+};
+
+// A Fate character that ALSO carries native class moves — proves the moves are
+// actively SUPPRESSED under Fate, not merely absent.
+const FATE_CHARACTER_WITH_NATIVE_MOVES: CharacterSheetData = {
+  ...FATE_CHARACTER,
+  class_moves: [{ id: "fan_hammer", label: "Fan the Hammer" }],
+};
+
+describe("CharacterPanel — Fate stunts (playtest 150-2)", () => {
+  it("renders the chosen stunts in the Stats-tab Fate sheet", () => {
+    render(
+      <CharacterPanel character={FATE_CHARACTER} fateSheet={FATE_SHEET_WITH_STUNTS} />,
+    );
+    expect(screen.getByTestId("fate-stunts")).toBeInTheDocument();
+    expect(screen.getByText("The Quick Draw")).toBeInTheDocument();
+    expect(screen.getByText(/Iron clears leather first\./)).toBeInTheDocument();
+    expect(screen.getByText("Nerves of Cold Iron")).toBeInTheDocument();
+  });
+
+  it("renders stunts in the Abilities tab and suppresses native 'Class moves' under Fate", () => {
+    render(
+      <CharacterPanel
+        character={FATE_CHARACTER_WITH_NATIVE_MOVES}
+        fateSheet={FATE_SHEET_WITH_STUNTS}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Abilities" }));
+    // The PC's stunts are the Abilities surface under Fate.
+    expect(screen.getByText("The Quick Draw")).toBeInTheDocument();
+    // The native class-move surface is suppressed — no heading, no move label.
+    expect(screen.queryByText("Class moves")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fan the Hammer")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest empty-state in the Abilities tab when a Fate PC has no stunts (never native moves)", () => {
+    render(
+      <CharacterPanel
+        character={FATE_CHARACTER_WITH_NATIVE_MOVES}
+        fateSheet={FATE_SHEET}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Abilities" }));
+    expect(screen.getByText(/under Fate your special abilities are your stunts/i)).toBeInTheDocument();
+    expect(screen.queryByText("Class moves")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fan the Hammer")).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import type { CharacterSheetData, AbilityDefinition, ClassMove } from "./Charact
 import { PortraitFrame } from "./PortraitFrame";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
-import { FateCharacterSheet } from "./FatePanel";
+import { FateCharacterSheet, FateStunts } from "./FatePanel";
 import { FateDiceTray } from "@/dice/FateDiceTray";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
@@ -453,14 +453,27 @@ export function CharacterPanel({
           ) : (
             <StatsContent stats={character.stats} />
           ))}
-        {activeTab === "abilities" && (
-          <AbilitiesContent
-            abilities={character.abilities}
-            class_moves={character.class_moves ?? []}
-            magicState={magicState}
-            characterId={character.name}
-          />
-        )}
+        {activeTab === "abilities" &&
+          (fateSheet ? (
+            // Fate pack: a PC's special abilities ARE their stunts — render those
+            // and SUPPRESS the native class-move surface (the same branch-on-ruleset
+            // theme as the Stats tab + the level/HP suppression above; playtest
+            // 150-2). An empty list is an honest "none chosen", never native moves.
+            (fateSheet.stunts?.length ?? 0) > 0 ? (
+              <FateStunts stunts={fateSheet.stunts ?? []} />
+            ) : (
+              <p className="text-sm opacity-70">
+                No stunts chosen — under Fate your special abilities are your stunts.
+              </p>
+            )
+          ) : (
+            <AbilitiesContent
+              abilities={character.abilities}
+              class_moves={character.class_moves ?? []}
+              magicState={magicState}
+              characterId={character.name}
+            />
+          ))}
         {activeTab === "status" && hasResources && (
           <StatusContent
             resources={resources!}
