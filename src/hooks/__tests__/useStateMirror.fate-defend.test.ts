@@ -101,4 +101,59 @@ describe("useStateMirror — FATE_DEFEND_REQUEST event (Story 126-17)", () => {
     ]);
     expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
   });
+
+  // Rework (Reviewer [HIGH] [SILENT][RULE], 2026-06-19): the guard must validate the
+  // MECHANICAL fields too, not just the routing keys — a version-skewed payload with
+  // valid request_id/defender but a missing attack_total renders a blank/wrong total on
+  // the mechanics-first defend tray (118-5 anti-drift), a silent No-Silent-Fallbacks
+  // corruption. Mirror the FATE_ROLL guard, which validates EVERY face value.
+  it("drops a request missing attack_total and leaves the slice unchanged (No Silent Fallbacks)", () => {
+    const r = mirror([
+      defendMsg(req("d-1", "Sam Spadework", 5)),
+      // request_id + defender present, but attack_total absent — the committed-attack
+      // number the tray shows. Must not pass the guard.
+      defendMsg({ request_id: "d-2", defender: "Sam Spadework", attacker: "X", attack_skill: "Shoot" }),
+    ]);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
+  });
+
+  it("drops a request with a non-number attack_total", () => {
+    const r = mirror([
+      defendMsg(req("d-1", "Sam Spadework", 5)),
+      defendMsg({
+        request_id: "d-2",
+        defender: "Sam Spadework",
+        attacker: "X",
+        attack_skill: "Shoot",
+        attack_total: "lots" as unknown as number,
+      }),
+    ]);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
+  });
+
+  it("drops a request missing attacker", () => {
+    const r = mirror([
+      defendMsg(req("d-1", "Sam Spadework", 5)),
+      defendMsg({ request_id: "d-2", defender: "Sam Spadework", attack_skill: "Shoot", attack_total: 9 }),
+    ]);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
+  });
+
+  it("drops a request missing attack_skill", () => {
+    const r = mirror([
+      defendMsg(req("d-1", "Sam Spadework", 5)),
+      defendMsg({ request_id: "d-2", defender: "Sam Spadework", attacker: "X", attack_total: 9 }),
+    ]);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
+  });
+
+  // CRITICAL anti-regression for the fix: attack_total === 0 is a VALID Fate value (an
+  // attack defended down to zero / a +0 ladder). The guard must check `typeof === 'number'`,
+  // NOT truthiness — a truthiness check would silently drop a legitimate zero-total attack.
+  it("KEEPS a request with attack_total === 0 (zero is a valid total — guard must use typeof, not truthiness)", () => {
+    const zero = req("d-zero", "Sam Spadework", 0);
+    const r = mirror([defendMsg(zero)]);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-zero");
+    expect(r.current.state.latestFateDefendRequest?.attack_total).toBe(0);
+  });
 });
