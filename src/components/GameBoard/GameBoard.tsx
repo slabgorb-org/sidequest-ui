@@ -78,7 +78,6 @@ import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { LocationWidget } from "./widgets/LocationWidget";
 import { RelationshipsWidget } from "./widgets/RelationshipsWidget";
 import { QuestsWidget } from "./widgets/QuestsWidget";
-import { FateWidget } from "./widgets/FateWidget";
 import {
   FateConflictSurface,
   type FateActionInput,
@@ -205,9 +204,10 @@ export interface GameBoardProps {
   /**
    * Story 118-7 (F3g) + 118-6 (F3f) / ADR-144: the latest resolved 4dF roll
    * (state.latestFateRoll). Null until a FATE_ROLL event arrives (only ever on a
-   * ruleset=='fate' pack). One slice, two consumers: the Fate panel's FateWidget
-   * threads it so the FateDiceTray mounts (F3g), and the Fate conflict surface
-   * composes it (F3f).
+   * ruleset=='fate' pack). One slice, two consumers: the Character panel threads
+   * it so the non-conflict FateDiceTray mounts in the Stats tab (Story 126-26
+   * re-home of F3g, replacing the removed dock Fate tab), and the Fate conflict
+   * surface composes its own tray (F3f).
    */
   latestFateRoll?: FateRollPayload | null;
   /**
@@ -437,14 +437,10 @@ export function GameBoard({
     if (navMode === "region" || navMode === "room_graph") {
       available.add("location");
     }
-    // Story 118-2 / ADR-144 F3b: the Fate tab is ruleset-gated. The server emits
-    // FATE_STATE only on a ruleset=='fate' pack, so gating the tab on
-    // `fateData != null` keeps it off the 7 WN/native packs entirely — it can
-    // never sit beside the beat/dial ConfrontationOverlay (epic 118). This is
-    // the UI realization of the ruleset gate and the paired negative test.
-    if (fateData != null) {
-      available.add("fate");
-    }
+    // Story 126-26 (PART B of 126-19): the standalone "Fate" sheet tab was
+    // removed (its sheet is under Character→Stats; its 4dF roll tray re-homed
+    // there too). The Fate CONFLICT surface below is a distinct, conflict-gated
+    // widget and is unaffected.
     // Story 118-6 / ADR-144 F3f: the Fate conflict surface claims the canvas ONLY
     // while a Fate conflict is ACTIVE — gated on fateData.conflict.active (the Fate
     // analog of confrontationData). A WN/native pack never emits a Fate conflict,
@@ -603,9 +599,10 @@ export function GameBoard({
             // Character panel's Stats tab. fateData is the FATE_STATE projection,
             // emitted only on a ruleset=='fate' pack — match the local PC by
             // character name. Null on WN/native packs (fateData == null) ⇒ the
-            // panel keeps its native StatsContent path. The Fate sheet otherwise
-            // lived only in the dock FateWidget; a Fate player opening Character
-            // saw "No stats available." (native `stats` is empty on a Fate pack).
+            // panel keeps its native StatsContent path. Before 118-2 the Fate
+            // sheet lived only in a separate dock tab (removed in 126-26); a Fate
+            // player opening Character saw "No stats available." (native `stats`
+            // is empty on a Fate pack).
             fateSheet={
               fateData?.characters.find(
                 (c) => c.name === characterSheet.name,
@@ -619,6 +616,12 @@ export function GameBoard({
             // a per-PC name match — so a Fate roster-name mismatch can never leak
             // the chrome. Null on WN/native packs ⇒ chrome renders unchanged.
             suppressNativeChrome={fateData != null}
+            // Story 126-26 (PART B of 126-19): the non-conflict 4dF roll tray
+            // re-homes from the removed standalone "Fate" dock tab to the Stats
+            // tab, beside the Fate sheet. Thread the same latestFateRoll slice the
+            // Fate conflict surface reads. Gated by fateSheet (null off Fate) in
+            // CharacterPanel, so a native pack never grows a 4dF tray.
+            fateRoll={latestFateRoll ?? null}
           />
         ) : null;
       case "inventory":
@@ -654,21 +657,6 @@ export function GameBoard({
         // Always render — QuestsPanel shows an empty state when the spine is
         // null/empty. Tab is always present from session start (Story 77-5).
         return <QuestsWidget data={questsData ?? null} />;
-      case "fate":
-        // Story 118-2 / ADR-144 F3b: the Fate sheet. The tab only exists when
-        // fateData is present (dataGated:true gate above), but render
-        // defensively — FatePanel shows an empty state for null/empty data.
-        // Story 118-7 / ADR-144 F3g: thread the latest 4dF roll + the ruleset so
-        // the FateDiceTray mounts. The tab is reachable only when fateData !=
-        // null (a ruleset=='fate' pack), so the ruleset is "fate" here — which
-        // keeps the roll surface off the WN/native ConfrontationOverlay.
-        return (
-          <FateWidget
-            data={fateData ?? null}
-            latestRoll={latestFateRoll ?? null}
-            ruleset={fateData != null ? "fate" : ""}
-          />
-        );
       case "fate-conflict": {
         // Story 118-6 / ADR-144 F3f: the Fate conflict surface. Reachable only
         // while a Fate conflict is active (gated in availableWidgets). actorName is
@@ -889,7 +877,6 @@ export function GameBoard({
       "character",
       "relationships",
       "quests",
-      "fate",
       "fate-conflict",
       "inventory",
       "map",

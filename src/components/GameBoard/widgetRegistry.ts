@@ -26,7 +26,6 @@ export type WidgetId =
   | "knowledge"
   | "relationships"
   | "quests"
-  | "fate"
   | "fate-conflict"
   | "gallery"
   | "audio"
@@ -157,24 +156,10 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     closable: true,
     dataGated: false,
   },
-  // Story 118-2 / ADR-144 F3b: player-facing Fate sheet (fate points, ladder
-  // skills, aspects, stress, consequences). UNLIKE quests/relationships
-  // (always-present), this is dataGated:true — the tab appears only when a
-  // FATE_STATE projection has arrived. The server emits FATE_STATE only on a
-  // ruleset=='fate' pack (server #880), so the tab never shows on the 7
-  // WN/native packs and can never co-render with the ConfrontationOverlay
-  // (epic 118 ruleset-gate). Hotkey 'f' — free (verified against buildHotkeyMap).
-  fate: {
-    id: "fate",
-    label: "Fate",
-    hotkey: "f",
-    minW: 3,
-    minH: 3,
-    defaultW: 4,
-    defaultH: 5,
-    closable: true,
-    dataGated: true,
-  },
+  // Story 126-26 (PART B of 126-19): the standalone "Fate" sheet tab was REMOVED.
+  // The Fate sheet it showed is consolidated under Character→Stats (118-2), and
+  // its unique surface — the non-conflict 4dF roll tray — re-homed there too. The
+  // Fate CONFLICT surface below is a DIFFERENT, conflict-gated widget and stays.
   gallery: {
     id: "gallery",
     label: "Scrapbook",

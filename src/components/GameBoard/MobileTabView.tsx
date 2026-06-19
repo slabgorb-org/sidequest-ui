@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart, Scroll, Dices, Swords } from "lucide-react";
+import { BookOpen, User, Map, MapPin, Package, BookMarked, Image, Heart, Scroll, Swords } from "lucide-react";
 import type { WidgetId } from "./widgetRegistry";
 
 interface MobileTab {
@@ -21,11 +21,9 @@ const TABS: MobileTab[] = [
   // rightGroupOrder (after relationships) so the Quests tab has mobile/desktop
   // layout parity.
   { id: "quests", label: "Quests", icon: <Scroll size={18} /> },
-  // Story 118-2 / ADR-144 F3b: player-facing Fate sheet. Data-gated (dataGated:
-  // true) — only renders when `fate` is in availableWidgets, which the parent
-  // gates on a FATE_STATE projection (ruleset=='fate' packs only). Kept in sync
-  // with the desktop dockview rightGroupOrder (after quests) for layout parity.
-  { id: "fate", label: "Fate", icon: <Dices size={18} /> },
+  // Story 126-26 (PART B of 126-19): the standalone "Fate" sheet tab was removed
+  // (sheet under Character→Stats; 4dF roll tray re-homed there). The Fate CONFLICT
+  // tab below is a distinct, conflict-gated surface and stays.
   // Story 118-6 / ADR-144 F3f: the Fate conflict surface. Data-gated on an ACTIVE
   // Fate conflict (fateData.conflict.active) in the parent's availableWidgets — so
   // the mobile tab appears only mid-conflict and never beside a WN/native pack
