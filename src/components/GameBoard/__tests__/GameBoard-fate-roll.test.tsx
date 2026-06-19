@@ -1,25 +1,40 @@
 /**
- * Story 118-7 (ADR-144 F3g): the FATE_ROLL surface is reachable from a
- * production render path (RED) — the mandatory wiring test (server/ui CLAUDE.md
- * "Every Test Suite Needs a Wiring Test"). FateDiceTray + the latest-roll slice
- * mean nothing if GameBoard.renderWidgetContent never threads the roll into the
- * FateWidget → FatePanel → FateDiceTray chain.
+ * Story 126-26 (PART B of 126-19): RE-HOME the non-conflict 4dF roll tray (RED).
  *
- * Proves: activate the Fate tab on a Fate pack and, when a roll has arrived, the
- * 3D roll surface mounts inside the dock panel — driven entirely through
- * GameBoard's real render path, not a hand-mounted FateDiceTray.
+ * 118-7 mounted the out-of-conflict FateDiceTray (`fate-dice-tray`) inside the
+ * STANDALONE "Fate" dock tab (FateWidget → FatePanel). 126-26 removes that tab
+ * because the Fate sheet it showed is already consolidated under Character→Stats
+ * (118-2). But the roll tray is NOT duplicated under Character — so it must be
+ * RE-HOMED there FIRST, or the out-of-conflict roll surface is lost.
  *
- * Paired negative (epic 118 ruleset gate): the same activated tab WITHOUT a roll
- * shows the sheet but NOT the tray — the surface only appears once a roll exists,
- * and (fateData-gated) never on a WN/native pack.
+ * New reality this suite pins: the non-conflict 4dF roll tray renders under the
+ * Character surface (the Stats tab, beside the FateCharacterSheet), reachable
+ * end-to-end through GameBoard's real `renderWidgetContent` → CharacterWidget →
+ * CharacterPanel path — the mandatory wiring test (ui CLAUDE.md "Every Test
+ * Suite Needs a Wiring Test"). The roll comes through GameBoard's existing
+ * `latestFateRoll` prop; Dev threads it into the Character render path the same
+ * way `fateData`/`fateSheet` is already threaded (118-2).
  *
- * `latestFateRoll` is not yet a GameBoard prop, so it's reached through a widened
- * type. R3F/dice-lib are mocked (no WebGL in jsdom).
+ * Paired negatives (the ruleset gate survives the move):
+ *   - Fate pack, roll present  → sheet AND tray under Character
+ *   - Fate pack, no roll yet   → sheet but NOT the tray
+ *   - native/WN pack + a roll  → no Fate sheet, no tray (fateData-gated)
+ *
+ * NOT touched: the Fate CONFLICT surface (FateConflictSurface) keeps its OWN
+ * FateDiceTray — that is a separate, conflict-gated surface (118-6) and out of
+ * scope here.
+ *
+ * R3F/dice-lib are mocked (no WebGL in jsdom). test-setup.ts mocks matchMedia →
+ * "mobile", so renderBoard() renders via MobileTabView (flat role="tab" buttons;
+ * the Character tab is labeled "Character"). CharacterPanel defaults to the
+ * "stats" tab, so opening Character shows the Fate sheet (and re-homed tray)
+ * with no sub-tab click.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { GameBoard, type GameBoardProps } from "../GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
+import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { FateRollPayload, FateStatePayload } from "@/types/payloads";
 
 vi.mock("@react-three/fiber", () => ({
@@ -50,21 +65,31 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Widen GameBoardProps with the not-yet-wired latestFateRoll prop so this RED
-// test compiles before the prop lands and stays correct after.
-type BoardOverrides = Partial<GameBoardProps> & {
-  fateData?: FateStatePayload | null;
-  latestFateRoll?: FateRollPayload | null;
+const FATE_PC = "Sam Spadework";
+
+// The local PC's collapsed sheet — its name matches the FATE_STATE roster below
+// so GameBoard derives a non-null fateSheet and the Stats tab renders the Fate
+// sheet (118-2). This is what the re-homed roll tray sits beside.
+const baseSheet: CharacterSheetData = {
+  name: FATE_PC,
+  class: "Sleuth",
+  level: 1,
+  hp: 10,
+  hp_max: 10,
+  stats: { Edge: 10 },
+  abilities: [],
+  class_moves: [],
+  backstory: "",
 };
 
-function renderBoard(overrides: BoardOverrides = {}) {
+function renderBoard(overrides: Partial<GameBoardProps> = {}) {
   const defaults: GameBoardProps = {
     messages: [],
     characters: [
       {
         player_id: "p1",
         name: "Sam",
-        character_name: "Sam Spadework",
+        character_name: FATE_PC,
         class: "Sleuth",
         level: 1,
         hp: 10,
@@ -74,10 +99,12 @@ function renderBoard(overrides: BoardOverrides = {}) {
         current_location: "",
       },
     ],
+    characterSheet: baseSheet,
+    currentPlayerId: "p1",
     onSend: vi.fn(),
     disabled: false,
   };
-  const props = { ...defaults, ...overrides } as GameBoardProps;
+  const props = { ...defaults, ...overrides };
   return render(
     <ImageBusProvider messages={props.messages ?? []}>
       <GameBoard {...props} />
@@ -85,14 +112,15 @@ function renderBoard(overrides: BoardOverrides = {}) {
   );
 }
 
-function fateTab() {
-  return screen.queryByRole("tab", { name: /fate/i });
+// The roll tray's new home is the Character surface (Stats tab, default).
+function openCharacterTab() {
+  fireEvent.click(screen.getByRole("tab", { name: /character/i }));
 }
 
 const seeded: FateStatePayload = {
   characters: [
     {
-      name: "Sam Spadework",
+      name: FATE_PC,
       fate_points: 3,
       refresh: 3,
       skills: [{ name: "Investigate", rating: 4, ladder: "Great" }],
@@ -120,23 +148,33 @@ const SUCCEED: FateRollPayload = {
   seed: 4242,
 };
 
-describe("GameBoard — FATE_ROLL surface wiring (Story 118-7)", () => {
-  it("mounts the roll surface in the Fate dock panel when a roll has arrived", () => {
+describe("GameBoard — non-conflict 4dF roll tray re-homed under Character (Story 126-26)", () => {
+  it("mounts the roll surface beside the Fate sheet under Character when a roll has arrived", () => {
+    // RED: today the latest roll is only threaded into the (about-to-be-removed)
+    // standalone Fate dock tab, never into the Character render path — so opening
+    // Character shows the sheet but the tray is absent.
     renderBoard({ fateData: seeded, latestFateRoll: SUCCEED });
-    const tab = fateTab();
-    expect(tab, "Fate tab must be present on a Fate pack").toBeInTheDocument();
-    fireEvent.click(tab!);
-    // The sheet renders AND the roll surface threads through to the tray.
-    expect(screen.getByText(/sam spadework/i)).toBeInTheDocument();
-    expect(screen.getByTestId("fate-dice-tray")).toBeInTheDocument();
+    openCharacterTab();
+    expect(screen.getByTestId("fate-character")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("fate-dice-tray"),
+      "the re-homed 4dF roll tray must mount in the Character surface",
+    ).toBeInTheDocument();
   });
 
-  it("shows the sheet but NOT the roll surface before any roll arrives (paired negative)", () => {
+  it("shows the Fate sheet but NOT the roll surface before any roll arrives (paired negative)", () => {
     renderBoard({ fateData: seeded, latestFateRoll: null });
-    const tab = fateTab();
-    expect(tab).toBeInTheDocument();
-    fireEvent.click(tab!);
-    expect(screen.getByText(/sam spadework/i)).toBeInTheDocument();
+    openCharacterTab();
+    expect(screen.getByTestId("fate-character")).toBeInTheDocument();
+    expect(screen.queryByTestId("fate-dice-tray")).not.toBeInTheDocument();
+  });
+
+  it("does NOT mount the roll tray under Character on a native/WN pack even if a roll is passed (ruleset gate survives the move)", () => {
+    // The re-home must stay fateData-gated, exactly like the old dock tab: a
+    // native pack has no Fate sheet and must never grow a 4dF tray.
+    renderBoard({ fateData: null, latestFateRoll: SUCCEED });
+    openCharacterTab();
+    expect(screen.queryByTestId("fate-character")).not.toBeInTheDocument();
     expect(screen.queryByTestId("fate-dice-tray")).not.toBeInTheDocument();
   });
 });

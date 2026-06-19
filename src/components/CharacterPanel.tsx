@@ -5,9 +5,10 @@ import { PortraitFrame } from "./PortraitFrame";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { LedgerPanel } from "./LedgerPanel";
 import { FateCharacterSheet } from "./FatePanel";
+import { FateDiceTray } from "@/dice/FateDiceTray";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
-import type { FateCharacterEntry } from "@/types/payloads";
+import type { FateCharacterEntry, FateRollPayload } from "@/types/payloads";
 import { getCharacterBars, type MagicState } from "@/types/magic";
 import { SensitivitiesSection } from "./SensitivitiesSection";
 
@@ -117,11 +118,23 @@ export interface CharacterPanelProps {
    * points, ladder skills, aspects, stress, consequences). Threaded from
    * GameBoard's fateData (the FATE_STATE projection, emitted only on a
    * ruleset=='fate' pack) so the Stats tab renders the shared FateCharacterSheet
-   * — the same legibility surface as the dock FateWidget — instead of the
+   * — the legibility surface for a Fate PC — instead of the
    * "No stats available." empty state (native `stats` is empty on a Fate pack).
    * Null on WN/native packs ⇒ the native StatsContent path is unchanged.
    */
   fateSheet?: FateCharacterEntry | null;
+  /**
+   * Story 126-26 (PART B of 126-19): the latest non-conflict 4dF roll, RE-HOMED
+   * here from the now-removed standalone "Fate" dock tab. When the Stats tab is
+   * showing the Fate sheet (fateSheet present) and a roll has arrived, the
+   * FateDiceTray mounts above the sheet — the same out-of-conflict roll surface
+   * the old dock FatePanel hosted (Story 118-7), now co-located with the sheet.
+   * Threaded from GameBoard's existing `latestFateRoll`. Null until a FATE_ROLL
+   * arrives (only ever on a ruleset=='fate' pack); on WN/native packs fateSheet
+   * is null so the tray never mounts. The Fate CONFLICT surface keeps its own,
+   * separate tray (Story 118-6) — untouched.
+   */
+  fateRoll?: FateRollPayload | null;
   /**
    * Story 126-19 / ADR-144 ("Bind the Ruleset, Don't Balance It"): when the bound
    * ruleset REPLACES the native HP/level/class model (Fate: harm = Stress +
@@ -161,6 +174,7 @@ export function CharacterPanel({
   submittedPlayerIds,
   magicState = null,
   fateSheet = null,
+  fateRoll = null,
   suppressNativeChrome = false,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
@@ -420,13 +434,22 @@ export function CharacterPanel({
         {activeTab === "stats" &&
           (fateSheet ? (
             // Fate pack: render the player's Fate sheet (aspects / ladder skills /
-            // stress / consequences) with the SAME renderer the dock FateWidget
-            // uses, so a Fate PC sees their mechanics where they look for them
+            // stress / consequences) with the shared FateCharacterSheet renderer,
+            // so a Fate PC sees their mechanics where they look for them
             // (the Sebastien/Jade "show me the math in the player UI" mandate),
             // not only in a separate dock tab. showDivider=false — a single sheet
             // needs no trailing rule. (playtest 2026-06-17: the Stats tab showed
             // "No stats available." because native `stats` is empty on a Fate pack.)
-            <FateCharacterSheet character={fateSheet} showDivider={false} />
+            //
+            // Story 126-26: the non-conflict 4dF roll tray re-homes here, above the
+            // sheet — the same layout the old dock FatePanel had (Story 118-7). It
+            // mounts only once a roll has arrived; ruleset="fate" is honest because
+            // fateSheet is non-null only on a ruleset=='fate' pack, and FateDiceTray
+            // self-gates on it so it never co-renders with the WN/native overlay.
+            <>
+              {fateRoll && <FateDiceTray roll={fateRoll} ruleset="fate" />}
+              <FateCharacterSheet character={fateSheet} showDivider={false} />
+            </>
           ) : (
             <StatsContent stats={character.stats} />
           ))}
