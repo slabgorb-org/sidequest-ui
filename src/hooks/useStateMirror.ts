@@ -298,16 +298,23 @@ export function useStateMirror(messages: GameMessage[]): void {
       }
 
       // Story 126-17 (ADR-148/149): the DEFEND barrier request EVENT. The latest
-      // request wins (not accumulated). No-Silent-Fallbacks: validate the routing
-      // keys at the boundary — a request with no `request_id` or `defender` (the
-      // field the conflict surface filters on) is a corrupt/version-skewed payload
-      // that must NOT overwrite the last valid request nor reach the surface and
-      // mis-mount a defenderless tray. Drop it and keep the last valid request.
-      // Mirrors the FATE_STATE / FATE_ROLL boundary guards above.
+      // request wins (not accumulated). No-Silent-Fallbacks: validate BOTH the
+      // routing keys (request_id / defender — the field the surface filters on) AND
+      // the mechanical fields the defend tray displays (attacker / attack_skill /
+      // attack_total). A version-skewed payload missing the committed-attack total
+      // would otherwise render a blank/wrong number on the mechanics-first surface
+      // (118-5 anti-drift) — a silent corruption. Mirror the FATE_ROLL guard, which
+      // validates EVERY mechanical value, not just the routing shape. attack_total
+      // is checked `typeof === 'number'` (NOT truthiness): 0 is a VALID total (an
+      // attack defended down to zero / a +0 ladder) and must not be dropped. Drop a
+      // malformed payload loud and keep the last valid request.
       if (msg.type === MessageType.FATE_DEFEND_REQUEST) {
         const p = msg.payload as unknown as FateDefendRequestPayload;
         if (typeof p.request_id !== 'string' || !p.request_id ||
-            typeof p.defender !== 'string' || !p.defender) {
+            typeof p.defender !== 'string' || !p.defender ||
+            typeof p.attacker !== 'string' || !p.attacker ||
+            typeof p.attack_skill !== 'string' || !p.attack_skill ||
+            typeof p.attack_total !== 'number') {
           console.error('[useStateMirror] malformed FATE_DEFEND_REQUEST payload — ignoring', p);
           continue;
         }

@@ -225,10 +225,13 @@ export function FateConflictSurface({
   // Story 126-17: the player threw their defense. The tray already built a
   // FateThrowPayload with action='defend', the echoed request_id, throw_params,
   // and the four settled faces (physics-is-the-roll) — forward it untouched and
-  // consume the request so the tray dismisses.
+  // consume by the THROWN request_id (the authoritative echoed id the tray was
+  // mounted for), not by a re-read of pendingDefend. Equivalent today (requestId
+  // is wired to pendingDefend.request_id), but robust if a future change ever
+  // decouples them — and it consumes unconditionally (Reviewer rework #2).
   function onDefendThrow(thrown: FateThrowPayload) {
     onFateThrow?.(thrown);
-    if (pendingDefend) setAnsweredDefendId(pendingDefend.request_id);
+    setAnsweredDefendId(thrown.request_id);
   }
 
   // Story 126-14: the player CONCEDES this attack — fold without rolling. Send a
