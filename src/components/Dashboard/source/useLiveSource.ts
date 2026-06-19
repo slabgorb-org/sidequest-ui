@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect, useMemo } from "react";
+import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
 import { useWatcherSocket } from "@/hooks/useWatcherSocket";
 import type { WatcherEvent, SessionStateView } from "@/types/watcher";
 
@@ -278,7 +278,14 @@ export interface LiveSourceState {
   selectedTurn: number | null;
   paused: boolean;
   connected: boolean;
+  /** The session the Live view is scoped to: the operator's explicit pin when
+   *  set, else the auto-derived newest-activity session. */
   activeSlug: string | null;
+  /** Known live session slugs for the picker (debug-state sessions ∪ any
+   *  session that has emitted a slug-tagged event). */
+  liveSessions: string[];
+  /** Pin the Live view to a specific session; `null` returns to auto-follow. */
+  selectSession: (slug: string | null) => void;
   setTab: (tab: number) => void;
   selectTurn: (i: number | null) => void;
   togglePause: () => void;
@@ -288,6 +295,11 @@ export interface LiveSourceState {
 
 export function useLiveSource(): LiveSourceState {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Operator's explicit session pin (story 126-23). When set it overrides
+  // auto-follow so a concurrent session that emits later can't steal the Live
+  // view away from the session the operator is actually driving.
+  const [pinnedSlug, setPinnedSlug] = useState<string | null>(null);
 
   const onEvent = useCallback((event: WatcherEvent) => {
     dispatch({ type: "EVENT", event });
@@ -316,10 +328,10 @@ export function useLiveSource(): LiveSourceState {
     }
   }, [state.turns.length, refreshState]);
 
-  // Derive the active session slug from debugState (same sort logic as StateTab).
-  // Used by EncounterTab to fetch encounter events for the live session AND as
-  // the partition key the Live view scopes its span stream to.
-  const activeSlug = useMemo<string | null>(() => {
+  // Auto-derive the newest-activity session slug from debugState (same sort
+  // logic as StateTab). This is the auto-follow fallback when the operator has
+  // not pinned a session.
+  const autoSlug = useMemo<string | null>(() => {
     if (!state.debugState || state.debugState.length === 0) return null;
     const sorted = [...state.debugState].sort((a, b) => {
       const aTs = a.last_activity_ts ?? 0;
@@ -328,6 +340,28 @@ export function useLiveSource(): LiveSourceState {
     });
     return sorted[0].session_key;
   }, [state.debugState]);
+
+  // Known live sessions for the picker: the active sessions from debug state,
+  // unioned with any session that has emitted a slug-tagged event. Session-less
+  // infra (null/"") is excluded — it's global, not a selectable session.
+  const liveSessions = useMemo<string[]>(() => {
+    const slugs = new Set<string>();
+    for (const s of state.debugState ?? []) slugs.add(s.session_key);
+    for (const e of state.allEvents) {
+      const sid = e.session_slug;
+      if (sid != null && sid !== "") slugs.add(sid);
+    }
+    return [...slugs];
+  }, [state.debugState, state.allEvents]);
+
+  // The operator's explicit pin wins over auto-follow. The Live view scopes its
+  // span stream to this — used by EncounterTab to fetch the live session's
+  // encounter events AND as the partition key for the timeline/tabs.
+  const activeSlug = pinnedSlug ?? autoSlug;
+
+  const selectSession = useCallback((slug: string | null) => {
+    setPinnedSlug(slug);
+  }, []);
 
   // --- Per-session scoping (OTEL-INSPECTOR fix, sq-playtest 2026-06-16) ---
   // The reducer accumulates EVERY session's events (so switching the active
@@ -400,6 +434,8 @@ export function useLiveSource(): LiveSourceState {
     paused: state.paused,
     connected,
     activeSlug,
+    liveSessions,
+    selectSession,
     setTab: (tab) => dispatch({ type: "SET_TAB", tab }),
     selectTurn,
     togglePause: () => dispatch({ type: "TOGGLE_PAUSE" }),

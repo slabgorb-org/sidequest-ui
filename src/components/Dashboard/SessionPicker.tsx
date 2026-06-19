@@ -8,6 +8,12 @@ interface Props {
   saves: ForensicSaveEntry[];
   onSelectLive: () => void;
   onSelectSave: (slug: string) => void;
+  /** Active live session slugs the operator can pin (story 126-23). When
+   *  non-empty the picker offers one option per session plus an auto-follow
+   *  option, so concurrent sessions are individually selectable. */
+  liveSessions?: string[];
+  /** Pin the Live view to a specific live session. */
+  onSelectLiveSession?: (slug: string) => void;
 }
 
 export function SessionPicker({
@@ -17,9 +23,17 @@ export function SessionPicker({
   saves,
   onSelectLive,
   onSelectSave,
+  liveSessions,
+  onSelectLiveSession,
 }: Props) {
+  const liveList = liveSessions ?? [];
+  const hasLiveSessions = liveList.length > 0;
   const value =
-    sourceKind === "live" ? "live" : `save:${selectedSlug ?? ""}`;
+    sourceKind === "live"
+      ? liveSlug && liveList.includes(liveSlug)
+        ? `live:${liveSlug}`
+        : "live"
+      : `save:${selectedSlug ?? ""}`;
 
   return (
     <select
@@ -29,6 +43,8 @@ export function SessionPicker({
       onChange={(e) => {
         const v = e.target.value;
         if (v === "live") onSelectLive();
+        else if (v.startsWith("live:"))
+          onSelectLiveSession?.(v.slice("live:".length));
         else if (v.startsWith("save:")) onSelectSave(v.slice("save:".length));
       }}
       style={{
@@ -40,9 +56,22 @@ export function SessionPicker({
         padding: "4px 8px",
       }}
     >
-      <option value="live">
-        ● Live: {liveSlug ?? "(no active session)"}
-      </option>
+      {hasLiveSessions ? (
+        <optgroup label="Live sessions">
+          {/* Auto-follow keeps the slug OUT of its label so it doesn't collide
+              with the per-session option for the same slug. */}
+          <option value="live">● Live · auto-follow newest</option>
+          {liveList.map((slug) => (
+            <option key={slug} value={`live:${slug}`}>
+              {slug}
+            </option>
+          ))}
+        </optgroup>
+      ) : (
+        <option value="live">
+          ● Live: {liveSlug ?? "(no active session)"}
+        </option>
+      )}
       <optgroup label="Saved sessions">
         {saves.map((s) => {
           const warn = s.mechanical_rows === 0 ? " ⚠" : "";

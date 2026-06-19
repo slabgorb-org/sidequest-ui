@@ -114,8 +114,16 @@ export function DashboardApp() {
           sourceKind={sourceKind}
           selectedSlug={forensic.selectedSlug}
           liveSlug={live.activeSlug}
+          liveSessions={live.liveSessions}
           saves={forensic.saves}
-          onSelectLive={() => setSourceKind("live")}
+          onSelectLive={() => {
+            setSourceKind("live");
+            live.selectSession(null); // auto-follow newest
+          }}
+          onSelectLiveSession={(s) => {
+            setSourceKind("live");
+            live.selectSession(s);
+          }}
           onSelectSave={(s) => {
             setSourceKind("forensic");
             forensic.selectSave(s);
