@@ -611,6 +611,14 @@ export function GameBoard({
                 (c) => c.name === characterSheet.name,
               ) ?? null
             }
+            // Story 126-19 / ADR-144: under a Fate binding the native HP/level/
+            // class model is REPLACED (harm = Stress + Consequences), so suppress
+            // the residual native chrome (header level/HP badge, body edge-ticks,
+            // party-row class/level/HP). Keyed on the ruleset signal `fateData !=
+            // null` (the same gate as the inventory `showCurrency` line below), NOT
+            // a per-PC name match — so a Fate roster-name mismatch can never leak
+            // the chrome. Null on WN/native packs ⇒ chrome renders unchanged.
+            suppressNativeChrome={fateData != null}
           />
         ) : null;
       case "inventory":
@@ -827,8 +835,14 @@ export function GameBoard({
       />
       {/* Co-located high-contrast HP pip scale (Story 69-2): keeps the local
           player's HP glanceable right at the input for mechanics-first
-          players, without a Dockview tab switch. Hierarchy: input → HP. */}
-      <HpPipScale characters={characters} currentPlayerId={currentPlayerId} />
+          players, without a Dockview tab switch. Hierarchy: input → HP.
+          Story 126-19 / ADR-144: suppressed on a Fate pack (fateData != null) —
+          Fate has no HP pool (harm = Stress + Consequences), so the native HP
+          readout is meaningless there. Same ruleset gate as the inventory
+          `showCurrency` line. Unchanged on WN/native packs. */}
+      {fateData == null && (
+        <HpPipScale characters={characters} currentPlayerId={currentPlayerId} />
+      )}
     </div>
   );
 
