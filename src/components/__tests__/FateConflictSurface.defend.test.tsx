@@ -180,6 +180,67 @@ describe("FateConflictSurface — DEFEND tray (Story 126-17)", () => {
     expect(screen.queryByTestId("fate-defend-tray")).not.toBeInTheDocument();
   });
 
+  // Playtest 150-2: the defend tray hardcoded skill="" so a thrown defense reached
+  // dispatch_fate_defense with an empty skill → rating 0, and the defender silently
+  // LOST their defense-skill bonus (Athletics/Fight/etc.). The server treats the
+  // defense skill as free-pick; the UI must let the defender choose it and send it.
+  const inConflictMultiSkill: FateStatePayload = {
+    ...inConflict,
+    characters: [
+      {
+        ...inConflict.characters[0],
+        skills: [
+          { name: "Athletics", rating: 4, ladder: "Great" },
+          { name: "Fight", rating: 2, ladder: "Fair" },
+        ],
+      },
+    ],
+  };
+
+  it("offers a defense-skill picker defaulting to the PC's first skill", () => {
+    render(
+      <FateConflictSurface
+        fateState={inConflictMultiSkill}
+        fateRoll={null}
+        ruleset="fate"
+        actorName={ACTOR}
+        defendRequest={defendAtMe}
+        onFateAction={vi.fn()}
+        onFateThrow={vi.fn()}
+      />,
+    );
+    const select = screen.getByTestId("fate-defend-skill-select") as HTMLSelectElement;
+    expect(select.value).toBe("Athletics");
+  });
+
+  it("sends the CHOSEN defense skill on the FATE_THROW (not skill='') — playtest 150-2 rating-0 fix", () => {
+    const onFateThrow = vi.fn();
+    render(
+      <FateConflictSurface
+        fateState={inConflictMultiSkill}
+        fateRoll={null}
+        ruleset="fate"
+        actorName={ACTOR}
+        defendRequest={defendAtMe}
+        onFateAction={vi.fn()}
+        onFateThrow={onFateThrow}
+      />,
+    );
+    // The defender picks Fight to parry (free-pick), then throws.
+    fireEvent.change(screen.getByTestId("fate-defend-skill-select"), {
+      target: { value: "Fight" },
+    });
+    act(() => {
+      (sceneProps.current!.onThrow as (p: unknown) => void)(SCENE_PARAMS);
+      (sceneProps.current!.onAllSettle as (f: number[]) => void)([1, 0, -1, 1]);
+    });
+    expect(onFateThrow).toHaveBeenCalledTimes(1);
+    const [payload] = onFateThrow.mock.calls[0];
+    expect(payload.action).toBe("defend");
+    expect(payload.skill).toBe("Fight");
+    expect(payload.skill).not.toBe("");
+  });
+
   it("Concede sends a defend throw with the concede signal and NO dice, then dismisses", () => {
     const { onFateThrow } = renderSurface(defendAtMe);
     fireEvent.click(screen.getByTestId("fate-defend-concede"));

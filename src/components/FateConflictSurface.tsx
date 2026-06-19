@@ -139,6 +139,10 @@ export function FateConflictSurface({
 }: FateConflictSurfaceProps) {
   const [freeform, setFreeform] = useState("");
   const [skill, setSkill] = useState("");
+  // The defender's free-pick defense skill (server `dispatch_fate_defense` resolves
+  // the defense at this skill's rating). Kept separate from the proactive `skill` so
+  // a defense never inherits the last proactive selection. Empty → first-skill default.
+  const [defendSkill, setDefendSkill] = useState("");
   const [target, setTarget] = useState("");
   const [pending, setPending] = useState<{ aspect: string; mode: "bonus" | "reroll" } | null>(null);
   // ADR-148: the throw armed by a roll-verb click, mounting the dF thrower below.
@@ -159,6 +163,11 @@ export function FateConflictSurface({
   const me = fateState?.characters.find((c) => c.name === actorName) ?? null;
   const skills = me?.skills ?? [];
   const activeSkill = skill || skills[0]?.name || "";
+  // Defense is free-pick (Athletics to dodge, Fight to parry, Will to resist, …);
+  // default to the PC's first skill (same convention as the proactive selector) so
+  // the throw never sends skill="" — which the server resolved at rating 0, silently
+  // dropping the defender's skill bonus (playtest 150-2).
+  const activeDefendSkill = defendSkill || skills[0]?.name || "";
   // The Other an attack must name (ADR-116 / server _resolve_attack fails loud on a
   // null target). Default to the sole/first opponent-side participant; a picker is
   // offered when there are several. Overcome/create_advantage are passive — no target.
@@ -318,10 +327,29 @@ export function FateConflictSurface({
             <strong>{pendingDefend.attack_total}</strong>
             {pendingDefend.mental ? " (mental)" : ""}
           </span>
+          {/* The defense skill (free-pick): which skill the defender rolls to fend
+              off the attack. Defaults to the first skill; the player can switch
+              (e.g. Athletics to dodge vs Fight to parry). The chosen skill rides the
+              FATE_THROW so the server resolves the defense at its rating — never the
+              skill="" / rating-0 default that silently lost the bonus (playtest 150-2). */}
+          {skills.length > 0 && (
+            <select
+              data-testid="fate-defend-skill-select"
+              value={activeDefendSkill}
+              disabled={sealedWaiting}
+              onChange={(e) => setDefendSkill(e.target.value)}
+            >
+              {skills.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name} ({s.ladder})
+                </option>
+              ))}
+            </select>
+          )}
           <FateDiceTray
             mode="thrower"
             action="defend"
-            skill=""
+            skill={activeDefendSkill}
             requestId={pendingDefend.request_id}
             ruleset={ruleset}
             onThrow={onDefendThrow}
