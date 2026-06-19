@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type {
   FateCharacterEntry,
+  FateDefendRequestPayload,
   FateRollPayload,
   FateStatePayload,
   FateThrowPayload,
@@ -67,6 +68,12 @@ export interface FateConflictSurfaceProps {
    *  the send until the dice settle, then submits a FATE_THROW carrying the four
    *  settled faces. The non-roll verbs (concede / compel_*) stay on onFateAction. */
   onFateThrow?: (payload: FateThrowPayload) => void;
+  /** ADR-148/149 / Story 126-8/126-17: the latest DEFEND barrier request (mirror
+   *  slice latestFateDefendRequest). When it targets the local PC (defender ===
+   *  actorName) and is unanswered, a defend tray mounts: the player throws their
+   *  4dF defense (a FATE_THROW(action='defend') via onFateThrow) or concedes
+   *  (concede=true, no dice). Null when no defense is pending. */
+  defendRequest?: FateDefendRequestPayload | null;
 }
 
 const FOLIO = {
@@ -79,6 +86,16 @@ const FOLIO = {
 
 const FONT_DISPLAY = "'Pirata One', serif";
 const FONT_BODY = "'EB Garamond', serif";
+
+/** A concede defend throw folds WITHOUT rolling, so it carries no dice — but the
+ *  server's FateThrowPayload requires `throw_params` (no default) even on the
+ *  concede path (which ignores it). Send a neutral zero-gesture to satisfy the
+ *  required field (Story 126-14 / TEA delivery finding). */
+const NEUTRAL_THROW_PARAMS = {
+  velocity: [0, 0, 0],
+  angular: [0, 0, 0],
+  position: [0.5, 0.5],
+} as const;
 
 /** The three proactive ROLL verbs — physics-is-the-roll under ADR-148 (these mount
  *  the dF thrower); distinct from the non-roll FateActionVerb members. */
@@ -118,6 +135,7 @@ export function FateConflictSurface({
   sealedWaiting = false,
   onFateAction,
   onFateThrow,
+  defendRequest = null,
 }: FateConflictSurfaceProps) {
   const [freeform, setFreeform] = useState("");
   const [skill, setSkill] = useState("");
@@ -125,6 +143,10 @@ export function FateConflictSurface({
   const [pending, setPending] = useState<{ aspect: string; mode: "bonus" | "reroll" } | null>(null);
   // ADR-148: the throw armed by a roll-verb click, mounting the dF thrower below.
   const [armed, setArmed] = useState<ArmedThrow | null>(null);
+  // Story 126-17: the request_id of the defense the player has already answered.
+  // The mirror slice keeps re-supplying the last request (it never clears), so we
+  // dismiss the tray once answered and re-mount only when a NEW request arrives.
+  const [answeredDefendId, setAnsweredDefendId] = useState<string | null>(null);
   const throwSeq = useRef(0);
 
   // The ruleset + conflict gates: never co-render with the WN/native overlay, and
@@ -145,6 +167,16 @@ export function FateConflictSurface({
   // ADR-144 F3e: the narrator's offered compels awaiting accept/refuse. The
   // server is the economy authority; the panel only reflects FATE_STATE.
   const compels = conflict.pending_compels ?? [];
+
+  // Story 126-17 (ADR-148/149): the pending DEFEND barrier for THIS PC. The
+  // server broadcasts one request per attacked PC and the client filters by
+  // defender (the request can name any seated PC). Suppressed once answered.
+  const pendingDefend =
+    defendRequest &&
+    defendRequest.defender === actorName &&
+    defendRequest.request_id !== answeredDefendId
+      ? defendRequest
+      : null;
 
   // ADR-148 / Story 126-7: a roll verb no longer dispatches synchronously — it ARMS
   // a throw and mounts the dF tray. The four faces the player settles ARE the roll;
@@ -188,6 +220,36 @@ export function FateConflictSurface({
 
   function cancelThrow() {
     setArmed(null);
+  }
+
+  // Story 126-17: the player threw their defense. The tray already built a
+  // FateThrowPayload with action='defend', the echoed request_id, throw_params,
+  // and the four settled faces (physics-is-the-roll) — forward it untouched and
+  // consume by the THROWN request_id (the authoritative echoed id the tray was
+  // mounted for), not by a re-read of pendingDefend. Equivalent today (requestId
+  // is wired to pendingDefend.request_id), but robust if a future change ever
+  // decouples them — and it consumes unconditionally (Reviewer rework #2).
+  function onDefendThrow(thrown: FateThrowPayload) {
+    onFateThrow?.(thrown);
+    setAnsweredDefendId(thrown.request_id);
+  }
+
+  // Story 126-14: the player CONCEDES this attack — fold without rolling. Send a
+  // defend throw carrying concede=true and NO dice (a neutral throw_params only,
+  // which the server requires but ignores on the concede path), then consume.
+  function concedeDefend() {
+    if (!pendingDefend) return;
+    onFateThrow?.({
+      request_id: pendingDefend.request_id,
+      action: "defend",
+      concede: true,
+      throw_params: {
+        velocity: [...NEUTRAL_THROW_PARAMS.velocity] as [number, number, number],
+        angular: [...NEUTRAL_THROW_PARAMS.angular] as [number, number, number],
+        position: [...NEUTRAL_THROW_PARAMS.position] as [number, number],
+      },
+    });
+    setAnsweredDefendId(pendingDefend.request_id);
   }
 
   function concede() {
@@ -237,6 +299,43 @@ export function FateConflictSurface({
           </li>
         ))}
       </ol>
+
+      {/* Story 126-17 (ADR-148/149): the DEFEND barrier. When the server parks the
+          round on this PC's defense it broadcasts the committed attack; the player
+          sees it (attacker / skill / total READ FROM THE PAYLOAD — 118-5 anti-drift,
+          mechanics-first legibility) then throws their 4dF defense (reuse of the
+          FateDiceTray thrower) or concedes (folds without rolling, Story 126-14).
+          The tray is consumed once answered. */}
+      {pendingDefend && (
+        <div
+          data-testid="fate-defend-tray"
+          className="flex flex-col gap-2 p-2"
+          style={{ borderLeft: `3px solid ${FOLIO.accent}`, paddingLeft: 10 }}
+        >
+          <span style={{ fontFamily: FONT_DISPLAY }} className="text-base">
+            Defend! <strong>{pendingDefend.attacker}</strong> attacks with{" "}
+            <strong>{pendingDefend.attack_skill}</strong> at total{" "}
+            <strong>{pendingDefend.attack_total}</strong>
+            {pendingDefend.mental ? " (mental)" : ""}
+          </span>
+          <FateDiceTray
+            mode="thrower"
+            action="defend"
+            skill=""
+            requestId={pendingDefend.request_id}
+            ruleset={ruleset}
+            onThrow={onDefendThrow}
+          />
+          <button
+            type="button"
+            data-testid="fate-defend-concede"
+            disabled={sealedWaiting}
+            onClick={concedeDefend}
+          >
+            Concede
+          </button>
+        </div>
+      )}
 
       {/* The 4dF roll (composed FateDiceTray, fate-gated in its own right). */}
       {fateRoll && <FateDiceTray roll={fateRoll} ruleset={ruleset} />}

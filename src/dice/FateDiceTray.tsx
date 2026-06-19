@@ -38,10 +38,12 @@ export interface FateDiceTraySpectatorProps {
   genreSlug?: string;
 }
 
-/** Thrower mode: the player physically throws their proactive Fate roll. */
+/** Thrower mode: the player physically throws their proactive Fate roll OR their
+ *  DEFENSE (ADR-148/149, Story 126-8/126-17 — a defend throw is physics-is-the-roll
+ *  exactly like a proactive verb). */
 export interface FateDiceTrayThrowerProps {
   mode: "thrower";
-  action: "overcome" | "create_advantage" | "attack";
+  action: "overcome" | "create_advantage" | "attack" | "defend";
   skill: string;
   requestId: string;
   target?: string | null;

@@ -2745,6 +2745,7 @@ function AppInner() {
                 latestFateRoll={gameState.latestFateRoll ?? null}
                 onFateAction={handleFateAction}
                 onFateThrow={handleFateThrow}
+                latestFateDefendRequest={gameState.latestFateDefendRequest ?? null}
                 audio={audio}
                 nowPlaying={nowPlaying}
                 knowledgeEntries={gameState.knowledge}

@@ -54,6 +54,7 @@ import type {
   FateStatePayload,
   FateRollPayload,
   FateThrowPayload,
+  FateDefendRequestPayload,
   ActionRevealEntry,
 } from "@/types/payloads";
 import type { PeerReveal } from "@/hooks/usePeerReveals";
@@ -219,6 +220,11 @@ export interface GameBoardProps {
   /** ADR-148 / Story 126-7: forward a player's PROACTIVE Fate throw (the four
    * settled dF faces + gesture) up to App, which sends it as a FATE_THROW. */
   onFateThrow?: (payload: FateThrowPayload) => void;
+  /** ADR-148/149 / Story 126-8/126-17: the latest DEFEND barrier request
+   * (state.latestFateDefendRequest). Threaded into the Fate conflict surface as
+   * `defendRequest` so the defend tray mounts when it targets the local PC. Null
+   * until a FATE_DEFEND_REQUEST arrives (only ever on a ruleset=='fate' pack). */
+  latestFateDefendRequest?: FateDefendRequestPayload | null;
   confrontationData?: ConfrontationData | null;
   /** Phase 5 (Story 47-3): branch-explicit outcome reveal payload. */
   confrontationOutcome?: ConfrontationOutcome | null;
@@ -328,6 +334,7 @@ export function GameBoard({
   latestFateRoll = null,
   onFateAction,
   onFateThrow,
+  latestFateDefendRequest = null,
   confrontationData,
   confrontationOutcome,
   onBeatSelect,
@@ -675,6 +682,7 @@ export function GameBoard({
             sealedWaiting={fateSealed}
             onFateAction={onFateAction}
             onFateThrow={onFateThrow}
+            defendRequest={latestFateDefendRequest ?? null}
           />
         );
       }
@@ -741,7 +749,7 @@ export function GameBoard({
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      onFateAction, onFateThrow,
+      onFateAction, onFateThrow, latestFateDefendRequest,
       activePlayerId, sealedPlayerIds, magicState, lastOrbitalChart, lastOrbitalError,
       sendOrbitalIntent, sessionBoundEpoch,
       // Story 85-3: confrontation-mode panel inputs.

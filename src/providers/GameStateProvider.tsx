@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { MagicState } from '@/types/magic';
 import type {
+  FateDefendRequestPayload,
   FateRollPayload,
   FateStatePayload,
   LocationDescriptionPayload,
@@ -100,6 +101,14 @@ export interface ClientGameState {
    * ruleset=='fate' pack (server gate).
    */
   latestFateRoll?: FateRollPayload | null;
+  /**
+   * Story 126-17 (ADR-148/149): the latest DEFEND barrier request, mirrored from
+   * the FATE_DEFEND_REQUEST EVENT (most recent wins — like latestFateRoll, unlike
+   * the FATE_STATE snapshot). Null until the first request arrives. Drives the
+   * defend-tray mount on the Fate conflict surface; only ever arrives on a
+   * ruleset=='fate' pack (server gate).
+   */
+  latestFateDefendRequest?: FateDefendRequestPayload | null;
 }
 
 export interface GameStateContextValue {
@@ -124,6 +133,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   questsData: null,
   fateState: null,
   latestFateRoll: null,
+  latestFateDefendRequest: null,
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

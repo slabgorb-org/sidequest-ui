@@ -120,6 +120,14 @@ export const MessageType = {
   // The server resolves from the faces and never rolls 4dF on the player path.
   // Distinct from FATE_ACTION (the non-roll verbs: concede / compel_*).
   FATE_THROW: "FATE_THROW",
+  // ADR-148/149 / Story 126-8/126-17: INBOUND — the DEFEND barrier. When an NPC
+  // attack seats on a PC the round PARKS and the server broadcasts one
+  // FateDefendRequestPayload per incoming attack (the client filters by defender),
+  // then blocks-and-waits with no auto-roll. The defender answers with a
+  // FATE_THROW(action='defend') echoing the request_id — the defense is
+  // physics-is-the-roll, exactly like the proactive throw. Dropping this message
+  // hangs the exchange forever (the 126-17 showstopper).
+  FATE_DEFEND_REQUEST: "FATE_DEFEND_REQUEST",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
