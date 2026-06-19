@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 import type {
+  FateDefendRequestPayload,
   FateRollPayload,
   FateStatePayload,
   FootnoteData,
@@ -95,6 +96,12 @@ export function useStateMirror(messages: GameMessage[]): void {
     // Fate panel's FateDiceTray (F3g) and the Fate conflict surface (F3f). Null
     // until the first roll arrives (only ever on a ruleset=='fate' pack).
     let latestFateRoll: FateRollPayload | null = null;
+    // Story 126-17 (ADR-148/149 / 126-8 §6): the latest DEFEND barrier request.
+    // Like FATE_ROLL (and UNLIKE the FATE_STATE snapshot) it is an EVENT — the
+    // most recent request wins, null until the first arrives, only ever on a
+    // ruleset=='fate' pack. The Fate conflict surface mounts the defend tray from
+    // it and filters by `defender`.
+    let latestFateDefendRequest: FateDefendRequestPayload | null = null;
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -290,6 +297,24 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // Story 126-17 (ADR-148/149): the DEFEND barrier request EVENT. The latest
+      // request wins (not accumulated). No-Silent-Fallbacks: validate the routing
+      // keys at the boundary — a request with no `request_id` or `defender` (the
+      // field the conflict surface filters on) is a corrupt/version-skewed payload
+      // that must NOT overwrite the last valid request nor reach the surface and
+      // mis-mount a defenderless tray. Drop it and keep the last valid request.
+      // Mirrors the FATE_STATE / FATE_ROLL boundary guards above.
+      if (msg.type === MessageType.FATE_DEFEND_REQUEST) {
+        const p = msg.payload as unknown as FateDefendRequestPayload;
+        if (typeof p.request_id !== 'string' || !p.request_id ||
+            typeof p.defender !== 'string' || !p.defender) {
+          console.error('[useStateMirror] malformed FATE_DEFEND_REQUEST payload — ignoring', p);
+          continue;
+        }
+        latestFateDefendRequest = p;
+        continue;
+      }
+
       // Story 54-9: per-encounter overlay delta. When a baseline exists
       // for the same region_id, replace its overlays slice. When the
       // baseline is for a DIFFERENT region the delta is stale (room change
@@ -421,6 +446,12 @@ export function useStateMirror(messages: GameMessage[]): void {
     // otherwise (event, not snapshot). Drives the FateDiceTray mount (panel) and
     // the Fate conflict surface.
     current = { ...current, latestFateRoll };
+
+    // Story 126-17 (ADR-148/149): latest DEFEND-request slice. Always mirrored —
+    // null until the first FATE_DEFEND_REQUEST arrives, the most recent request
+    // otherwise (event, not snapshot). Drives the defend-tray mount on the Fate
+    // conflict surface.
+    current = { ...current, latestFateDefendRequest };
 
     if (messages.length !== prevLengthRef.current) {
       prevLengthRef.current = messages.length;

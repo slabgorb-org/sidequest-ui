@@ -74,13 +74,13 @@ function req(
 describe("useStateMirror — FATE_DEFEND_REQUEST event (Story 126-17)", () => {
   it("starts null when no FATE_DEFEND_REQUEST has arrived", () => {
     const r = mirror([]);
-    expect(r.current.latestFateDefendRequest).toBeNull();
+    expect(r.current.state.latestFateDefendRequest).toBeNull();
   });
 
   it("threads the request onto state.latestFateDefendRequest", () => {
     const payload = req("d-1", "Sam Spadework", 5);
     const r = mirror([defendMsg(payload)]);
-    expect(r.current.latestFateDefendRequest).toEqual(payload);
+    expect(r.current.state.latestFateDefendRequest).toEqual(payload);
   });
 
   it("is an EVENT — the most recent request wins", () => {
@@ -88,8 +88,8 @@ describe("useStateMirror — FATE_DEFEND_REQUEST event (Story 126-17)", () => {
       defendMsg(req("d-1", "Sam Spadework", 4)),
       defendMsg(req("d-2", "Sam Spadework", 6)),
     ]);
-    expect(r.current.latestFateDefendRequest?.request_id).toBe("d-2");
-    expect(r.current.latestFateDefendRequest?.attack_total).toBe(6);
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-2");
+    expect(r.current.state.latestFateDefendRequest?.attack_total).toBe(6);
   });
 
   it("drops a malformed request (missing defender) and leaves the slice unchanged (No Silent Fallbacks)", () => {
@@ -99,6 +99,6 @@ describe("useStateMirror — FATE_DEFEND_REQUEST event (Story 126-17)", () => {
       // request must not overwrite the last valid one nor crash the surface.
       defendMsg({ request_id: "d-2", attacker: "X", attack_skill: "Shoot", attack_total: 9 }),
     ]);
-    expect(r.current.latestFateDefendRequest?.request_id).toBe("d-1");
+    expect(r.current.state.latestFateDefendRequest?.request_id).toBe("d-1");
   });
 });

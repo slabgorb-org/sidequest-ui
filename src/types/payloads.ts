@@ -611,7 +611,10 @@ export interface FateRollPayload {
  */
 export interface FateThrowPayload {
   request_id: string;
-  action: "overcome" | "create_advantage" | "attack";
+  // ADR-148/149 / Story 126-8: "defend" answers a FATE_DEFEND_REQUEST — the
+  // defender's settled faces ARE the roll (never roll_4df), exactly like the
+  // proactive verbs. The non-roll verbs (concede / compel_*) stay on FATE_ACTION.
+  action: "overcome" | "create_advantage" | "attack" | "defend";
   skill?: string;
   target?: string | null;
   difficulty?: number;
@@ -619,14 +622,39 @@ export interface FateThrowPayload {
   invoke_mode?: "bonus" | "reroll";
   aspect_text?: string;
   player_action?: string;
+  // Story 126-14: a defend throw may CONCEDE instead of rolling — the defender
+  // folds against this attack and throws no dice, so `face` is omitted on that
+  // path only. Meaningful solely for action='defend' (server validates).
+  concede?: boolean;
   throw_params: DiceThrowParams;
-  /** Exactly 4 settled dF faces, each -1 / 0 / +1. */
-  face: number[];
+  /** Exactly 4 settled dF faces, each -1 / 0 / +1. Omitted ONLY on a concede
+   *  (Story 126-14) — a concession folds without rolling. */
+  face?: number[];
   // Story 125-5: index signature so a FateThrowMessage is assignable to the
   // GameMessage union (payload: Record<string, unknown>) at App.tsx's send()
   // call — sibling sent payloads carry this; FateThrowPayload (126-7/ADR-148)
   // shipped without it and red-built develop's tsc -b.
   [key: string]: unknown;
+}
+
+/**
+ * Server → client: "you are attacked by `attacker` with `attack_skill` at total
+ * `attack_total` — defend" (ADR-148/149, Story 126-8 §6). Mirrors the server's
+ * FateDefendRequestPayload (sidequest-server/sidequest/protocol/fate.py).
+ *
+ * One per incoming attack on a seated PC, broadcast when the round PARKS at the
+ * DEFEND barrier. The defender is INFORMED — they see the committed attack total
+ * before they throw — then answer with a FATE_THROW(action='defend') that echoes
+ * `request_id`. `mental` is True for a social conflict (the defense skill / stress
+ * track is mental rather than physical). The client filters by `defender`.
+ */
+export interface FateDefendRequestPayload {
+  request_id: string;
+  defender: string;
+  attacker: string;
+  attack_skill: string;
+  attack_total: number;
+  mental: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -753,6 +781,12 @@ export interface FateThrowMessage extends BaseMessage {
   payload: FateThrowPayload;
 }
 
+/** Server → client: the DEFEND barrier (ADR-148/149 / Story 126-8/126-17). */
+export interface FateDefendRequestMessage extends BaseMessage {
+  type: typeof MessageType.FATE_DEFEND_REQUEST;
+  payload: FateDefendRequestPayload;
+}
+
 export interface FateRollMessage extends BaseMessage {
   type: typeof MessageType.FATE_ROLL;
   payload: FateRollPayload;
@@ -805,7 +839,8 @@ export type TypedGameMessage =
   | ScrapbookEntryMessage
   | RelationshipsMessage
   | CharacterIncapacitatedMessage
-  | FateStateMessage;
+  | FateStateMessage
+  | FateDefendRequestMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
