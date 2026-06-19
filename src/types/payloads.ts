@@ -1188,9 +1188,20 @@ export interface FateConsequenceEntry {
   text: string;
 }
 
+/** One Fate stunt: a named special rule the PC picked at chargen. Under Fate the
+ *  player's special abilities ARE their stunts, so the Character/Fate panel renders
+ *  these in place of the native class-move surface (playtest 150-2). `source_gear`
+ *  is the GearDef id it was compiled from (null/absent for a hand-picked stunt). */
+export interface FateStuntEntry {
+  name: string;
+  description: string;
+  source_gear?: string | null;
+}
+
 /** One PC's full Fate sheet. `aspects` is named character aspects only; a filled
  *  consequence surfaces in `consequences`, not duplicated here. `stress` maps each
- *  track name (physical / mental) to its ordered boxes. */
+ *  track name (physical / mental) to its ordered boxes. `stunts` are the PC's chosen
+ *  stunts (their special abilities under Fate). */
 export interface FateCharacterEntry {
   name: string;
   fate_points: number;
@@ -1199,6 +1210,9 @@ export interface FateCharacterEntry {
   aspects: FateAspectEntry[];
   stress: Record<string, FateStressBox[]>;
   consequences: FateConsequenceEntry[];
+  // Additive (playtest 150-2): optional so pre-existing payloads/fixtures stay valid;
+  // the server always populates it (default empty). The surface reads it as `?? []`.
+  stunts?: FateStuntEntry[];
 }
 
 /** One participant in an active Fate conflict. `side` is the encounter actor's

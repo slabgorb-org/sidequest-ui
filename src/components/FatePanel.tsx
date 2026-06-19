@@ -3,6 +3,7 @@ import type {
   FateCharacterEntry,
   FateRollPayload,
   FateStatePayload,
+  FateStuntEntry,
 } from "@/types/payloads";
 import { FateDiceTray } from "@/dice/FateDiceTray";
 
@@ -161,6 +162,7 @@ export function FateCharacterSheet({
   const aspects = ch.aspects ?? [];
   const stress = ch.stress ?? {};
   const consequences = ch.consequences ?? [];
+  const stunts = ch.stunts ?? [];
   return (
     <div
       data-testid="fate-character"
@@ -271,6 +273,30 @@ export function FateCharacterSheet({
           ))}
         </div>
       )}
+
+      <FateStunts stunts={stunts} />
+    </div>
+  );
+}
+
+/** Render a PC's Fate stunts (their special abilities under Fate). Returns null
+ *  when there are none, so a sheet with no stunts draws no empty section. Shared by
+ *  the FateCharacterSheet (Stats tab + dock widget) and the Character panel's
+ *  Abilities tab — under Fate the player's special abilities ARE their stunts, so
+ *  the native class-move surface is replaced by this (playtest 150-2). */
+export function FateStunts({ stunts }: { stunts: FateStuntEntry[] }) {
+  if (stunts.length === 0) return null;
+  return (
+    <div data-testid="fate-stunts" style={{ marginTop: "0.4rem" }}>
+      <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>Stunts</div>
+      {stunts.map((st) => (
+        <div key={st.name} data-testid="fate-stunt" style={{ marginTop: "0.15rem" }}>
+          <span style={{ fontWeight: 600 }}>{st.name}</span>
+          {st.description ? (
+            <span style={{ color: FOLIO.inkSoft }}>{` — ${st.description}`}</span>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }
