@@ -196,9 +196,11 @@ export interface GameBoardProps {
   /**
    * Story 118-2 / ADR-144 F3b: player-facing Fate sheet, mirrored from
    * state.fateState. Null until a FATE_STATE snapshot arrives — and it only
-   * ever arrives on a ruleset=='fate' pack (server gate). The Fate tab is
-   * dataGated:true and added to availableWidgets only when this is non-null, so
-   * it never co-renders with the WN/native ConfrontationOverlay (epic 118).
+   * ever arrives on a ruleset=='fate' pack (server gate). Story 126-26 removed
+   * the standalone Fate dock tab this once gated; today fateData drives the
+   * `fateSheet` prop on the Character panel (Stats tab) and the
+   * `fateData.conflict.active` gate that adds the `fate-conflict` surface —
+   * neither ever co-renders with the WN/native ConfrontationOverlay (epic 118).
    */
   fateData?: FateStatePayload | null;
   /**
@@ -445,7 +447,8 @@ export function GameBoard({
     // while a Fate conflict is ACTIVE — gated on fateData.conflict.active (the Fate
     // analog of confrontationData). A WN/native pack never emits a Fate conflict,
     // so this can never co-render with the ConfrontationOverlay (the epic-118
-    // paired negative). Distinct from the always-available Fate SHEET tab above.
+    // paired negative). Distinct from the Fate SHEET, which lives under
+    // Character→Stats (its standalone dock tab was removed in 126-26).
     if (fateData?.conflict?.active === true) {
       available.add("fate-conflict");
     }
@@ -599,10 +602,11 @@ export function GameBoard({
             // Character panel's Stats tab. fateData is the FATE_STATE projection,
             // emitted only on a ruleset=='fate' pack — match the local PC by
             // character name. Null on WN/native packs (fateData == null) ⇒ the
-            // panel keeps its native StatsContent path. Before 118-2 the Fate
-            // sheet lived only in a separate dock tab (removed in 126-26); a Fate
-            // player opening Character saw "No stats available." (native `stats`
-            // is empty on a Fate pack).
+            // panel keeps its native StatsContent path. The standalone Fate dock
+            // tab (added in 118-2, removed in 126-26) once held this sheet; before
+            // the 118-2 consolidation routed it here, a Fate player opening
+            // Character saw "No stats available." (native `stats` is empty on a
+            // Fate pack).
             fateSheet={
               fateData?.characters.find(
                 (c) => c.name === characterSheet.name,

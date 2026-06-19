@@ -82,12 +82,7 @@ const baseSheet: CharacterSheetData = {
   backstory: "",
 };
 
-type BoardOverrides = Partial<GameBoardProps> & {
-  fateData?: FateStatePayload | null;
-  latestFateRoll?: FateRollPayload | null;
-};
-
-function renderBoard(overrides: BoardOverrides = {}) {
+function renderBoard(overrides: Partial<GameBoardProps> = {}) {
   const defaults: GameBoardProps = {
     messages: [],
     characters: [
@@ -109,7 +104,7 @@ function renderBoard(overrides: BoardOverrides = {}) {
     onSend: vi.fn(),
     disabled: false,
   };
-  const props = { ...defaults, ...overrides } as GameBoardProps;
+  const props = { ...defaults, ...overrides };
   return render(
     <ImageBusProvider messages={props.messages ?? []}>
       <GameBoard {...props} />
