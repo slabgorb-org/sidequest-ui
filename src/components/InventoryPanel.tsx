@@ -132,7 +132,49 @@ export function InventoryPanel({ data, showCurrency = true }: InventoryPanelProp
       </div>
 
       <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {Array.from(grouped.entries()).map(([type, items]) => (
+        {data.items.length === 0 ? (
+          // Empty-state copy — a bare "Inventory" header over blank space reads
+          // as broken (sq-playtest 2026-06-19, Keith: "presenting a blank screen
+          // is wrong regardless"). A Fate inventory is *legitimately* empty much
+          // of the time because signature gear is compiled into the FateSheet as
+          // aspects, not carried items — so the empty state must read as
+          // intentional, not as a failure to load. The secondary line is gated on
+          // `!showCurrency`, the same no-economy signal the GameBoard passes only
+          // for Fate packs (see GameBoard-fate-inventory-tab.test.tsx).
+          <div
+            data-testid="inventory-empty"
+            style={{
+              padding: "20px 4px 12px",
+              textAlign: "center",
+              fontFamily: FONT_BODY,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 16,
+                fontStyle: "italic",
+                color: FOLIO.ink,
+                margin: 0,
+              }}
+            >
+              Nothing in your pockets yet.
+            </p>
+            {!showCurrency && (
+              <p
+                style={{
+                  fontSize: 14,
+                  fontStyle: "italic",
+                  color: FOLIO.inkSoft,
+                  lineHeight: 1.4,
+                  margin: "6px 0 0",
+                }}
+              >
+                Your signature gear lives in your aspects, not as carried items.
+              </p>
+            )}
+          </div>
+        ) : (
+          Array.from(grouped.entries()).map(([type, items]) => (
           <div key={type}>
             {/* Group header — Pirata One crimson with a dotted gold rule that
                 trails to the right edge, matching the abilities-grouped header
@@ -303,7 +345,8 @@ export function InventoryPanel({ data, showCurrency = true }: InventoryPanelProp
               })}
             </ul>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
