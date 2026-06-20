@@ -187,6 +187,13 @@ export function FateConflictSurface({
 
   const me = fateState?.characters.find((c) => c.name === actorName) ?? null;
   const skills = me?.skills ?? [];
+  // Story 126-29: the local PC's server-authoritative committed-this-exchange flag,
+  // read straight off the conflict participant (FATE_STATE). Resume-safe — unlike the
+  // transient `sealedWaiting` prop it survives a reconnect — so a resumed mid-exchange
+  // conflict pre-disables the proactive tiles instead of offering an action the
+  // server's sealed-commit guard (ADR-129/151) would reject. `?? false` because the
+  // local PC may not be among the participants (e.g. a spectator) — never disable then.
+  const committed = conflict.participants.find((p) => p.name === actorName)?.committed ?? false;
   const activeSkill = skill || skills[0]?.name || "";
   // Defense is free-pick (Athletics to dodge, Fight to parry, Will to resist, …);
   // default to the PC's first skill (same convention as the proactive selector) so
@@ -658,7 +665,7 @@ export function FateConflictSurface({
               key={verb}
               type="button"
               data-testid={`fate-action-${verb}`}
-              disabled={sealedWaiting || armed !== null}
+              disabled={sealedWaiting || armed !== null || committed}
               onClick={() => armThrow(verb)}
               className={`${TILE_BASE} ${VERB_WEIGHT[verb]}`}
             >
@@ -670,7 +677,7 @@ export function FateConflictSurface({
           <button
             type="button"
             data-testid="fate-action-concede"
-            disabled={sealedWaiting || armed !== null}
+            disabled={sealedWaiting || armed !== null || committed}
             onClick={concede}
             className={`${TILE_BASE} ${TILE_QUIET} ml-auto`}
           >
@@ -707,7 +714,7 @@ export function FateConflictSurface({
         </div>
       )}
 
-      {sealedWaiting && (
+      {(sealedWaiting || committed) && (
         <p
           data-testid="fate-sealed-hint"
           className="text-sm italic text-muted-foreground"

@@ -1220,6 +1220,11 @@ export interface FateCharacterEntry {
 export interface FateConflictParticipant {
   name: string;
   side: string;
+  // Story 126-29: True when this actor has sealed a proactive action this exchange
+  // (server-authoritative, resume-safe). Optional/back-compat like `stunts?` — the
+  // server always sends it (default false). The surface reads it as `?? false` to
+  // gate the proactive tiles so a resumed conflict never re-offers a rejected action.
+  committed?: boolean;
 }
 
 /** A narrator-offered compel awaiting the player's accept/refuse (ADR-144 F3e).
