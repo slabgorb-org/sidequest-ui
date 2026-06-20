@@ -106,7 +106,8 @@ export const MessageType = {
   // consequence slots, scene aspects, active conflict). The RELATIONSHIPS/QUESTS
   // analog. Server emits ONLY on a ruleset=='fate' pack (server #880), so the
   // Fate surface never co-renders with the WN/native ConfrontationOverlay.
-  // Full-replace per message; UI consumer is the FatePanel (118-2).
+  // Full-replace per message; UI consumer is the FateCharacterSheet rendered in
+  // the Character→Stats tab (118-2; the standalone Fate dock tab was removed 126-26).
   FATE_STATE: "FATE_STATE",
   // Story 118-6 / ADR-144 F3f/F1d: OUTBOUND — the player committed a Fate action
   // from the conflict surface (a proactive tile, an invoke-bearing action, or a

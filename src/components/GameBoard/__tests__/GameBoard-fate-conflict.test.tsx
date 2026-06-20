@@ -15,7 +15,8 @@
  *     ConfrontationOverlay, because a WN pack never emits FATE_STATE)
  *
  * The conflict surface consumes the shared `latestFateRoll` mirror slice (118-7
- * F3g) — one field, two consumers (the Fate panel's FateWidget and this surface).
+ * F3g) — one field, two consumers (the Character→Stats non-conflict roll tray and
+ * this conflict surface).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
