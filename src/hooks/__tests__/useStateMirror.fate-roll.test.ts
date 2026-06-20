@@ -4,9 +4,9 @@
  * FATE_ROLL is an EVENT (the DICE_RESULT analog, not a change-gated snapshot):
  * the server emits one resolved 4dF roll the moment a PC acts, and the client
  * keeps the LATEST as `latestFateRoll` so the Fate conflict surface can hand it
- * to the FateDiceTray (118-3). The slice is shared with the Fate panel (118-7
- * F3g): one mirror field, two consumers (the conflict surface here, the panel's
- * FateWidget in 118-7).
+ * to the FateDiceTray (118-3). The slice is shared with the Character→Stats roll
+ * tray (118-7 F3g): one mirror field, two consumers (the conflict surface here,
+ * and the Character→Stats non-conflict roll tray).
  *
  * No-Silent-Fallbacks: a malformed payload (dice not a 4-tuple) degrades to null
  * rather than storing garbage the tray throws on — mirrors the FATE_STATE

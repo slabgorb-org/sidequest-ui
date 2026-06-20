@@ -1,11 +1,8 @@
 import type {
   FateAspectEntry,
   FateCharacterEntry,
-  FateRollPayload,
-  FateStatePayload,
   FateStuntEntry,
 } from "@/types/payloads";
-import { FateDiceTray } from "@/dice/FateDiceTray";
 
 // Folio palette — mirrors QuestsPanel / RelationshipsPanel / LocationPanel so
 // every dock panel reads as the same artifact. Resolved via CSS custom
@@ -20,33 +17,6 @@ const FOLIO = {
 } as const;
 
 const FONT_DISPLAY = "'Pirata One', serif";
-const FONT_BODY = "'EB Garamond', serif";
-
-const PANEL_LABEL = "Fate sheet";
-
-// Story 118-2 / ADR-144 F3b: the player-facing Fate sheet made legible. Renders,
-// per PC: fate points (labeled), skills on the ladder (name + adjective +
-// signed numeric), aspects grouped by kind with free-invoke pips, the stress
-// tracks, and the four consequence slots (filled vs open). Plus the scene's
-// situation aspects/boosts and the active conflict's participants by side.
-// Read-only — no fate-point spending, no aspect invocation (later F3 stories).
-// Structurally a sibling of QuestsPanel: a pure presentational component taking
-// a typed `data` prop, with the empty-state branch first.
-//
-// THE mechanics-legibility surface for Sebastien/Jade (CLAUDE.md): every number
-// carries a label. This is a player-UI mandate, not OTEL/GM observability.
-export interface FatePanelProps {
-  data: FateStatePayload | null;
-  /**
-   * Story 118-7 / ADR-144 F3g: the latest resolved 4dF roll. When present (and
-   * the pack is Fate), the FateDiceTray mounts above the sheet so the table sees
-   * the soloist's roll. Null/absent → no roll surface.
-   */
-  latestRoll?: FateRollPayload | null;
-  /** The active pack's ruleset; the roll surface renders only when "fate"
-   *  (FateDiceTray self-gates — never co-renders with the WN/native overlay). */
-  ruleset?: string;
-}
 
 // snake_case wire kind → human display label. Canonical render order matches the
 // story's enumeration (high-concept / trouble / character / situation / boost /
@@ -139,16 +109,15 @@ function AspectGroups({ aspects }: { aspects: FateAspectEntry[] }) {
 /**
  * One PC's Fate sheet — fate points + refresh, ladder skills (name + adjective +
  * signed rating), aspects grouped by kind, stress tracks, and consequence slots.
- * Extracted from FatePanel's per-character block (playtest 2026-06-17) so the
- * SAME renderer powers both the dock FateWidget AND the in-game Character panel's
- * Stats tab — a Fate player must see their sheet where they look for it, not only
- * in a separate dock tab (the Sebastien/Jade "show me the math in the player UI"
- * mandate). Pure presentational; markup is byte-identical to the prior inline
- * block so the existing FatePanel tests still cover it.
+ * THE Fate-sheet renderer, mounted in the Character panel's Stats tab (the
+ * standalone "Fate" dock tab and its FateWidget/FatePanel host were removed in
+ * 126-26) — a Fate player sees their sheet where they look for it, the
+ * Sebastien/Jade "show me the math in the player UI" mandate. Pure
+ * presentational; covered by CharacterPanelFateSheet.test.tsx.
  *
- * `showDivider` draws the inter-PC separator rule — true when FatePanel stacks
- * several PCs, false when the Character panel renders a single sheet (no trailing
- * rule under one sheet).
+ * `showDivider` draws the inter-PC separator rule — true when several PCs stack,
+ * false when the Character panel renders a single sheet (no trailing rule under
+ * one sheet).
  */
 export function FateCharacterSheet({
   character,
@@ -281,9 +250,9 @@ export function FateCharacterSheet({
 
 /** Render a PC's Fate stunts (their special abilities under Fate). Returns null
  *  when there are none, so a sheet with no stunts draws no empty section. Shared by
- *  the FateCharacterSheet (Stats tab + dock widget) and the Character panel's
- *  Abilities tab — under Fate the player's special abilities ARE their stunts, so
- *  the native class-move surface is replaced by this (playtest 150-2). */
+ *  the FateCharacterSheet (Stats tab) and the Character panel's Abilities tab —
+ *  under Fate the player's special abilities ARE their stunts, so the native
+ *  class-move surface is replaced by this (playtest 150-2). */
 export function FateStunts({ stunts }: { stunts: FateStuntEntry[] }) {
   if (stunts.length === 0) return null;
   return (
@@ -297,85 +266,6 @@ export function FateStunts({ stunts }: { stunts: FateStuntEntry[] }) {
           ) : null}
         </div>
       ))}
-    </div>
-  );
-}
-
-export function FatePanel({ data, latestRoll, ruleset }: FatePanelProps) {
-  const characters = data?.characters ?? [];
-  if (!data || characters.length === 0) {
-    return (
-      <div
-        role="region"
-        aria-label={PANEL_LABEL}
-        data-testid="fate-empty"
-        className="p-6"
-        style={{
-          background: FOLIO.paper,
-          color: FOLIO.inkSoft,
-          fontFamily: FONT_BODY,
-          minHeight: "100%",
-        }}
-      >
-        <p>No Fate sheet yet — your aspects, skills, and fate points will appear here.</p>
-      </div>
-    );
-  }
-
-  const sceneAspects = data.scene_aspects ?? [];
-  const conflict = data.conflict;
-
-  return (
-    <div
-      role="region"
-      aria-label={PANEL_LABEL}
-      data-testid="fate-panel"
-      className="p-4"
-      style={{
-        background: FOLIO.paper,
-        color: FOLIO.ink,
-        fontFamily: FONT_BODY,
-        minHeight: "100%",
-      }}
-    >
-      {/* Story 118-7 / ADR-144 F3g: the 4dF roll surface. Mounts only when a
-          roll has arrived; FateDiceTray self-gates on ruleset==="fate" so it
-          never co-renders with the WN/native ConfrontationOverlay. */}
-      {latestRoll && (
-        <FateDiceTray roll={latestRoll} ruleset={ruleset ?? ""} />
-      )}
-
-      {characters.map((ch) => (
-        <FateCharacterSheet key={ch.name} character={ch} />
-      ))}
-
-      {sceneAspects.length > 0 && (
-        <div data-testid="fate-scene-aspects" style={{ marginBottom: "0.75rem" }}>
-          <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
-            Scene Aspects
-          </div>
-          <AspectGroups aspects={sceneAspects} />
-        </div>
-      )}
-
-      {conflict && conflict.active && (
-        <div data-testid="fate-conflict">
-          <div style={{ fontFamily: FONT_DISPLAY, color: FOLIO.ink }}>
-            Conflict
-          </div>
-          {conflict.participants.map((p, i) => (
-            <div
-              key={`${p.name}-${i}`}
-              style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}
-            >
-              <span style={{ flex: 1 }}>{p.name}</span>
-              <span style={{ color: FOLIO.inkSoft, textTransform: "capitalize" }}>
-                {p.side}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

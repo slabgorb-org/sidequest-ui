@@ -1150,8 +1150,8 @@ export interface LocationOverlayChangedPayload {
 // names mirror the server pydantic models (sidequest-server/sidequest/protocol/
 // models.py, all `extra: forbid`) on the snake_case wire, built by
 // game/ruleset/fate_projection.py:build_fate_state_payload. The rich nested
-// shape is the source of truth — the FatePanel renders every mechanical number
-// (the Sebastien/Jade legibility mandate), so the client must not thin it.
+// shape is the source of truth — the FateCharacterSheet renders every mechanical
+// number (the Sebastien/Jade legibility mandate), so the client must not thin it.
 // ---------------------------------------------------------------------------
 
 /** One skill on the Fate ladder. `rating` is the signed value (Terrible -2 ..
