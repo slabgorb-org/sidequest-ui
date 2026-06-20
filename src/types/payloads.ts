@@ -1225,6 +1225,16 @@ export interface FateConflictParticipant {
   // server always sends it (default false). The surface reads it as `?? false` to
   // gate the proactive tiles so a resumed conflict never re-offers a rejected action.
   committed?: boolean;
+  // Story 126-31: an OPPONENT-side participant's projected mechanical track, so the
+  // surface can draw the opponent stress track + the taken-out win-meter. Per ADR-143
+  // the win signal is the opponent's stress+consequence fill toward taken-out, NOT the
+  // vestigial native tension dial. Server-projected from the NPC `core.fate_sheet`
+  // (fate_projection._project_conflict_participant); reuses the PC-sheet wire shapes.
+  // A player-side participant leaves both ABSENT — its full sheet already rides in
+  // FateStatePayload.characters, never duplicated here. Optional/back-compat like
+  // `committed?`; the surface reads them as `?? {}` / `?? []`.
+  stress?: Record<string, FateStressBox[]>;
+  consequences?: FateConsequenceEntry[];
 }
 
 /** A narrator-offered compel awaiting the player's accept/refuse (ADR-144 F3e).
