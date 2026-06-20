@@ -23,11 +23,14 @@ import {
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 
 // Archetype → dice label font (matches useChromeArchetype UI fonts).
-// Self-hosted from R2 — troika fetches these by URL for canvas glyphs, so the
-// R2 bucket CORS policy (GET/HEAD allow-origin) must be live. troika's parser
-// reads TTF/OTF/WOFF (not WOFF2), so the dice faces stay TTF. (2026-06-03: was
-// /fonts/*.ttf in ui/public; moved to content + R2 to kill the local store.)
-const DICE_FONT_BASE = "https://cdn.slabgorb.com/genre_packs/assets/fonts";
+// Hosted in R2; troika reads TTF/OTF/WOFF (not WOFF2), so the dice faces stay
+// TTF. (2026-06-03: was /fonts/*.ttf in ui/public; moved to content + R2 to kill
+// the local store.) Served through the same-origin /dice-cdn Vite proxy rather
+// than the bare cdn.slabgorb.com URL: troika fetches the font in a blob worker,
+// and a cross-origin worker fetch flakes intermittently → blank dice (sq-playtest
+// 2026-06-19). The proxy keeps the font in R2 but makes the worker fetch
+// same-origin (troika resolved same-origin /fonts/*.ttf fine pre-2026-06-03).
+const DICE_FONT_BASE = "/dice-cdn/genre_packs/assets/fonts";
 const PARCHMENT_FONT = `${DICE_FONT_BASE}/EBGaramond.ttf`;
 const TERMINAL_FONT = `${DICE_FONT_BASE}/Orbitron.ttf`;
 const RUGGED_FONT = `${DICE_FONT_BASE}/Oswald.ttf`;

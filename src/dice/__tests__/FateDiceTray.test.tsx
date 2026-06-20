@@ -157,4 +157,35 @@ describe("FateDiceTray", () => {
     expect(secondThrow).not.toBe(firstThrow);
     expect(secondKey).not.toBe(firstKey);
   });
+
+  // -- sq-playtest 2026-06-19: Fate dice rendered BLANK -----------------------
+  // The face glyphs (+ / − / 0) are drawn by troika in a blob worker from the
+  // theme's labelFont. DEFAULT_DICE_THEME carries no labelFont, so DiceScene fell
+  // back to dice-lib's cross-origin CDN Inter-Bold (cdn.slabgorb.com), whose
+  // worker fetch flakes → blank dice. The tray must hand DiceScene a SAME-ORIGIN
+  // labelFont (served via the /dice-cdn Vite proxy) so the glyphs load reliably.
+
+  it("spectator tray gives DiceScene a same-origin face font (no cross-origin CDN URL)", () => {
+    render(<FateDiceTray roll={SUCCEED} ruleset="fate" genreSlug="pulp_noir" />);
+    const theme = sceneProps.current!.theme as { labelFont?: string };
+    expect(theme.labelFont).toBeTruthy();
+    expect(theme.labelFont).not.toMatch(/^https?:\/\//);
+  });
+
+  it("thrower tray gives DiceScene a same-origin face font (no cross-origin CDN URL)", () => {
+    render(
+      <FateDiceTray
+        mode="thrower"
+        action="attack"
+        skill="Shoot"
+        requestId="req-1"
+        ruleset="fate"
+        genreSlug="pulp_noir"
+        onThrow={() => {}}
+      />,
+    );
+    const theme = sceneProps.current!.theme as { labelFont?: string };
+    expect(theme.labelFont).toBeTruthy();
+    expect(theme.labelFont).not.toMatch(/^https?:\/\//);
+  });
 });

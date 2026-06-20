@@ -24,9 +24,22 @@ import {
   DEFAULT_DICE_THEME,
   replayThrowParams,
   D6_RADIUS,
+  type DiceTheme,
   type ThrowParams,
 } from "@local/dice-lib";
 import type { FateRollPayload, FateThrowPayload } from "@/types/payloads";
+
+// Fate face glyphs (+ / − / 0) are drawn by troika from this font. dice-lib's
+// DEFAULT_DICE_THEME carries no labelFont, so DiceScene fell back to its
+// cross-origin CDN Inter-Bold (cdn.slabgorb.com/dice_assets/Inter-Bold.ttf),
+// whose blob-worker fetch flakes intermittently → blank dice (sq-playtest
+// 2026-06-19). Serve the SAME font same-origin through the /dice-cdn Vite proxy
+// (mirrors /audio-cdn) so the worker fetch is reliable. The font stays in R2 —
+// this only changes the origin the browser sees, not where it's hosted.
+const FATE_DICE_THEME: DiceTheme = {
+  ...DEFAULT_DICE_THEME,
+  labelFont: "/dice-cdn/dice_assets/Inter-Bold.ttf",
+};
 
 /** Spectator mode: replay a resolved FATE_ROLL (the 125-4 path, unchanged). */
 export interface FateDiceTraySpectatorProps {
@@ -100,7 +113,7 @@ function FateSpectatorTray({ roll }: FateDiceTraySpectatorProps) {
             rollKey={roll.seed}
             onThrow={() => {}}
             onAllSettle={() => {}}
-            theme={DEFAULT_DICE_THEME}
+            theme={FATE_DICE_THEME}
           />
         </Canvas>
       </div>
@@ -180,7 +193,7 @@ function FateThrowerTray({
             rollKey={rollKey}
             onThrow={handleSceneThrow}
             onAllSettle={handleAllSettle}
-            theme={DEFAULT_DICE_THEME}
+            theme={FATE_DICE_THEME}
           />
         </Canvas>
       </div>
