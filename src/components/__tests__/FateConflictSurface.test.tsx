@@ -332,3 +332,26 @@ describe("FateConflictSurface — mechanics-first legibility (sq-playtest 2026-0
     expect(screen.getByTestId("fate-action-concede").className).not.toContain("bg-primary");
   });
 });
+
+describe("FateConflictSurface — Contest action gating (spec 2026-06-17 §2, sq-playtest 150-6)", () => {
+  // A Contest (is_contest) has no stress/consequences; the server rejects an Attack
+  // in one loudly (fate_dispatch_error). The surface must NOT offer Attack — offering
+  // it wastes the player's 4dF throw and surfaces only a red error toast.
+  function contestState(): FateStatePayload {
+    const s = fateState();
+    return { ...s, conflict: { ...s.conflict!, is_contest: true } };
+  }
+
+  it("hides Attack in a Contest, keeping Overcome + Create Advantage + Concede", () => {
+    renderSurface({ fateState: contestState() });
+    expect(screen.queryByTestId("fate-action-attack")).not.toBeInTheDocument();
+    expect(screen.getByTestId("fate-action-overcome")).toBeInTheDocument();
+    expect(screen.getByTestId("fate-action-create_advantage")).toBeInTheDocument();
+    expect(screen.getByTestId("fate-action-concede")).toBeInTheDocument();
+  });
+
+  it("still offers Attack in a Conflict (is_contest absent/false)", () => {
+    renderSurface(); // the default fixture is a Conflict
+    expect(screen.getByTestId("fate-action-attack")).toBeInTheDocument();
+  });
+});

@@ -1260,6 +1260,12 @@ export interface FateConflictEntry {
   // Additive (ADR-144 F3e): optional so pre-F3e payloads/fixtures stay valid; the
   // server always populates it (default empty). The surface reads it as `?? []`.
   pending_compels?: FatePendingCompel[];
+  // True when this is a Fate Contest (no stress/consequences) rather than a
+  // Conflict (spec 2026-06-17 §2). Optional so pre-existing payloads/fixtures stay
+  // valid (treated as a Conflict when absent). The surface gates its action rack on
+  // it: a Contest exposes Overcome + Create Advantage (+ Concede), never Attack —
+  // the server rejects an attack in a Contest loudly (fate_dispatch_error).
+  is_contest?: boolean;
 }
 
 /** Full Fate-spine snapshot: per-PC sheets + scene situation aspects (incl.
