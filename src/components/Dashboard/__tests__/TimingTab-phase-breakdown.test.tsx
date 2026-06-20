@@ -48,8 +48,9 @@ describe("TimingTab phase breakdown (turn-pipeline phase timing)", () => {
     expect(screen.getAllByText("narrator_subprocess").length).toBeGreaterThan(0);
     expect(screen.getAllByText("state_apply").length).toBeGreaterThan(0);
 
-    // Latest-turn total appears in the section header
-    expect(screen.getByText(/101\.00s/)).toBeInTheDocument();
+    // Latest-turn total appears in the section header. (Also rendered by the
+    // sibling per-turn-duration bar's total column — getAllByText tolerates both.)
+    expect(screen.getAllByText(/101\.00s/).length).toBeGreaterThan(0);
 
     // ms values render in seconds with 2 decimals
     expect(screen.getAllByText("87.00s").length).toBeGreaterThan(0);
