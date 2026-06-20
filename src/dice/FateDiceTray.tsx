@@ -34,12 +34,16 @@ import type { FateRollPayload, FateThrowPayload } from "@/types/payloads";
 // DEFAULT_DICE_THEME carries no labelFont, so DiceScene fell back to its
 // cross-origin CDN Inter-Bold (cdn.slabgorb.com/dice_assets/Inter-Bold.ttf),
 // whose blob-worker fetch flakes intermittently → blank dice (sq-playtest
-// 2026-06-19). Serve the SAME font same-origin through the /dice-cdn Vite proxy
-// (mirrors /audio-cdn) so the worker fetch is reliable. The font stays in R2 —
-// this only changes the origin the browser sees, not where it's hosted.
+// 2026-06-19). #430 routed it same-origin via the /dice-cdn Vite proxy, but that
+// proxy rewrites to https://cdn.slabgorb.com/dice_assets/Inter-Bold.ttf which
+// returns HTTP 403 (the font isn't public on R2 under dice_assets/) → STILL
+// blank dice (sq-playtest 2026-06-20). Serve the font that already ships in this
+// app's own public/ directory instead: /fonts/Inter-Bold.ttf is same-origin (no
+// CORS/worker flake), needs no CDN/R2 round-trip, and is copied into dist/ on a
+// production build — so it resolves in dev AND prod, offline included.
 const FATE_DICE_THEME: DiceTheme = {
   ...DEFAULT_DICE_THEME,
-  labelFont: "/dice-cdn/dice_assets/Inter-Bold.ttf",
+  labelFont: "/fonts/Inter-Bold.ttf",
 };
 
 /** Spectator mode: replay a resolved FATE_ROLL (the 125-4 path, unchanged). */
