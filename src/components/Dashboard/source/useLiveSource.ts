@@ -470,10 +470,18 @@ function inActiveSession(
   return sid === activeSlug;
 }
 
+/** Canonical test-run slug prefixes (story 125-10, follow-up to 126-34). MIRRORS
+ *  the server's `_TEST_SESSION_SLUG_PREFIXES`
+ *  (sidequest-server/sidequest/telemetry/watcher_hub.py). The two are pinned to a
+ *  byte-identical fixture by a contract test in each repo
+ *  (__tests__/test-session-prefix-contract.test.ts here) so they can't drift —
+ *  change BOTH repos' arrays AND the canonical fixture together. */
+export const TEST_SESSION_SLUG_PREFIXES = ["test-", "tool-test"] as const;
+
 /** Test-run session predicate (story 126-34). Headless pytest-harness and
  *  tool-driven probe sessions use these slug prefixes; they're kept out of the
  *  live GM dashboard (picker, State tab, auto-follow) so they can't bury the
  *  genuinely-driven session. Mirrors the server's `is_test_session`. */
-function isTestSession(slug: string): boolean {
-  return slug.startsWith("test-") || slug.startsWith("tool-test");
+export function isTestSession(slug: string): boolean {
+  return TEST_SESSION_SLUG_PREFIXES.some((prefix) => slug.startsWith(prefix));
 }
