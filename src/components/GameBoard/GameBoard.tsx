@@ -586,6 +586,10 @@ export function GameBoard({
             resources={resources}
             companions={companions}
             genreSlug={genreSlug}
+            // Title-cased into the Fate eyebrow above the cartouche
+            // ("Munchkin Country · Fate Core") — CharacterPanel consumes it only
+            // when fateSheet is present (Fate-pack surface, 2026-06-20 design import).
+            worldSlug={worldSlug}
             onResourceThresholdCrossed={handleResourceThresholdCrossed}
             characters={characters}
             currentPlayerId={currentPlayerId}
