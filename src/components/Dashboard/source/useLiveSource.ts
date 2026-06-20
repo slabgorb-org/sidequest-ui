@@ -328,31 +328,43 @@ export function useLiveSource(): LiveSourceState {
     }
   }, [state.turns.length, refreshState]);
 
-  // Auto-derive the newest-activity session slug from debugState (same sort
-  // logic as StateTab). This is the auto-follow fallback when the operator has
-  // not pinned a session.
+  // Test-run sessions (test-*, tool-test) are dropped from every dashboard
+  // surface (story 126-34): 41 stale test-* sessions linger under ADR-122
+  // never-evict and would otherwise bury the genuinely-driven session and
+  // steal auto-follow. The reducer keeps the full set (lossless); only the
+  // RETURNED view is filtered — same pattern as the per-session scoping below.
+  const visibleDebugState = useMemo<SessionStateView[] | null>(() => {
+    if (state.debugState == null) return null;
+    return state.debugState.filter((s) => !isTestSession(s.session_key));
+  }, [state.debugState]);
+
+  // Auto-derive the newest-activity session slug from the visible (non-test)
+  // sessions (same sort logic as StateTab). This is the auto-follow fallback
+  // when the operator has not pinned a session.
   const autoSlug = useMemo<string | null>(() => {
-    if (!state.debugState || state.debugState.length === 0) return null;
-    const sorted = [...state.debugState].sort((a, b) => {
+    if (!visibleDebugState || visibleDebugState.length === 0) return null;
+    const sorted = [...visibleDebugState].sort((a, b) => {
       const aTs = a.last_activity_ts ?? 0;
       const bTs = b.last_activity_ts ?? 0;
       return bTs - aTs;
     });
     return sorted[0].session_key;
-  }, [state.debugState]);
+  }, [visibleDebugState]);
 
   // Known live sessions for the picker: the active sessions from debug state,
   // unioned with any session that has emitted a slug-tagged event. Session-less
   // infra (null/"") is excluded — it's global, not a selectable session.
+  // Test-run sessions (test-*, tool-test) are excluded from BOTH sources so
+  // they never reach the picker (story 126-34).
   const liveSessions = useMemo<string[]>(() => {
     const slugs = new Set<string>();
-    for (const s of state.debugState ?? []) slugs.add(s.session_key);
+    for (const s of visibleDebugState ?? []) slugs.add(s.session_key);
     for (const e of state.allEvents) {
       const sid = e.session_slug;
-      if (sid != null && sid !== "") slugs.add(sid);
+      if (sid != null && sid !== "" && !isTestSession(sid)) slugs.add(sid);
     }
     return [...slugs];
-  }, [state.debugState, state.allEvents]);
+  }, [visibleDebugState, state.allEvents]);
 
   // The operator's explicit pin wins over auto-follow. The Live view scopes its
   // span stream to this — used by EncounterTab to fetch the live session's
@@ -429,7 +441,7 @@ export function useLiveSource(): LiveSourceState {
     componentMap: scopedComponentMap,
     promptEvents: scopedPromptEvents,
     loreEvents: scopedLoreEvents,
-    debugState: state.debugState,
+    debugState: visibleDebugState,
     selectedTurn,
     paused: state.paused,
     connected,
@@ -456,4 +468,12 @@ function inActiveSession(
   const sid = ev.session_slug;
   if (sid == null || sid === "") return true;
   return sid === activeSlug;
+}
+
+/** Test-run session predicate (story 126-34). Headless pytest-harness and
+ *  tool-driven probe sessions use these slug prefixes; they're kept out of the
+ *  live GM dashboard (picker, State tab, auto-follow) so they can't bury the
+ *  genuinely-driven session. Mirrors the server's `is_test_session`. */
+function isTestSession(slug: string): boolean {
+  return slug.startsWith("test-") || slug.startsWith("tool-test");
 }
