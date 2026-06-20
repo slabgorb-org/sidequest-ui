@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type {
   FateCharacterEntry,
+  FateConflictParticipant,
   FateDefendRequestPayload,
   FateRollPayload,
   FateStatePayload,
@@ -150,6 +151,35 @@ interface ArmedThrow {
 function canInvoke(me: FateCharacterEntry | null, freeInvokes: number): boolean {
   if (me === null) return false;
   return freeInvokes > 0 || me.fate_points > 0;
+}
+
+/** The ADR-143 win signal for an OPPONENT-side participant: USED absorption (checked
+ *  stress boxes + filled consequences) over TOTAL capacity, reproducing the server's
+ *  `fate_projection.conflict_opponent_progress` — read from the projected track, never
+ *  the vestigial native tension dial. `pct` fills toward 100 as the Other takes harm;
+ *  `atThreshold` means the next overflowing hit takes them out. Returns null when there
+ *  is no meter to draw: a player-side actor (its full sheet rides in `characters`), or a
+ *  sheetless opponent (capacity 0 — the #966 seated-without-a-sheet honest empty state).
+ *  Reads `stress`/`consequences` as `?? {}`/`?? []` for pre-projection back-compat. */
+function opponentProgress(
+  p: FateConflictParticipant,
+): { used: number; capacity: number; pct: number; atThreshold: boolean } | null {
+  if (p.side !== "opponent") return null;
+  let capacity = 0;
+  let used = 0;
+  for (const boxes of Object.values(p.stress ?? {})) {
+    for (const b of boxes) {
+      capacity += b.value;
+      if (b.checked) used += b.value;
+    }
+  }
+  for (const c of p.consequences ?? []) {
+    capacity += c.value;
+    if (c.filled) used += c.value;
+  }
+  if (capacity <= 0) return null;
+  const pct = Math.max(0, Math.min(100, (used / capacity) * 100));
+  return { used, capacity, pct, atThreshold: used >= capacity };
 }
 
 export function FateConflictSurface({
@@ -376,9 +406,9 @@ export function FateConflictSurface({
 
       {/* You — the local PC's stress + consequences, the same server-authoritative
           data FatePanel renders (the player sees their own absorption mid-exchange).
-          The OPPONENT's track and the win/progress meter need a server projection —
-          FATE_STATE carries no opponent sheet or conflict metric today — so they are
-          a server follow-up (sq-playtest 2026-06-19), not faked client-side. */}
+          The OPPONENT's track + the taken-out win-meter follow in their own section
+          below, now that the server projects them onto conflict.participants[opponent]
+          (Story 126-31). */}
       {me &&
         (Object.values(me.stress ?? {}).some((boxes) => boxes.length > 0) ||
           (me.consequences ?? []).length > 0) && (
@@ -420,6 +450,96 @@ export function FateConflictSurface({
             ))}
           </section>
         )}
+
+      {/* The Other(s) — each opponent-side participant's projected stress/consequence
+          track + a taken-out win-meter. Per ADR-143 the win signal is the opponent's
+          stress+consequence fill toward taken-out (read from FATE_STATE.conflict, NOT
+          the vestigial native tension dial). The meter MIRRORS ConfrontationOverlay's
+          EdgeBar — fill % + at-threshold flash + the legible used/capacity numerator
+          (Sebastien/Jade mechanics-first legibility). A sheetless opponent (capacity 0)
+          draws nothing — the honest empty state, not a 0/0 bar implying false engagement. */}
+      {opponents.map((o) => {
+        const progress = opponentProgress(o);
+        if (progress === null) return null;
+        return (
+          <section
+            key={o.name}
+            data-testid="fate-conflict-opponent-track"
+            data-opponent={o.name}
+            className="flex flex-col gap-1"
+          >
+            <div className={SECTION_LABEL}>{o.name}</div>
+            {/* Taken-out win-meter (mirrors EdgeBar): fills toward 100% as the Other
+                absorbs harm; flashes at threshold (next overflow takes them out). */}
+            <div
+              data-testid="fate-conflict-win-meter"
+              data-opponent={o.name}
+              data-at-threshold={progress.atThreshold ? "true" : undefined}
+              className="flex items-center gap-1.5"
+            >
+              <span
+                className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0"
+                aria-label={`${o.name} taken-out progress`}
+              >
+                Taken out
+              </span>
+              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden min-w-[24px]">
+                <div
+                  data-testid="fate-conflict-win-meter-fill"
+                  className={`h-full transition-all duration-300 motion-reduce:transition-none ${
+                    progress.atThreshold ? "animate-pulse motion-reduce:animate-none" : ""
+                  }`}
+                  style={{
+                    width: `${progress.pct}%`,
+                    background: "var(--destructive)",
+                    boxShadow: progress.atThreshold ? "0 0 8px var(--destructive)" : undefined,
+                  }}
+                />
+              </div>
+              <span className="text-sm font-semibold tabular-nums flex-shrink-0">
+                {progress.used}/{progress.capacity}
+                <span className="sr-only"> absorption used</span>
+              </span>
+            </div>
+            {/* The Other's stress boxes per track (filled = absorbed harm). */}
+            {Object.entries(o.stress ?? {})
+              .filter(([, boxes]) => boxes.length > 0)
+              .map(([track, boxes]) => (
+                <div key={track} className="flex items-center gap-1.5">
+                  <span className="text-xs capitalize text-muted-foreground w-16 flex-shrink-0">
+                    {track}
+                  </span>
+                  {boxes.map((b, i) => (
+                    <span
+                      key={`${track}-${i}`}
+                      data-testid="fate-conflict-opponent-stress-box"
+                      data-checked={b.checked ? "true" : "false"}
+                      className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs tabular-nums ${
+                        b.checked
+                          ? "bg-destructive text-destructive-foreground border-transparent"
+                          : "border-border text-foreground"
+                      }`}
+                    >
+                      {b.value}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            {/* The Other's consequences (filled ones carry their invokable text). */}
+            {(o.consequences ?? []).map((c) => (
+              <div
+                key={c.level}
+                data-testid="fate-conflict-opponent-consequence"
+                data-filled={c.filled ? "true" : "false"}
+                className={`text-xs ${c.filled ? "text-foreground" : "text-muted-foreground"}`}
+              >
+                <span className="capitalize">{c.level}</span> ({c.value})
+                {c.filled ? `: ${c.text}` : " — open"}
+              </div>
+            ))}
+          </section>
+        );
+      })}
 
       {/* Story 126-17 (ADR-148/149): the DEFEND barrier. When the server parks the
           round on this PC's defense it broadcasts the committed attack; the player
