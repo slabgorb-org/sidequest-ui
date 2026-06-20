@@ -8,7 +8,7 @@ import { AgentDotPlot } from "../charts/AgentDotPlot";
 import { TierPlot } from "../charts/TierPlot";
 import { Sparkline, SectionTitle } from "../charts/tufte";
 import { quantile } from "../charts/chartMath";
-import { THEME, AGENT_COLORS, MONO, SERIF } from "../shared/constants";
+import { THEME, AGENT_COLORS, SPAN_COLORS, MONO, SERIF } from "../shared/constants";
 
 interface Props {
   turns: WatcherEvent[];
@@ -110,6 +110,11 @@ export function TimingTab({ turns, allEvents }: Props) {
         ))}
       </div>
 
+      {/* Per-turn player-POV duration — one stacked bar per turn (total segmented
+          by phase). Answers "how long did each turn take and where did the wait
+          go" at a glance. Short-circuits when no turn ships phase/total timing. */}
+      <PerTurnDuration turnFields={turnFields} />
+
       {/* Phase breakdown — only renders when phase_durations_ms is present.
           Older servers (pre-phase-timing) don't ship it; the section just
           short-circuits in that case. */}
@@ -181,6 +186,164 @@ function Stat({ label, value, sub, spark, alert }: StatProps) {
         {spark}
       </span>
       <span style={{ fontFamily: SERIF, fontStyle: "italic", color: THEME.dot, fontSize: 11 }}>{sub}</span>
+    </div>
+  );
+}
+
+// Fallback hues for phases not named in SPAN_COLORS — muted Tufte data palette,
+// assigned deterministically by the phase's rank in the session (largest first).
+const PHASE_PALETTE = [THEME.steel, THEME.mauve, THEME.sage, THEME.ochre, THEME.steelDim, THEME.inkDim];
+const UNACCOUNTED_COLOR = THEME.faint;
+
+interface PerTurnRowData {
+  turn: number;
+  total: number;
+  phases: Record<string, number>;
+  unaccounted: number;
+}
+
+/**
+ * Per-turn player-POV duration view: one stacked bar per turn, the bar length
+ * proportional to `total_duration_ms` (submit → narration delivered) and segmented
+ * by `phase_durations_ms` (+ the `_unaccounted_ms` remainder). The latest-turn /
+ * session-avg PhaseBreakdown answers "where does a turn's time go on average"; THIS
+ * answers "how long did EACH turn take and where did its wait go" — the question the
+ * single-span Timeline flame can't. Reads only data already on turn_complete.
+ */
+function PerTurnDuration({ turnFields }: { turnFields: TurnCompleteFields[] }) {
+  const rows = useMemo<PerTurnRowData[]>(
+    () =>
+      turnFields
+        .map((f, i) => ({
+          turn: f.turn_number ?? f.turn_id ?? i + 1,
+          total: f.total_duration_ms ?? 0,
+          phases: f.phase_durations_ms ?? {},
+          unaccounted: f._unaccounted_ms ?? 0,
+        }))
+        .filter((r) => r.total > 0 || Object.keys(r.phases).length > 0),
+    [turnFields],
+  );
+
+  // Stable phase order + color: union across the session, ranked by total time desc
+  // so the heaviest phase is first in the legend and every turn's segments line up.
+  const { phaseNames, colorOf } = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const r of rows) {
+      for (const [name, ms] of Object.entries(r.phases)) {
+        totals[name] = (totals[name] || 0) + ms;
+      }
+    }
+    const names = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+    const colors: Record<string, string> = {};
+    names.forEach((n, i) => {
+      colors[n] = SPAN_COLORS[n] ?? PHASE_PALETTE[i % PHASE_PALETTE.length];
+    });
+    return { phaseNames: names, colorOf: colors };
+  }, [rows]);
+
+  const maxTotal = useMemo(() => Math.max(1, ...rows.map((r) => r.total)), [rows]);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section data-testid="per-turn-duration" style={{ marginBottom: 32 }}>
+      <SectionTitle>Per-turn duration · player-POV</SectionTitle>
+      <div style={{ fontFamily: MONO, fontSize: 10, color: THEME.dot, marginBottom: 10 }}>
+        each bar = one turn, submit → narration delivered · width ∝ total · segmented by phase
+      </div>
+      {/* Legend — phase swatches (heaviest first) + the unaccounted remainder. */}
+      <div
+        data-testid="per-turn-legend"
+        style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 12, fontFamily: MONO, fontSize: 11 }}
+      >
+        {phaseNames.map((n) => (
+          <Swatch key={n} color={colorOf[n]} label={n} />
+        ))}
+        <Swatch color={UNACCOUNTED_COLOR} label="unaccounted" muted />
+      </div>
+      {/* One row per turn. */}
+      <div>
+        {rows.map((r) => (
+          <PerTurnRow key={r.turn} row={r} phaseNames={phaseNames} colorOf={colorOf} maxTotal={maxTotal} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Swatch({ color, label, muted }: { color: string; label: string; muted?: boolean }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      <span style={{ width: 9, height: 9, background: color, display: "inline-block", borderRadius: 1 }} />
+      <span style={{ color: muted ? THEME.muted : THEME.inkDim, fontStyle: muted ? "italic" : "normal" }}>{label}</span>
+    </span>
+  );
+}
+
+function PerTurnRow({
+  row,
+  phaseNames,
+  colorOf,
+  maxTotal,
+}: {
+  row: PerTurnRowData;
+  phaseNames: string[];
+  colorOf: Record<string, string>;
+  maxTotal: number;
+}) {
+  // Segments in the stable session order; only phases this turn actually spent on.
+  const segments = phaseNames
+    .filter((n) => (row.phases[n] ?? 0) > 0)
+    .map((n) => ({ name: n, ms: row.phases[n], color: colorOf[n] }));
+  if (row.unaccounted > 0) {
+    segments.push({ name: "unaccounted", ms: row.unaccounted, color: UNACCOUNTED_COLOR });
+  }
+  // Bar length scaled to the slowest turn so turns are visually comparable; segments
+  // fill the bar proportional to their share of THIS turn's total.
+  const barPct = (row.total / maxTotal) * 100;
+  const denom = row.total > 0 ? row.total : segments.reduce((s, seg) => s + seg.ms, 0) || 1;
+
+  return (
+    <div
+      data-testid="per-turn-row"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "62px 1fr 58px",
+        gap: 10,
+        alignItems: "center",
+        padding: "3px 0",
+        fontSize: 12,
+      }}
+    >
+      <span style={{ fontFamily: SERIF, fontSize: 13, color: THEME.inkDim }}>Turn {row.turn}</span>
+      {/* Bar track: a hairline leader with the stacked bar over it. */}
+      <div style={{ position: "relative", height: 12 }}>
+        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: `1px dotted ${THEME.rule}` }} />
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            transform: "translateY(-50%)",
+            left: 0,
+            width: `${barPct}%`,
+            height: 9,
+            display: "flex",
+            overflow: "hidden",
+          }}
+        >
+          {segments.map((seg) => (
+            <div
+              key={seg.name}
+              data-testid="per-turn-segment"
+              title={`${seg.name} ${(seg.ms / 1000).toFixed(2)}s (${Math.round((seg.ms / denom) * 100)}%)`}
+              style={{ width: `${(seg.ms / denom) * 100}%`, height: "100%", background: seg.color }}
+            />
+          ))}
+        </div>
+      </div>
+      <span style={{ fontFamily: MONO, color: THEME.ink, textAlign: "right" }}>{(row.total / 1000).toFixed(2)}s</span>
     </div>
   );
 }
