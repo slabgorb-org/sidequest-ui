@@ -74,6 +74,14 @@ export interface CharacterPanelProps {
   character: CharacterSheetData;
   resources?: Record<string, ResourcePool> | null;
   genreSlug?: string;
+  /**
+   * Active world slug — title-cased into the Fate eyebrow above the cartouche
+   * ("Munchkin Country · Fate Core"), the 2026-06-20 "Fate Sheet.dc.html"
+   * design import. Only consumed when `fateSheet` is present (the eyebrow is a
+   * Fate-pack surface); absent ⇒ the eyebrow shows the ruleset label alone, never
+   * a fabricated world name (No-Silent-Fallbacks).
+   */
+  worldSlug?: string;
   onResourceThresholdCrossed?: (info: {
     resource: string;
     threshold: ResourceThreshold;
@@ -166,6 +174,7 @@ export function CharacterPanel({
   character,
   resources,
   genreSlug,
+  worldSlug,
   onResourceThresholdCrossed,
   characters = [],
   companions = [],
@@ -227,6 +236,48 @@ export function CharacterPanel({
         fontFamily: FONT_BODY,
       }}
     >
+      {/* Fate eyebrow (2026-06-20 "Fate Sheet.dc.html" design import) — the
+          world · ruleset band above the cartouche. Fate-pack only (gated on
+          fateSheet, the same ruleset signal that drives suppressNativeChrome),
+          so native/WN packs render no eyebrow. World name is title-cased from
+          worldSlug; absent ⇒ the ruleset label stands alone (never a fabricated
+          world). "Fate Core" is honest here — fateSheet is non-null only on a
+          ruleset=='fate' pack. */}
+      {fateSheet && (
+        <div
+          data-testid="fate-eyebrow"
+          className="flex items-center justify-between"
+          style={{
+            padding: "0.6rem 1rem 0.5rem",
+            borderBottom: `2px double ${FOLIO.rule}`,
+            background: FOLIO.paper,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: FONT_LABEL,
+              fontSize: 11,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: FOLIO.inkSoft,
+            }}
+          >
+            {worldSlug ? toDisplayName(worldSlug) : null}
+          </span>
+          <span
+            style={{
+              fontFamily: FONT_LABEL,
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: FOLIO.crimson,
+            }}
+          >
+            Fate Core
+          </span>
+        </div>
+      )}
+
       {/* Header: portrait · name/subtitle · level badge · edge badge.
           The double-rule border-bottom and the linear-gradient on the
           paper2 → paper backdrop mark this as the illuminated cartouche;

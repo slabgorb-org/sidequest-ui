@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { CharacterPanel } from "../CharacterPanel";
 import type { CharacterSheetData } from "../CharacterSheet";
@@ -144,5 +144,70 @@ describe("CharacterPanel — Fate stunts (playtest 150-2)", () => {
     expect(screen.getByText(/under Fate your special abilities are your stunts/i)).toBeInTheDocument();
     expect(screen.queryByText("Class moves")).not.toBeInTheDocument();
     expect(screen.queryByText("Fan the Hammer")).not.toBeInTheDocument();
+  });
+});
+
+// 2026-06-20 design import — the Fate character sheet was restyled to the
+// imported Claude Design ("Fate Sheet.dc.html", project "Fate character sheet
+// improvements"): a world eyebrow above the cartouche, a fate-point token row,
+// and the ladder grouped into rungs (signed value + adjective + skill chips).
+// The restyle is READ-ONLY — the sheet DISPLAYS state, it never mutates it
+// (spending fate points / invoking aspects flows through the conflict surface,
+// not the sheet). So the sheet body carries no interactive controls: the
+// prototype's per-aspect Invoke buttons and clickable tokens are deliberately
+// omitted rather than rendered dead (No Stubbing).
+describe("CharacterPanel — Fate sheet redesign (Fate Sheet.dc.html)", () => {
+  it("shows a world eyebrow with the world name and the Fate Core ruleset label", () => {
+    render(
+      <CharacterPanel
+        character={FATE_CHARACTER}
+        fateSheet={FATE_SHEET}
+        worldSlug="munchkin_country"
+      />,
+    );
+    const eyebrow = screen.getByTestId("fate-eyebrow");
+    expect(eyebrow).toHaveTextContent("Munchkin Country");
+    expect(eyebrow).toHaveTextContent("Fate Core");
+  });
+
+  it("does not render the Fate eyebrow on a non-Fate pack (no fateSheet)", () => {
+    render(
+      <CharacterPanel character={FATE_CHARACTER} worldSlug="munchkin_country" />,
+    );
+    expect(screen.queryByTestId("fate-eyebrow")).not.toBeInTheDocument();
+  });
+
+  it("renders one fate-point token per refresh, with fate_points of them filled", () => {
+    render(
+      <CharacterPanel
+        character={FATE_CHARACTER}
+        fateSheet={{ ...FATE_SHEET, fate_points: 1, refresh: 3 }}
+      />,
+    );
+    const tokens = screen.getAllByTestId("fate-point-token");
+    expect(tokens).toHaveLength(3); // one per refresh
+    const filled = tokens.filter(
+      (t) => t.getAttribute("data-filled") === "true",
+    );
+    expect(filled).toHaveLength(1); // fate_points currently available
+  });
+
+  it("groups ladder skills by rating into rungs, apex rung first", () => {
+    render(<CharacterPanel character={FATE_CHARACTER} fateSheet={FATE_SHEET} />);
+    // FATE_SHEET: Deceive +4 (Great), Rapport +3 (Good) → two rungs.
+    const rungs = screen.getAllByTestId("fate-rung");
+    expect(rungs).toHaveLength(2);
+    // The apex rung (+4) sorts first and carries its skill chip + adjective.
+    expect(rungs[0]).toHaveTextContent("+4");
+    expect(rungs[0].textContent?.toUpperCase()).toContain("GREAT");
+    expect(within(rungs[0]).getByText("Deceive")).toBeInTheDocument();
+  });
+
+  it("is read-only: the sheet body carries no interactive controls", () => {
+    render(<CharacterPanel character={FATE_CHARACTER} fateSheet={FATE_SHEET} />);
+    const sheet = screen.getByTestId("fate-character");
+    // No Invoke buttons, no clickable fate-point/stress controls in the sheet.
+    expect(within(sheet).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByText("Invoke")).not.toBeInTheDocument();
   });
 });
