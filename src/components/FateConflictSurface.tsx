@@ -87,6 +87,31 @@ const FOLIO = {
 const FONT_DISPLAY = "'Pirata One', serif";
 const FONT_BODY = "'EB Garamond', serif";
 
+// Control styling — native elements + design tokens, matching the sibling
+// ConfrontationOverlay tile pattern (sq-playtest 2026-06-19: this surface shipped
+// with bare unstyled controls — every button/select/input read as flat text, and
+// Attack was visually identical to the give-up Concede). Native <button>/<select>/
+// <input> keep their accessibility + the data-testids the tests key on; only
+// presentation changes.
+const SECTION_LABEL = "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground";
+const FIELD_CLS =
+  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 disabled:pointer-events-none";
+const TILE_BASE =
+  "inline-flex items-center justify-center rounded-md border px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
+const TILE_PRIMARY = "border-transparent bg-primary text-primary-foreground hover:bg-primary/85";
+const TILE_OUTLINE = "border-border bg-background hover:bg-muted hover:text-foreground";
+const TILE_QUIET = "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground";
+// Per-verb weight: Attack is the primary/destructive action, the two setup verbs
+// are equal-weight outlines, and Concede (give up) is deliberately quiet so it can
+// never be mistaken for the primary action (DRIVER: "Attack identical to Concede").
+const VERB_WEIGHT: Record<RollVerb, string> = {
+  overcome: TILE_OUTLINE,
+  create_advantage: TILE_OUTLINE,
+  attack: TILE_PRIMARY,
+};
+const CHIP =
+  "text-xs px-2 py-0.5 rounded border transition-colors outline-none disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
+
 /** A concede defend throw folds WITHOUT rolling, so it carries no dice — but the
  *  server's FateThrowPayload requires `throw_params` (no default) even on the
  *  concede path (which ignores it). Send a neutral zero-gesture to satisfy the
@@ -290,24 +315,104 @@ export function FateConflictSurface({
       style={{ color: FOLIO.ink, background: FOLIO.paper, fontFamily: FONT_BODY }}
       className="flex flex-col gap-3 p-3"
     >
-      <h2 style={{ fontFamily: FONT_DISPLAY }} className="text-lg">
-        Conflict
-      </h2>
-
-      {/* Participants by side, in seating (turn) order. */}
-      <ol data-testid="fate-conflict-order" className="flex flex-col gap-1">
-        {conflict.participants.map((p) => (
-          <li
-            key={p.name}
-            data-testid={`fate-conflict-participant-${p.name}`}
-            data-side={p.side}
-            className="flex items-baseline gap-2"
+      {/* Header — title + the live Fate-point economy. Mechanics-first legibility
+          (Sebastien/Jade): the player can always see what they have to spend on an
+          Invoke, so a disabled Invoke reads as "you're out", not "it's broken". */}
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 style={{ fontFamily: FONT_DISPLAY }} className="text-lg">
+          Conflict
+        </h2>
+        {me && (
+          <span
+            data-testid="fate-conflict-fate-points"
+            className="rounded-md border border-border px-2 py-0.5 text-sm whitespace-nowrap"
+            title="Fate points available to spend on Invoke"
           >
-            <span>{p.name}</span>
-            <span style={{ color: FOLIO.inkSoft }}>({p.side})</span>
-          </li>
-        ))}
-      </ol>
+            Fate Points <strong className="tabular-nums">{me.fate_points}</strong>
+            <span className="text-muted-foreground"> · Refresh {me.refresh}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Participants by side, in seating (turn) order. A side dot + badge so the
+          player can tell their crew from the Other at a glance. */}
+      <section className="flex flex-col gap-1">
+        <div className={SECTION_LABEL}>Participants</div>
+        <ol data-testid="fate-conflict-order" className="flex flex-col gap-1">
+          {conflict.participants.map((p) => (
+            <li
+              key={p.name}
+              data-testid={`fate-conflict-participant-${p.name}`}
+              data-side={p.side}
+              className="flex items-center gap-2 text-sm"
+            >
+              <span
+                aria-hidden
+                className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  p.side === "opponent" ? "bg-destructive" : "bg-primary"
+                }`}
+              />
+              <span className="flex-1">{p.name}</span>
+              <span
+                className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 border ${
+                  p.side === "opponent"
+                    ? "border-destructive/40 text-destructive"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {p.side}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* You — the local PC's stress + consequences, the same server-authoritative
+          data FatePanel renders (the player sees their own absorption mid-exchange).
+          The OPPONENT's track and the win/progress meter need a server projection —
+          FATE_STATE carries no opponent sheet or conflict metric today — so they are
+          a server follow-up (sq-playtest 2026-06-19), not faked client-side. */}
+      {me &&
+        (Object.values(me.stress ?? {}).some((boxes) => boxes.length > 0) ||
+          (me.consequences ?? []).length > 0) && (
+          <section data-testid="fate-conflict-self-track" className="flex flex-col gap-1">
+            <div className={SECTION_LABEL}>You — {me.name}</div>
+            {Object.entries(me.stress ?? {})
+              .filter(([, boxes]) => boxes.length > 0)
+              .map(([track, boxes]) => (
+                <div key={track} className="flex items-center gap-1.5">
+                  <span className="text-xs capitalize text-muted-foreground w-16 flex-shrink-0">
+                    {track}
+                  </span>
+                  {boxes.map((b, i) => (
+                    <span
+                      key={`${track}-${i}`}
+                      data-testid="fate-conflict-stress-box"
+                      data-checked={b.checked ? "true" : "false"}
+                      className={`inline-flex items-center justify-center w-6 h-6 rounded border text-xs tabular-nums ${
+                        b.checked
+                          ? "bg-primary text-primary-foreground border-transparent"
+                          : "border-border text-foreground"
+                      }`}
+                    >
+                      {b.value}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            {(me.consequences ?? []).map((c) => (
+              <div
+                key={c.level}
+                data-testid="fate-conflict-consequence"
+                data-filled={c.filled ? "true" : "false"}
+                className={`text-xs ${c.filled ? "text-foreground" : "text-muted-foreground"}`}
+              >
+                <span className="capitalize">{c.level}</span> ({c.value})
+                {c.filled ? `: ${c.text}` : " — open"}
+              </div>
+            ))}
+          </section>
+        )}
 
       {/* Story 126-17 (ADR-148/149): the DEFEND barrier. When the server parks the
           round on this PC's defense it broadcasts the committed attack; the player
@@ -316,15 +421,14 @@ export function FateConflictSurface({
           FateDiceTray thrower) or concedes (folds without rolling, Story 126-14).
           The tray is consumed once answered. */}
       {pendingDefend && (
-        <div
+        <section
           data-testid="fate-defend-tray"
-          className="flex flex-col gap-2 p-2"
-          style={{ borderLeft: `3px solid ${FOLIO.accent}`, paddingLeft: 10 }}
+          className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2"
         >
           <span style={{ fontFamily: FONT_DISPLAY }} className="text-base">
             Defend! <strong>{pendingDefend.attacker}</strong> attacks with{" "}
             <strong>{pendingDefend.attack_skill}</strong> at total{" "}
-            <strong>{pendingDefend.attack_total}</strong>
+            <strong className="tabular-nums">{pendingDefend.attack_total}</strong>
             {pendingDefend.mental ? " (mental)" : ""}
           </span>
           {/* The defense skill (free-pick): which skill the defender rolls to fend
@@ -333,18 +437,22 @@ export function FateConflictSurface({
               FATE_THROW so the server resolves the defense at its rating — never the
               skill="" / rating-0 default that silently lost the bonus (playtest 150-2). */}
           {skills.length > 0 && (
-            <select
-              data-testid="fate-defend-skill-select"
-              value={activeDefendSkill}
-              disabled={sealedWaiting}
-              onChange={(e) => setDefendSkill(e.target.value)}
-            >
-              {skills.map((s) => (
-                <option key={s.name} value={s.name}>
-                  {s.name} ({s.ladder})
-                </option>
-              ))}
-            </select>
+            <label className="flex flex-col gap-1">
+              <span className={SECTION_LABEL}>Defend with</span>
+              <select
+                data-testid="fate-defend-skill-select"
+                value={activeDefendSkill}
+                disabled={sealedWaiting}
+                onChange={(e) => setDefendSkill(e.target.value)}
+                className={FIELD_CLS}
+              >
+                {skills.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name} ({s.ladder})
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <FateDiceTray
             mode="thrower"
@@ -359,10 +467,11 @@ export function FateConflictSurface({
             data-testid="fate-defend-concede"
             disabled={sealedWaiting}
             onClick={concedeDefend}
+            className={`${TILE_BASE} ${TILE_QUIET} self-start`}
           >
             Concede
           </button>
-        </div>
+        </section>
       )}
 
       {/* The 4dF roll (composed FateDiceTray, fate-gated in its own right). */}
@@ -375,14 +484,14 @@ export function FateConflictSurface({
           cost is the SRD-fixed −1 constant. Both shown on the control (mechanics-first
           legibility). Disabled while a sealed round resolves. */}
       {compels.length > 0 && (
-        <div data-testid="fate-compel-rack" className="flex flex-col gap-2">
+        <section data-testid="fate-compel-rack" className="flex flex-col gap-2">
+          <div className={SECTION_LABEL}>Compels</div>
           {compels.map((c) => (
             <div
               key={c.aspect}
-              className="flex flex-col gap-1"
-              style={{ borderLeft: `2px solid ${FOLIO.accent}`, paddingLeft: 8 }}
+              className="flex flex-col gap-1 rounded-md border border-accent/40 bg-accent/5 p-2"
             >
-              <span>
+              <span className="text-sm">
                 <strong>Compel — {c.aspect}:</strong> {c.reason}
               </span>
               <div className="flex gap-2">
@@ -391,6 +500,7 @@ export function FateConflictSurface({
                   data-testid={`fate-compel-accept-${c.aspect}`}
                   disabled={sealedWaiting}
                   onClick={() => resolveCompel(c.aspect, "compel_accept")}
+                  className={`${TILE_BASE} ${TILE_PRIMARY}`}
                 >
                   Accept (+{c.offered_delta} FP)
                 </button>
@@ -399,136 +509,184 @@ export function FateConflictSurface({
                   data-testid={`fate-compel-refuse-${c.aspect}`}
                   disabled={sealedWaiting}
                   onClick={() => resolveCompel(c.aspect, "compel_refuse")}
+                  className={`${TILE_BASE} ${TILE_OUTLINE}`}
                 >
                   Refuse (−1 FP)
                 </button>
               </div>
             </div>
           ))}
-        </div>
+        </section>
       )}
 
       {/* The local PC's invokable aspects — each Invoke gated on the economy. */}
-      {me && (
-        <div data-testid="fate-invoke-rack" className="flex flex-col gap-1">
-          {me.aspects.map((a) => {
-            const armed = pending?.aspect === a.text;
-            return (
-              <div key={a.text} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid={`fate-invoke-${a.text}`}
-                  data-armed={armed ? "true" : "false"}
-                  disabled={sealedWaiting || !canInvoke(me, a.free_invokes)}
-                  onClick={() => toggleInvoke(a.text)}
-                >
-                  Invoke
-                </button>
-                <span>{a.text}</span>
-                {a.free_invokes > 0 && (
-                  <span style={{ color: FOLIO.accent }}>({a.free_invokes} free)</span>
-                )}
-                {armed && (
-                  <span data-testid="fate-invoke-mode" className="flex gap-1">
-                    <button
-                      type="button"
-                      data-testid="fate-invoke-mode-bonus"
-                      data-selected={pending?.mode === "bonus" ? "true" : "false"}
-                      disabled={sealedWaiting}
-                      onClick={() => setMode("bonus")}
-                    >
-                      +2
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="fate-invoke-mode-reroll"
-                      data-selected={pending?.mode === "reroll" ? "true" : "false"}
-                      disabled={sealedWaiting}
-                      onClick={() => setMode("reroll")}
-                    >
-                      Reroll
-                    </button>
-                  </span>
-                )}
-              </div>
-            );
-          })}
+      {me && me.aspects.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <div className={SECTION_LABEL}>Aspects</div>
+          <div data-testid="fate-invoke-rack" className="flex flex-col gap-1.5">
+            {me.aspects.map((a) => {
+              const armed = pending?.aspect === a.text;
+              return (
+                <div key={a.text} className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    data-testid={`fate-invoke-${a.text}`}
+                    data-armed={armed ? "true" : "false"}
+                    disabled={sealedWaiting || !canInvoke(me, a.free_invokes)}
+                    onClick={() => toggleInvoke(a.text)}
+                    title={
+                      a.free_invokes > 0
+                        ? `${a.free_invokes} free invoke(s)`
+                        : "Spends 1 Fate Point"
+                    }
+                    className={`${CHIP} ${
+                      armed
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background hover:bg-muted"
+                    }`}
+                  >
+                    {a.free_invokes > 0 ? "Invoke (free)" : "Invoke (1 FP)"}
+                  </button>
+                  <span className="text-sm flex-1">{a.text}</span>
+                  {a.free_invokes > 0 && (
+                    <span style={{ color: FOLIO.accent }} className="text-xs">
+                      ({a.free_invokes} free)
+                    </span>
+                  )}
+                  {armed && (
+                    <span data-testid="fate-invoke-mode" className="flex gap-1">
+                      <button
+                        type="button"
+                        data-testid="fate-invoke-mode-bonus"
+                        data-selected={pending?.mode === "bonus" ? "true" : "false"}
+                        disabled={sealedWaiting}
+                        onClick={() => setMode("bonus")}
+                        className={`${CHIP} ${
+                          pending?.mode === "bonus"
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background hover:bg-muted"
+                        }`}
+                      >
+                        +2
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="fate-invoke-mode-reroll"
+                        data-selected={pending?.mode === "reroll" ? "true" : "false"}
+                        disabled={sealedWaiting}
+                        onClick={() => setMode("reroll")}
+                        className={`${CHIP} ${
+                          pending?.mode === "reroll"
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background hover:bg-muted"
+                        }`}
+                      >
+                        Reroll
+                      </button>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Your move — describe (optional flourish) → pick skill → pick the Other →
+          act. A roll verb ARMS the dF thrower (ADR-148) rather than dispatching
+          synchronously; Concede stays a pre-roll FATE_ACTION. Controls are dead while
+          a sealed round resolves OR while a throw is already armed (mid-throw). */}
+      <section className="flex flex-col gap-2">
+        <div className={SECTION_LABEL}>Your Move</div>
+
+        {/* Freeform flourish that rides the next tile as narrator color. */}
+        <input
+          data-testid="fate-freeform-input"
+          value={freeform}
+          placeholder="Describe your move (e.g. 'I swing from the chandelier and fire')"
+          disabled={sealedWaiting}
+          onChange={(e) => setFreeform(e.target.value)}
+          className={FIELD_CLS}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {/* Skill the action resolves on (server validates; client mirrors). */}
+          {skills.length > 0 && (
+            <label className="flex flex-1 flex-col gap-1 min-w-[8rem]">
+              <span className={SECTION_LABEL}>Skill</span>
+              <select
+                data-testid="fate-skill-select"
+                value={activeSkill}
+                disabled={sealedWaiting}
+                onChange={(e) => setSkill(e.target.value)}
+                className={FIELD_CLS}
+              >
+                {skills.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name} ({s.ladder})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {/* The Other an attack targets — opponent-side participants. Always present
+              in a conflict (ADR-116: a confrontation requires an Other). */}
+          {opponents.length > 0 && (
+            <label className="flex flex-1 flex-col gap-1 min-w-[8rem]">
+              <span className={SECTION_LABEL}>Target</span>
+              <select
+                data-testid="fate-target-select"
+                value={activeTarget}
+                disabled={sealedWaiting}
+                onChange={(e) => setTarget(e.target.value)}
+                className={FIELD_CLS}
+              >
+                {opponents.map((o) => (
+                  <option key={o.name} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
-      )}
 
-      {/* Freeform flourish that rides the next tile as narrator color. */}
-      <input
-        data-testid="fate-freeform-input"
-        value={freeform}
-        placeholder="Describe your move (e.g. 'I swing from the chandelier and fire')"
-        disabled={sealedWaiting}
-        onChange={(e) => setFreeform(e.target.value)}
-      />
-
-      {/* Skill the action resolves on (server validates; client mirrors). */}
-      {skills.length > 0 && (
-        <select
-          data-testid="fate-skill-select"
-          value={activeSkill}
-          disabled={sealedWaiting}
-          onChange={(e) => setSkill(e.target.value)}
-        >
-          {skills.map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.name} ({s.ladder})
-            </option>
+        <div className="flex flex-wrap gap-2">
+          {PROACTIVE.map(({ verb, label }) => (
+            <button
+              key={verb}
+              type="button"
+              data-testid={`fate-action-${verb}`}
+              disabled={sealedWaiting || armed !== null}
+              onClick={() => armThrow(verb)}
+              className={`${TILE_BASE} ${VERB_WEIGHT[verb]}`}
+            >
+              {label}
+            </button>
           ))}
-        </select>
-      )}
-
-      {/* The Other an attack targets — opponent-side participants. Always present
-          in a conflict (ADR-116: a confrontation requires an Other). */}
-      {opponents.length > 0 && (
-        <select
-          data-testid="fate-target-select"
-          value={activeTarget}
-          disabled={sealedWaiting}
-          onChange={(e) => setTarget(e.target.value)}
-        >
-          {opponents.map((o) => (
-            <option key={o.name} value={o.name}>
-              {o.name}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* Proactive-action tiles + the Concede control. A roll verb ARMS the dF
-          thrower (ADR-148) rather than dispatching synchronously; Concede stays a
-          pre-roll FATE_ACTION. Disabled while a sealed round resolves OR while a
-          throw is already armed (the player is mid-throw). */}
-      <div className="flex gap-2">
-        {PROACTIVE.map(({ verb, label }) => (
+          {/* Concede sits apart and reads quiet so it can never be mistaken for the
+              primary Attack (DRIVER: the two were visually identical). */}
           <button
-            key={verb}
             type="button"
-            data-testid={`fate-action-${verb}`}
+            data-testid="fate-action-concede"
             disabled={sealedWaiting || armed !== null}
-            onClick={() => armThrow(verb)}
+            onClick={concede}
+            className={`${TILE_BASE} ${TILE_QUIET} ml-auto`}
           >
-            {label}
+            Concede
           </button>
-        ))}
-        <button
-          type="button"
-          data-testid="fate-action-concede"
-          disabled={sealedWaiting || armed !== null}
-          onClick={concede}
-        >
-          Concede
-        </button>
-      </div>
+        </div>
+      </section>
 
       {/* ADR-148 / Story 126-7: the dF thrower for an armed proactive roll. The
           player throws four Fudge dice; on settle the tray submits the FATE_THROW
           (the settled faces ARE the roll). Mounted only while armed. */}
       {armed && (
-        <div data-testid="fate-throw-armed" className="flex flex-col gap-2">
+        <div
+          data-testid="fate-throw-armed"
+          className="flex flex-col gap-2 rounded-md border border-accent/40 p-2"
+        >
           <FateDiceTray
             mode="thrower"
             action={armed.verb}
@@ -538,14 +696,22 @@ export function FateConflictSurface({
             ruleset={ruleset}
             onThrow={onTrayThrow}
           />
-          <button type="button" data-testid="fate-throw-cancel" onClick={cancelThrow}>
+          <button
+            type="button"
+            data-testid="fate-throw-cancel"
+            onClick={cancelThrow}
+            className={`${TILE_BASE} ${TILE_QUIET} self-start`}
+          >
             Cancel
           </button>
         </div>
       )}
 
       {sealedWaiting && (
-        <p data-testid="fate-sealed-hint" style={{ color: FOLIO.inkSoft }}>
+        <p
+          data-testid="fate-sealed-hint"
+          className="text-sm italic text-muted-foreground"
+        >
           Committed — waiting for the round to resolve…
         </p>
       )}
