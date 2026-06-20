@@ -14,7 +14,7 @@
  * exactly as InlineDiceTray.test.tsx mocks them (no WebGL in jsdom); the
  * dice-lib mock captures the props FateDiceTray hands DiceScene.
  */
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 // R3F + drei mocks — no WebGL in jsdom.
@@ -44,6 +44,13 @@ vi.mock("@local/dice-lib", () => ({
   },
   D6_RADIUS: 0.36,
   DEFAULT_DICE_THEME: { dieColor: "#4a1a3a", labelColor: "#d4af37" },
+  // The default-throw builder the visible Throw button (and the keyboard) fire.
+  buildDefaultThrowParams: () => ({
+    position: [0, 0.5, 0],
+    linearVelocity: [0, 4, -1],
+    angularVelocity: [0.5, 0.5, 0.5],
+    rotation: [0, 0, 0],
+  }),
   replayThrowParams: (
     wire: { velocity: number[]; angular: number[]; position: number[] },
     seed: number,
@@ -187,5 +194,35 @@ describe("FateDiceTray", () => {
     const theme = sceneProps.current!.theme as { labelFont?: string };
     expect(theme.labelFont).toBeTruthy();
     expect(theme.labelFont).not.toMatch(/^https?:\/\//);
+  });
+
+  // -- sq-playtest 2026-06-19: a discoverable throw trigger ---------------------
+  // The drag-flick was the only discoverable way to roll (and it's finicky); the
+  // keyboard throw existed but was hidden. The thrower tray must surface a visible
+  // "Throw" button wired to the same default-throw path.
+
+  it("thrower tray surfaces a visible Throw button that drives the roll to a FATE_THROW", () => {
+    const onThrow = vi.fn();
+    render(
+      <FateDiceTray
+        mode="thrower"
+        action="attack"
+        skill="Shoot"
+        requestId="req-1"
+        ruleset="fate"
+        genreSlug="pulp_noir"
+        onThrow={onThrow}
+      />,
+    );
+    const button = screen.getByTestId("fate-throw-button");
+    expect(button).toBeInTheDocument();
+    // Clicking it arms the same throw path a flick/keypress would; settling submits.
+    fireEvent.click(button);
+    act(() => {
+      (sceneProps.current!.onAllSettle as (f: number[]) => void)([1, 0, -1, 0]);
+    });
+    expect(onThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "attack", face: [1, 0, -1, 0] }),
+    );
   });
 });
