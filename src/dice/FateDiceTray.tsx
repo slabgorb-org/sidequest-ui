@@ -41,8 +41,14 @@ import type { FateRollPayload, FateThrowPayload } from "@/types/payloads";
 // app's own public/ directory instead: /fonts/Inter-Bold.ttf is same-origin (no
 // CORS/worker flake), needs no CDN/R2 round-trip, and is copied into dist/ on a
 // production build — so it resolves in dev AND prod, offline included.
+// A DARK die body (not the default ivory) so the four Fudge cubes pop off the
+// pale parchment background and the bright per-value face glyphs (green + / red −
+// / near-white 0, coloured in dice-lib's FaceLabels) read at a glance — the ivory
+// die on cream was invisible and its faces unreadable (Keith, sq-playtest 2026-06-20).
 const FATE_DICE_THEME: DiceTheme = {
   ...DEFAULT_DICE_THEME,
+  dieColor: "#26262e",
+  labelColor: "#ece9e0",
   labelFont: "/fonts/Inter-Bold.ttf",
 };
 
@@ -80,6 +86,46 @@ function faceGlyph(value: number): string {
   if (value > 0) return "+";
   if (value < 0) return "−";
   return "0";
+}
+
+/**
+ * A single 4dF face as a large, high-contrast, per-value COLORED chip so the
+ * three Fudge faces are unmistakable at a glance: green = +1, red = −1, grey = 0.
+ *
+ * The pre-fix readout drew `+ / 0 / −` as one thin same-colour line, which is
+ * illegible against the parchment theme (Keith, sq-playtest 2026-06-20: "I have
+ * no idea what the dice say — is it a diamond or a zero?"). Colours are inline so
+ * they never depend on the Tailwind palette/purge config — a roll readout must
+ * always render correctly. `aria-label` keeps the value readable to assistive tech.
+ */
+function FaceChip({ value }: { value: number }) {
+  const tone =
+    value > 0
+      ? { bg: "#15803d", fg: "#ffffff", border: "#166534" } // emerald
+      : value < 0
+        ? { bg: "#be123c", fg: "#ffffff", border: "#9f1239" } // rose
+        : { bg: "#e7e5e4", fg: "#57534e", border: "#a8a29e" }; // stone
+  return (
+    <span
+      aria-label={value > 0 ? "plus" : value < 0 ? "minus" : "zero"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        border: `2px solid ${tone.border}`,
+        backgroundColor: tone.bg,
+        color: tone.fg,
+        fontSize: 28,
+        fontWeight: 900,
+        lineHeight: 1,
+      }}
+    >
+      {faceGlyph(value)}
+    </span>
+  );
 }
 
 function formatShift(shifts: number): string {
@@ -123,16 +169,34 @@ function FateSpectatorTray({ roll }: FateDiceTraySpectatorProps) {
         </Canvas>
       </div>
 
-      {/* The legible readout — visible regardless of the 3D render. */}
-      <div className="flex items-baseline gap-3">
-        <span data-testid="fate-roll-faces">
-          {roll.dice.map(faceGlyph).join(" ")}
+      {/* The legible readout — visible regardless of the 3D render. The four
+          faces are large, per-value COLOURED chips (+ green / − red / 0 grey) so
+          the roll reads at a glance; the old thin one-colour "0 0 + +" line was
+          unreadable on the parchment theme (Keith, sq-playtest 2026-06-20). */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div data-testid="fate-roll-faces" className="flex gap-1.5">
+          {roll.dice.map((value, i) => (
+            <FaceChip key={i} value={value} />
+          ))}
+        </div>
+        <span data-testid="fate-roll-shift" className="text-2xl font-black tabular-nums leading-none">
+          {formatShift(roll.shifts)}
+          <span className="ml-1 text-base font-semibold text-muted-foreground">shifts</span>
         </span>
-        <span data-testid="fate-roll-shift">{formatShift(roll.shifts)} shifts</span>
-        <span data-testid="fate-roll-ladder">{roll.ladder_name}</span>
-        <span data-testid="fate-roll-tier">{roll.tier}</span>
+        <span data-testid="fate-roll-ladder" className="text-lg font-semibold">
+          {roll.ladder_name}
+        </span>
+        <span data-testid="fate-roll-tier" className="text-sm text-muted-foreground">
+          {roll.tier}
+        </span>
         {roll.succeeded_with_style && (
-          <span data-testid="fate-roll-style">Succeed with Style!</span>
+          <span
+            data-testid="fate-roll-style"
+            style={{ backgroundColor: "#fcd34d", color: "#451a03" }}
+            className="rounded-full px-2.5 py-0.5 text-sm font-bold shadow-sm"
+          >
+            ★ Succeed with Style!
+          </span>
         )}
       </div>
     </div>

@@ -14,7 +14,7 @@
  * exactly as InlineDiceTray.test.tsx mocks them (no WebGL in jsdom); the
  * dice-lib mock captures the props FateDiceTray hands DiceScene.
  */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 // R3F + drei mocks — no WebGL in jsdom.
@@ -113,6 +113,21 @@ describe("FateDiceTray", () => {
     expect(screen.getByTestId("fate-roll-shift")).toHaveTextContent("2");
     expect(screen.getByTestId("fate-roll-ladder")).toHaveTextContent("Great");
     expect(screen.getByTestId("fate-roll-tier")).toHaveTextContent(/Succeed/i);
+  });
+
+  // -- AC-U2b (sq-playtest 2026-06-20): per-value legible face readout ----------
+  // A thin one-colour "0 0 + +" line was unreadable on the parchment theme ("I have
+  // no idea what the dice say — is it a diamond or a zero?"). Each face now renders
+  // as its own colour-coded chip carrying a value aria-label (+ → plus, − → minus,
+  // 0 → zero) so the result reads at a glance and to assistive tech.
+
+  it("renders each face as a per-value labelled chip (+ → plus, − → minus, 0 → zero)", () => {
+    // SUCCEED.dice = [1, 1, 0, -1] → plus, plus, zero, minus
+    render(<FateDiceTray roll={SUCCEED} ruleset="fate" genreSlug="pulp_noir" />);
+    const faces = screen.getByTestId("fate-roll-faces");
+    expect(within(faces).getAllByLabelText("plus")).toHaveLength(2);
+    expect(within(faces).getAllByLabelText("zero")).toHaveLength(1);
+    expect(within(faces).getAllByLabelText("minus")).toHaveLength(1);
   });
 
   it("highlights succeed-with-style only when the roll earned it", () => {
