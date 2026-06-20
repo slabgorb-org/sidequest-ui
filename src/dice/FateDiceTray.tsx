@@ -23,6 +23,7 @@ import {
   DiceScene,
   DEFAULT_DICE_THEME,
   replayThrowParams,
+  buildDefaultThrowParams,
   D6_RADIUS,
   type DiceTheme,
   type ThrowParams,
@@ -199,6 +200,23 @@ function FateThrowerTray({
       </div>
       <div data-testid="fate-throw-hint" className="text-sm opacity-80">
         Throw your four Fudge dice for {action.replace("_", " ")} ({skill}).
+      </div>
+      {/* sq-playtest 2026-06-19: the drag-flick was the only DISCOVERABLE trigger
+          and it is finicky (the Space/Enter keyboard throw already existed but was
+          hidden — window listener, no UI hint). Surface a visible primary "Throw"
+          button wired to the SAME default-throw path (buildDefaultThrowParams), and
+          name the flick + keyboard alternatives. Low-friction default (Alex). */}
+      <div className="mt-1 flex items-center gap-2">
+        <button
+          type="button"
+          data-testid="fate-throw-button"
+          disabled={throwParams !== null}
+          onClick={() => handleSceneThrow(buildDefaultThrowParams())}
+          className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/85 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+          {throwParams !== null ? "Rolling…" : "Throw dice"}
+        </button>
+        <span className="text-xs text-muted-foreground">or flick a die · Space / Enter</span>
       </div>
     </div>
   );
