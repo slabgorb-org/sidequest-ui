@@ -239,6 +239,15 @@ export function FateConflictSurface({
   // server is the economy authority; the panel only reflects FATE_STATE.
   const compels = conflict.pending_compels ?? [];
 
+  // spec 2026-06-17 §2: Attack is a Conflict-only action. A Contest has no stress/
+  // consequences, and the server rejects an attack in one loudly (fate_dispatch_error).
+  // Gate the rack by encounter kind so a Contest exposes only Overcome + Create
+  // Advantage (Concede sits apart, always available) — never a verb the engine will
+  // always reject and waste the player's 4dF throw on.
+  const proactiveVerbs = conflict.is_contest
+    ? PROACTIVE.filter(({ verb }) => verb !== "attack")
+    : PROACTIVE;
+
   // Story 126-17 (ADR-148/149): the pending DEFEND barrier for THIS PC. The
   // server broadcasts one request per attacked PC and the client filters by
   // defender (the request can name any seated PC). Suppressed once answered.
@@ -780,7 +789,7 @@ export function FateConflictSurface({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {PROACTIVE.map(({ verb, label }) => (
+          {proactiveVerbs.map(({ verb, label }) => (
             <button
               key={verb}
               type="button"
