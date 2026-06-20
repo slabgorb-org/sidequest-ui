@@ -97,13 +97,16 @@ describe("useLiveSource test-session filtering (story 126-34)", () => {
 
     act(() => {
       // A live event tagged with a test-session slug must not register the
-      // session as a selectable live session.
+      // session as a selectable live session — both prefixes, via the stream.
       driveEvent!(turnComplete("test-elsewhere-99999999", 1));
-      driveEvent!(turnComplete(REAL, 2));
+      driveEvent!(turnComplete("tool-test-elsewhere-88888888", 2));
+      driveEvent!(turnComplete(REAL, 3));
     });
 
     expect(
-      result.current.liveSessions.some((s) => s.startsWith("test-")),
+      result.current.liveSessions.some(
+        (s) => s.startsWith("test-") || s.startsWith("tool-test"),
+      ),
     ).toBe(false);
     expect(result.current.liveSessions).toContain(REAL);
   });
