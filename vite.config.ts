@@ -48,6 +48,17 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/audio-cdn/, ''),
       },
+      // Dice-font CDN proxy — same shape as /audio-cdn. troika-three-text
+      // fetches the dice face-label fonts (Inter-Bold + per-genre TTFs) in a
+      // blob web-worker; a cross-origin worker fetch to cdn.slabgorb.com flakes
+      // intermittently → blank dice (sq-playtest 2026-06-19). Routing the font
+      // URLs through this same-origin path makes the worker fetch reliable while
+      // keeping the fonts in R2. See src/dice/FateDiceTray.tsx + InlineDiceTray.tsx.
+      '/dice-cdn': {
+        target: 'https://cdn.slabgorb.com',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/dice-cdn/, ''),
+      },
     },
   },
   test: {
