@@ -295,3 +295,40 @@ describe("FateConflictSurface — the attack names an opponent (rework: Reviewer
     );
   });
 });
+
+describe("FateConflictSurface — mechanics-first legibility (sq-playtest 2026-06-19)", () => {
+  // The surface shipped with bare unstyled controls, no Fate-point counter, no
+  // win/progress feedback, and Attack visually identical to the give-up Concede.
+  // These cover the UI-tier legibility fixes (the win/opponent-track meter needs a
+  // server projection and is a separate follow-up).
+
+  it("shows the live Fate-point count so the Invoke economy is legible", () => {
+    renderSurface({ fateState: fateState({ heroFatePoints: 3 }) });
+    expect(screen.getByTestId("fate-conflict-fate-points")).toHaveTextContent("3");
+  });
+
+  it("renders the local PC's stress track (own absorption mid-exchange)", () => {
+    renderSurface();
+    // The fixture seeds one physical stress box (value 1); the empty mental track is omitted.
+    const boxes = screen.getAllByTestId("fate-conflict-stress-box");
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0]).toHaveAttribute("data-checked", "false");
+    expect(boxes[0]).toHaveTextContent("1");
+  });
+
+  it("renders the local PC's consequence slots", () => {
+    renderSurface();
+    const cons = screen.getAllByTestId("fate-conflict-consequence");
+    expect(cons).toHaveLength(1);
+    expect(cons[0]).toHaveAttribute("data-filled", "false");
+    expect(cons[0]).toHaveTextContent(/mild/i);
+  });
+
+  it("weights Attack as the primary action and Concede as quiet (never identical)", () => {
+    renderSurface();
+    // Attack carries the primary fill; Concede must NOT, so the give-up control can
+    // never be mistaken for the primary action (the reported affordance bug).
+    expect(screen.getByTestId("fate-action-attack").className).toContain("bg-primary");
+    expect(screen.getByTestId("fate-action-concede").className).not.toContain("bg-primary");
+  });
+});
