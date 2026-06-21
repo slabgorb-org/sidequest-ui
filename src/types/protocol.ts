@@ -15,6 +15,12 @@
 export const MessageType = {
   PARTY_STATUS: "PARTY_STATUS",
   MAP_UPDATE: "MAP_UPDATE",
+  // ADR-055 / story 153-25: the dungeon room-graph frame. The server already
+  // broadcasts this alongside the surface-cartography MAP_UPDATE
+  // (sidequest-server .../map_emit.py `emit_fn(msg, "DUNGEON_MAP")`); it carries
+  // the discovered room graph (explored[] with room_exits) so the Map tab can
+  // draw the maze the player is standing in, not just the surface regions.
+  DUNGEON_MAP: "DUNGEON_MAP",
   PLAYER_ACTION: "PLAYER_ACTION",
   NARRATION: "NARRATION",
   TURN_STATUS: "TURN_STATUS",
