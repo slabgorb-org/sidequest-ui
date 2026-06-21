@@ -1251,6 +1251,26 @@ export interface FatePendingCompel {
   offered_delta: number;
 }
 
+/** One resolved action in the MOST RECENT Fate exchange — the legible attack/defend
+ *  math the conflict surface renders (FATE-CONFLICT-SEQUENCE-OPAQUE, sq-playtest
+ *  2026-06-20). `actor`/`target` are names; the surface localizes "You"/"you" when
+ *  they match the local PC. NPC dice stay hidden (ADR-148); `opposition_total` is the
+ *  defender's derived TOTAL, which is fair to show. `outcome` ∈ miss|tie|absorbed|
+ *  taken_out|conceded (attack) / advantage|boost|fail (create-advantage) /
+ *  overcome|cost|fail (overcome). `detail` is a short human result line. */
+export interface FateExchangeLine {
+  actor: string;
+  action: string;
+  skill?: string;
+  target?: string;
+  defense_skill?: string;
+  actor_total?: number;
+  opposition_total?: number;
+  shifts?: number;
+  outcome?: string;
+  detail?: string;
+}
+
 /** The active Fate conflict's participants by side, in seating order.
  *  `pending_compels` (ADR-144 F3e) are the narrator's offered compels awaiting
  *  accept/refuse — the player surface gates its control on this list. */
@@ -1266,6 +1286,11 @@ export interface FateConflictEntry {
   // it: a Contest exposes Overcome + Create Advantage (+ Concede), never Attack —
   // the server rejects an attack in a Contest loudly (fate_dispatch_error).
   is_contest?: boolean;
+  // FATE-CONFLICT-SEQUENCE-OPAQUE (sq-playtest 2026-06-20): the most recent exchange's
+  // per-action resolution ledger — the legible attack/defend math, replaced wholesale
+  // each exchange. Optional/back-compat (ProtocolBase drops empty lists from the wire);
+  // the surface reads it as `?? []`.
+  last_exchange?: FateExchangeLine[];
 }
 
 /** Full Fate-spine snapshot: per-PC sheets + scene situation aspects (incl.
