@@ -3,6 +3,7 @@ import type {
   FateCharacterEntry,
   FateConflictParticipant,
   FateDefendRequestPayload,
+  FateExchangeLine,
   FateRollPayload,
   FateStatePayload,
   FateThrowPayload,
@@ -182,6 +183,48 @@ function opponentProgress(
   return { used, capacity, pct, atThreshold: used >= capacity };
 }
 
+/** FATE-CONFLICT-SEQUENCE-OPAQUE (sq-playtest 2026-06-20): the resolution-ledger
+ *  clause for one exchange line — everything UP TO the outcome, which the caller
+ *  renders as a colored badge. Localizes "You"/"you" when an actor is the local PC,
+ *  and conjugates the verb (2nd vs 3rd person) so "You attack" / "Queen attacks" both
+ *  read naturally. NPC dice stay hidden (ADR-148); the derived TOTALS are shown. */
+function exchangeClause(line: FateExchangeLine, me: string): string {
+  const subjectIsMe = line.actor === me;
+  const subject = subjectIsMe ? "You" : line.actor;
+  const verb =
+    line.action === "attack"
+      ? subjectIsMe
+        ? "attack"
+        : "attacks"
+      : line.action === "create_advantage"
+        ? subjectIsMe
+          ? "create an advantage"
+          : "creates an advantage"
+        : subjectIsMe
+          ? "overcome"
+          : "overcomes";
+  const total = typeof line.actor_total === "number" ? ` ${line.actor_total}` : "";
+  const skillClause = line.skill ? ` ${line.skill}${total}` : total;
+  let clause = `${subject} ${verb}${skillClause}`;
+  if (line.action === "attack" && line.target) {
+    const defenderIsMe = line.target === me;
+    const dtotal = typeof line.opposition_total === "number" ? ` ${line.opposition_total}` : "";
+    const dskill = line.defense_skill ? ` ${line.defense_skill}` : "";
+    clause += defenderIsMe
+      ? ` → you defend${dskill}${dtotal}`
+      : ` → ${line.target} defends${dskill}${dtotal}`;
+  }
+  return `${clause} →`;
+}
+
+/** A landed/landing hit reads in the destructive tint; a no-harm or positive result
+ *  reads in the default ink. Keeps the outcome legible at a glance (mechanics-first). */
+function outcomeTint(outcome: string | undefined): string | undefined {
+  return outcome === "absorbed" || outcome === "taken_out"
+    ? "var(--destructive)"
+    : undefined;
+}
+
 export function FateConflictSurface({
   fateState,
   fateRoll,
@@ -238,6 +281,11 @@ export function FateConflictSurface({
   // ADR-144 F3e: the narrator's offered compels awaiting accept/refuse. The
   // server is the economy authority; the panel only reflects FATE_STATE.
   const compels = conflict.pending_compels ?? [];
+  // FATE-CONFLICT-SEQUENCE-OPAQUE (sq-playtest 2026-06-20): the most recent exchange's
+  // per-action resolution ledger — the legible attack/defend math, server-authored
+  // (never narrator-improvised). `?? []` for back-compat (ProtocolBase drops empty
+  // lists from the wire). Most-recent action first.
+  const lastExchange = conflict.last_exchange ?? [];
 
   // spec 2026-06-17 §2: Attack is a Conflict-only action. A Contest has no stress/
   // consequences, and the server rejects an attack in one loudly (fate_dispatch_error).
@@ -549,6 +597,37 @@ export function FateConflictSurface({
           </section>
         );
       })}
+
+      {/* FATE-CONFLICT-SEQUENCE-OPAQUE (sq-playtest 2026-06-20, Keith-flagged): the
+          per-exchange resolution ledger. Before this, an attack→defend exchange
+          "silently returned to my turn" — the only feedback was narrator prose, which
+          could omit or improvise the math. Now the server projects the derived
+          attacker/defender totals + outcome (NPC dice stay hidden per ADR-148; the
+          TOTALS do not), and we render them deterministically. Mechanics-first
+          legibility (Sebastien/Jade): the result is engine-sourced, not the lie. */}
+      {lastExchange.length > 0 && (
+        <section data-testid="fate-last-exchange" className="flex flex-col gap-1">
+          <div className={SECTION_LABEL}>Last Exchange</div>
+          <ul className="flex flex-col gap-1 text-sm leading-snug">
+            {lastExchange.map((line, i) => (
+              <li
+                key={`${line.actor}-${line.action}-${i}`}
+                data-testid="fate-last-exchange-line"
+                data-actor={line.actor}
+                data-outcome={line.outcome}
+                className="flex flex-wrap items-baseline gap-x-1 tabular-nums"
+              >
+                <span>{exchangeClause(line, actorName)}</span>
+                {line.detail && (
+                  <span className="font-semibold" style={{ color: outcomeTint(line.outcome) }}>
+                    {line.detail}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Story 126-17 (ADR-148/149): the DEFEND barrier. When the server parks the
           round on this PC's defense it broadcasts the committed attack; the player
