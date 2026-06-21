@@ -82,20 +82,22 @@ function formatRating(rating: number): string {
   return rating >= 0 ? `+${rating}` : `${rating}`;
 }
 
-// No legitimate aspect carries more than a handful of free invokes; cap the
-// rendered pip count well above that. free_invokes rides the FATE_STATE wire
-// payload, so a malformed/huge/non-finite value would otherwise allocate a
-// pathological array here — Array.from({ length: 1e9 }) materializes a billion
-// nodes and Array.from({ length: Infinity }) throws RangeError — a browser-tab
-// DoS (Story 125-6, 118-2 Reviewer finding).
-const MAX_FREE_INVOKE_PIPS = 12;
+// Several Fate-sheet sections render one small marker per wire-supplied count:
+// fate-point tokens (one per `refresh`) and an aspect's free-invoke pips (one per
+// `free_invokes`). Those counts ride the FATE_STATE payload, so a malformed/huge/
+// non-finite value would allocate a pathological array — Array.from({ length: 1e9 })
+// materializes a billion nodes and Array.from({ length: Infinity }) throws
+// RangeError — a browser-tab DoS (Story 125-6, 118-2 Reviewer finding). EVERY such
+// Array.from length goes through clampPipCount.
+const MAX_PIP_COUNT = 12;
 
-/** Clamp an aspect's free-invoke count to a sane, bounded pip count. Accepts a
- *  possibly-missing wire value: `?? 0` defaults null/undefined to 0 (a malformed
- *  payload), Math.max floors negatives at 0, Math.min caps the huge/Infinity
- *  case at MAX_FREE_INVOKE_PIPS. A falsy-but-valid 0 stays 0. */
-function clampFreeInvokes(freeInvokes: number | null | undefined): number {
-  return Math.min(Math.max(0, freeInvokes ?? 0), MAX_FREE_INVOKE_PIPS);
+/** Clamp a wire-supplied marker count (fate-point tokens / free-invoke pips) to a
+ *  sane, bounded value before it becomes an `Array.from` length. Accepts a possibly-
+ *  missing wire value: `?? 0` defaults null/undefined to 0 (a malformed payload),
+ *  Math.max floors negatives at 0, Math.min caps the huge/Infinity case at
+ *  MAX_PIP_COUNT. A falsy-but-valid 0 stays 0. */
+function clampPipCount(count: number | null | undefined): number {
+  return Math.min(Math.max(0, count ?? 0), MAX_PIP_COUNT);
 }
 
 /** Crimson uppercase section header with optional right-aligned meta — the
@@ -149,8 +151,10 @@ const SECTION_STYLE: CSSProperties = {
  *  restyle, so the prototype's clickable tokens are omitted, not rendered
  *  dead). */
 function FatePoints({ points, refresh }: { points: number; refresh: number }) {
-  // One token per point of Refresh; the first `points` read as available.
-  const tokens = Array.from({ length: Math.max(0, refresh) }, (_, i) => i < points);
+  // One token per point of Refresh; the first `points` read as available. The
+  // count is clamped (Story 125-6): refresh is wire data, so a malformed/huge/
+  // non-finite value must not allocate a pathological array (or throw on Infinity).
+  const tokens = Array.from({ length: clampPipCount(refresh) }, (_, i) => i < points);
   const hint =
     points > 0
       ? "Spend to invoke an aspect or refuse a compel."
@@ -378,7 +382,7 @@ function Aspects({ aspects }: { aspects: FateAspectEntry[] }) {
                       count is clamped (Story 125-6): free_invokes is wire data,
                       so a malformed/huge/non-finite value must not allocate a
                       pathological array here. */}
-                  {Array.from({ length: clampFreeInvokes(a.free_invokes) }).map((_, pip) => (
+                  {Array.from({ length: clampPipCount(a.free_invokes) }).map((_, pip) => (
                     <span
                       key={pip}
                       data-testid="fate-pip"
