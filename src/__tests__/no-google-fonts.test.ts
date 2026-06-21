@@ -43,11 +43,14 @@ describe("no Google Fonts in the UI shell", () => {
     expect(css).toMatch(/@import\s+["']\.\/styles\/fonts\.css["']/);
   });
 
-  it("the dice tray loads label faces from R2, not /public/fonts", () => {
+  it("the dice tray loads label faces from R2 via the same-origin proxy, not /public/fonts", () => {
     const src = read("src/dice/InlineDiceTray.tsx");
+    // Glyph faces must not come from the retired /public/fonts dir.
     expect(src).not.toMatch(/["'`]\/fonts\//);
-    expect(src).toContain(
-      "https://cdn.slabgorb.com/genre_packs/assets/fonts",
-    );
+    // Faces are served from R2 through the same-origin /dice-cdn Vite proxy
+    // (vite.config.ts rewrites it to cdn.slabgorb.com/genre_packs/assets/fonts).
+    // The bare cross-origin CDN URL flaked in troika's blob worker, so it was
+    // routed same-origin (#430, 2026-06-19).
+    expect(src).toContain("/dice-cdn/genre_packs/assets/fonts");
   });
 });
