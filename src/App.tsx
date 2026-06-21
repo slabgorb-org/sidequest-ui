@@ -37,6 +37,7 @@ import { makeRequestId } from "@/lib/utils";
 import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
 import { beatDispatchBlockReason, isItemUseBeat } from "@/lib/beatDispatch";
 import { toCharacterSummary, toCharacterSheetData } from "@/lib/partyStatusMapping";
+import { isDungeonMapPayload, dungeonMapToMapState } from "@/lib/dungeonMap";
 import {
   computeSubmittedPlayerIds,
   mergePeerRevealsWithSubmittedStatus,
@@ -1267,6 +1268,32 @@ function AppInner() {
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
+      return;
+    }
+    // ADR-055 / story 153-25: the dungeon room-graph frame. The server already
+    // broadcasts DUNGEON_MAP alongside the surface MAP_UPDATE (map_emit.py); it
+    // carries the discovered room graph. Route it into `mapData` so MapWidget
+    // renders the Automapper room graph while the PC is inside the dungeon,
+    // instead of leaving only the 2 surface cartography nodes (the bug). The
+    // dungeon wire omits x/y/fog_bounds, so we adapt it explicitly rather than
+    // blind-casting it into MapState. Fail loud on a malformed frame (No Silent
+    // Fallbacks) — a silent drop is exactly the defect this story fixes.
+    if (msg.type === MessageType.DUNGEON_MAP) {
+      if (!isDungeonMapPayload(msg.payload)) {
+        console.warn(
+          "[dungeon-map] dropped malformed DUNGEON_MAP frame (missing current_location/explored)",
+          msg.payload,
+        );
+        return;
+      }
+      const dungeonPayload = msg.payload;
+      setMapData(dungeonMapToMapState(dungeonPayload));
+      // Client-side consumption marker (story 153-25 AC-5): the server proves it
+      // SENT via the dungeon.map_emitted span; this proves the client RECEIVED
+      // and APPLIED the frame, so a playtest can confirm it isn't being dropped.
+      console.info(
+        `[dungeon-map] applied room-graph frame: rooms=${dungeonPayload.explored.length} current=${dungeonPayload.current_location}`,
+      );
       return;
     }
     // ADR-096 Task 20b: TACTICAL_GRID arrives on room entry and carries the
