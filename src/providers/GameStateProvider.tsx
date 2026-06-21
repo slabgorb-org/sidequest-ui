@@ -176,7 +176,17 @@ function loadGameStateFromStorage(): ClientGameState | null {
     const raw = sessionStorage.getItem(GAME_STATE_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ClientGameState;
-      if (parsed && typeof parsed.location === 'string') return parsed;
+      if (parsed && typeof parsed.location === 'string') {
+        // Story 125-6 (AC2): drop fateState on rehydration. It is a
+        // server-validated projection gated by the FATE_STATE boundary guard
+        // in useStateMirror (Array.isArray(characters/scene_aspects)); this
+        // rehydration path has NO such guard (only the location-string check
+        // above), so a once-malformed fateState persisted to sessionStorage
+        // would survive a reload and reach the Fate surfaces as wire garbage.
+        // It re-enters only via a fresh FATE_STATE message through the guard;
+        // HMR survival for the rest of the state is unaffected.
+        return { ...parsed, fateState: null };
+      }
     }
   } catch {
     // ignore corrupt sessionStorage

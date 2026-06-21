@@ -82,6 +82,22 @@ function formatRating(rating: number): string {
   return rating >= 0 ? `+${rating}` : `${rating}`;
 }
 
+// No legitimate aspect carries more than a handful of free invokes; cap the
+// rendered pip count well above that. free_invokes rides the FATE_STATE wire
+// payload, so a malformed/huge/non-finite value would otherwise allocate a
+// pathological array here — Array.from({ length: 1e9 }) materializes a billion
+// nodes and Array.from({ length: Infinity }) throws RangeError — a browser-tab
+// DoS (Story 125-6, 118-2 Reviewer finding).
+const MAX_FREE_INVOKE_PIPS = 12;
+
+/** Clamp an aspect's free-invoke count to a sane, bounded pip count. Accepts a
+ *  possibly-missing wire value: `?? 0` defaults null/undefined to 0 (a malformed
+ *  payload), Math.max floors negatives at 0, Math.min caps the huge/Infinity
+ *  case at MAX_FREE_INVOKE_PIPS. A falsy-but-valid 0 stays 0. */
+function clampFreeInvokes(freeInvokes: number | null | undefined): number {
+  return Math.min(Math.max(0, freeInvokes ?? 0), MAX_FREE_INVOKE_PIPS);
+}
+
 /** Crimson uppercase section header with optional right-aligned meta — the
  *  recurring band that opens every section of the sheet (FATE POINTS · THE
  *  LADDER · ASPECTS · …). */
@@ -358,8 +374,11 @@ function Aspects({ aspects }: { aspects: FateAspectEntry[] }) {
                   >
                     {a.text}
                   </span>
-                  {/* One pip per available free invoke (zero ⇒ no pips). */}
-                  {Array.from({ length: a.free_invokes }).map((_, pip) => (
+                  {/* One pip per available free invoke (zero ⇒ no pips). The
+                      count is clamped (Story 125-6): free_invokes is wire data,
+                      so a malformed/huge/non-finite value must not allocate a
+                      pathological array here. */}
+                  {Array.from({ length: clampFreeInvokes(a.free_invokes) }).map((_, pip) => (
                     <span
                       key={pip}
                       data-testid="fate-pip"
