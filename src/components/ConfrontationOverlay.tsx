@@ -463,6 +463,20 @@ function StatusLine({ data }: { data: ConfrontationData }) {
   const committedActors = Array.isArray(data.committed_actors)
     ? new Set(data.committed_actors)
     : null;
+  // Story 153-30: group the roster by faction `side` so allied PCs read as
+  // allies — "vs" marks ONLY the genuine player↔opponent boundary (ADR-116's
+  // "Other"), never the gap between two players. Opponents form the "them"
+  // camp; everyone else (players, neutrals, and legacy/missing-`side` actors)
+  // forms the "us" camp, so an absent `side` can never invent a false adversary
+  // boundary, and a single-side roster shows no "vs" at all. Mirrors how
+  // `ThemPanel` already reads `a.side` to pick the opponent.
+  const opponentActors = data.actors.filter((a) => a.side === "opponent");
+  const alliedActors = data.actors.filter((a) => a.side !== "opponent");
+  const hasFactionBoundary =
+    alliedActors.some((a) => a.side === "player") && opponentActors.length > 0;
+  const rosterGroups: EncounterActor[][] = hasFactionBoundary
+    ? [alliedActors, opponentActors]
+    : [data.actors];
   return (
     <div
       data-testid="dial-scoreboard"
@@ -473,26 +487,45 @@ function StatusLine({ data }: { data: ConfrontationData }) {
       }}
     >
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        {data.actors.map((a, i) => (
-          <span key={a.name} className="flex items-center gap-1.5">
-            {i > 0 && (
-              <span className="text-[10px] text-muted-foreground/60">vs</span>
-            )}
-            <ActorChip actor={a} />
-            {committedActors !== null && a.side === "player" && (
+        {rosterGroups.map((group, gi) => (
+          <span key={`roster-group-${gi}`} className="flex items-center gap-1.5">
+            {gi > 0 && (
+              // Cross-faction boundary: the single genuine "vs" (ADR-116's Other).
               <span
-                data-testid={`commitment-${a.name}`}
-                data-committed={committedActors.has(a.name) ? "true" : "false"}
-                className="text-[9px] uppercase tracking-wide flex-shrink-0"
-                style={{
-                  color: committedActors.has(a.name)
-                    ? "var(--encounter-player)"
-                    : "var(--muted-foreground)",
-                }}
+                data-testid="roster-vs"
+                className="text-[10px] text-muted-foreground/60"
               >
-                {committedActors.has(a.name) ? "Committed" : "Waiting"}
+                vs
               </span>
             )}
+            {group.map((a, ai) => (
+              <span key={a.name} className="flex items-center gap-1.5">
+                {ai > 0 && (
+                  // Intra-side separator: allies on the same side, never "vs".
+                  <span
+                    className="text-[10px] text-muted-foreground/40"
+                    aria-hidden="true"
+                  >
+                    ·
+                  </span>
+                )}
+                <ActorChip actor={a} />
+                {committedActors !== null && a.side === "player" && (
+                  <span
+                    data-testid={`commitment-${a.name}`}
+                    data-committed={committedActors.has(a.name) ? "true" : "false"}
+                    className="text-[9px] uppercase tracking-wide flex-shrink-0"
+                    style={{
+                      color: committedActors.has(a.name)
+                        ? "var(--encounter-player)"
+                        : "var(--muted-foreground)",
+                    }}
+                  >
+                    {committedActors.has(a.name) ? "Committed" : "Waiting"}
+                  </span>
+                )}
+              </span>
+            ))}
           </span>
         ))}
       </div>
