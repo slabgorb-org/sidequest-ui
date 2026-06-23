@@ -64,6 +64,7 @@ export interface ExploredLocation {
       hp: { current: number; max: number };
       ac: number; class_name?: string; speed?: number;
     }[];
+    features?: { feature_type: string; cell: { x: number; y: number }; label: string }[];
     settlement_description?: string | null;
     settlement_exits?: Record<string, unknown>[] | null;
   };

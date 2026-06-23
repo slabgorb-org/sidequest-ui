@@ -1,4 +1,4 @@
-import type { TacticalGridData } from "@/types/tactical";
+import type { FeatureType, TacticalGridData } from "@/types/tactical";
 
 interface WirePayload {
   room_id: string;
@@ -17,6 +17,7 @@ interface WirePayload {
     pois: [number, number][];
   } | null;
   tokens: WireToken[];
+  features?: { feature_type: string; cell: { x: number; y: number }; label: string }[];
 }
 
 interface WireToken {
@@ -54,6 +55,11 @@ export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
       id: t.id, name: t.name, initial: t.initial, faction: t.faction,
       cell: t.cell, hp: t.hp, ac: t.ac,
       className: t.class_name, speed: t.speed,
+    })),
+    features: (p.features ?? []).map(f => ({
+      feature_type: f.feature_type as FeatureType | "water",
+      cell: f.cell,
+      label: f.label,
     })),
   };
 }

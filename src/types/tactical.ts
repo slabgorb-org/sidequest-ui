@@ -47,6 +47,13 @@ export interface FeatureDef {
   readonly label: string;
 }
 
+/** A positioned tactical-map feature marker (ADR-096 token+feature phase). */
+export interface TacticalFeatureMarker {
+  readonly feature_type: FeatureType | "water";
+  readonly cell: { readonly x: number; readonly y: number };
+  readonly label: string;
+}
+
 /** Cardinal direction for exit gap identification. */
 export type CardinalDirection = "north" | "east" | "south" | "west";
 
@@ -164,4 +171,5 @@ export interface TacticalGridData {
   readonly cellular: CavernCellularParams | null;
   readonly derived: CavernDerivedData;
   readonly tokens: readonly TacticalToken[];
+  readonly features: readonly TacticalFeatureMarker[];
 }
