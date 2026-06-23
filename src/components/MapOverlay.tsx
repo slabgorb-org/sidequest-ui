@@ -57,14 +57,16 @@ export interface ExploredLocation {
       exits: Record<string, [number, number] | null>;
       pois: [number, number][];
     } | null;
+    // Real server wire shape — token_id/label/position; faction/hp/ac always
+    // present for PCs and revealed creatures (populated by map_emit.py).
     tokens: {
-      id: string; name: string; initial: string;
-      faction: "player" | "ally" | "neutral" | "hostile";
-      cell: { x: number; y: number };
-      hp: { current: number; max: number };
-      ac: number; class_name?: string; speed?: number;
+      token_id: string; label: string; position: [number, number];
+      faction?: string;
+      hp?: { current: number; max: number } | null;
+      ac?: number | null;
     }[];
-    features?: { feature_type: string; cell: { x: number; y: number }; label: string }[];
+    // feature cell is an ARRAY [x,y] on the wire (uniform with other positions)
+    features?: { feature_type: string; cell: [number, number]; label: string }[];
     settlement_description?: string | null;
     settlement_exits?: Record<string, unknown>[] | null;
   };

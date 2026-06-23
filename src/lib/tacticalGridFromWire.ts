@@ -1,4 +1,18 @@
-import type { FeatureType, TacticalGridData } from "@/types/tactical";
+import type { FeatureType, TacticalGridData, TacticalToken } from "@/types/tactical";
+
+const FACTIONS = ["player", "ally", "neutral", "hostile"] as const;
+
+// Real server wire shape — matches sidequest-server TokenPayload (protocol/models.py).
+// token_id/label/position are always present; faction/hp/ac are always populated for
+// PCs and revealed creatures the server emits (see map_emit.py _place_tokens_on_anchors).
+interface WireToken {
+  token_id: string;
+  label: string;
+  position: [number, number];
+  faction?: string;               // server: "player"|"ally"|"neutral"|"hostile" (default "neutral")
+  hp?: { current: number; max: number } | null;
+  ac?: number | null;
+}
 
 interface WirePayload {
   room_id: string;
@@ -17,19 +31,8 @@ interface WirePayload {
     pois: [number, number][];
   } | null;
   tokens: WireToken[];
-  features?: { feature_type: string; cell: { x: number; y: number }; label: string }[];
-}
-
-interface WireToken {
-  id: string;
-  name: string;
-  initial: string;
-  faction: "player" | "ally" | "neutral" | "hostile";
-  cell: { x: number; y: number };
-  hp: { current: number; max: number };
-  ac: number;
-  class_name?: string;
-  speed?: number;
+  // feature cell is an ARRAY [x,y] on the wire (uniform with other positions)
+  features?: { feature_type: string; cell: [number, number]; label: string }[];
 }
 
 export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
@@ -51,14 +54,22 @@ export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
     cell_size: p.cell_size,
     cellular: p.cellular,
     derived: p.derived,
-    tokens: p.tokens.map(t => ({
-      id: t.id, name: t.name, initial: t.initial, faction: t.faction,
-      cell: t.cell, hp: t.hp, ac: t.ac,
-      className: t.class_name, speed: t.speed,
+    tokens: p.tokens.map((t): TacticalToken => ({
+      id: t.token_id,
+      name: t.label,
+      initial: (t.label?.[0] ?? "?").toUpperCase(),
+      faction: (FACTIONS as readonly string[]).includes(t.faction ?? "neutral")
+        ? ((t.faction ?? "neutral") as TacticalToken["faction"])
+        : "neutral",
+      cell: { x: t.position[0], y: t.position[1] },
+      // Server always sends hp/ac for PCs and revealed creatures; coalesce is
+      // defensive only (guards the impossible-miss path for TS satisfaction).
+      hp: t.hp ?? { current: 0, max: 0 },
+      ac: t.ac ?? 0,
     })),
     features: (p.features ?? []).map(f => ({
       feature_type: f.feature_type as FeatureType | "water",
-      cell: f.cell,
+      cell: { x: f.cell[0], y: f.cell[1] },   // ARRAY [x,y] → {x,y}
       label: f.label,
     })),
   };
