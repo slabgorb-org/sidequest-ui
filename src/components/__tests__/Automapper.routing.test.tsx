@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Automapper } from "@/components/Automapper";
+import type React from "react";
 
 describe("Automapper routing after dead-renderer retirement", () => {
   it("routes a single cavern room to the image renderer", () => {
@@ -12,8 +13,8 @@ describe("Automapper routing after dead-renderer retirement", () => {
         mask: "###\n#.#\n###", cavern_image_url: "/x.png", cell_size: 28, cellular: null,
         derived: { floor_count: 1, exits: {}, pois: [] }, tokens: [], features: [],
       },
-    }];
-    render(<Automapper rooms={rooms as any} currentRoomId="r" />);
+    }] as React.ComponentProps<typeof Automapper>["rooms"];
+    render(<Automapper rooms={rooms} currentRoomId="r" />);
     expect(screen.getByTestId("tactical-grid-renderer")).toBeInTheDocument();
   });
 });

@@ -20,7 +20,7 @@ describe("tacticalGridFromWire features", () => {
   });
 
   it("defaults features to [] when wire omits them", () => {
-    const { features, ...noFeatures } = wire;
+    const { features: _features, ...noFeatures } = wire;
     const grid = tacticalGridFromWire(noFeatures as typeof wire);
     expect(grid!.features).toEqual([]);
   });
