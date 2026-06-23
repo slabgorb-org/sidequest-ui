@@ -13,6 +13,7 @@ import { describe, it, expect, vi } from "vitest";
 import { MapWidget } from "../MapWidget";
 import type { MapState } from "@/components/MapOverlay";
 import type { OrbitalIntentResponse } from "@/types/orbital-intent";
+import { dungeonMapToMapState } from "@/lib/dungeonMap";
 
 function roomGraphMapState(): MapState {
   // Shape matches MAP_UPDATE emitted by build_room_graph_explored in
@@ -219,6 +220,48 @@ describe("MapWidget", () => {
     });
   });
 
+  // Story 158-6: the deep-view DUNGEON_MAP frame labels regions by their shared
+  // THEME display name, so distinct procedural regions arrive as duplicate
+  // "The Drowned Cavern" labels. `dungeonMapToMapState` disambiguates them; this
+  // proves the distinct labels survive the real adapter → MapWidget → Automapper
+  // render path and reach the on-screen <text> nodes (CLAUDE.md wiring rule).
+  describe("deep-view region labels (158-6)", () => {
+    it("renders distinct labels for theme-shared regions in the Automapper", () => {
+      const mapData = dungeonMapToMapState({
+        current_location: "exp001.r2",
+        region: "exp001.r2",
+        explored: [
+          {
+            id: "exp001.r1",
+            name: "The Drowned Cavern",
+            type: "region",
+            connections: ["exp001.r2"],
+            room_exits: [{ target: "exp001.r2", exit_type: "corridor" }],
+            room_type: "normal",
+            is_current_room: false,
+          },
+          {
+            id: "exp001.r2",
+            name: "The Drowned Cavern",
+            type: "region",
+            connections: ["exp001.r1"],
+            room_exits: [{ target: "exp001.r1", exit_type: "corridor" }],
+            room_type: "normal",
+            is_current_room: true,
+          },
+        ],
+      });
+      const { getByText, queryByText, getByTestId } = render(
+        <MapWidget mapData={mapData} />
+      );
+      // The deep map renders via the Automapper room-graph, not MapOverlay.
+      expect(getByTestId("map-panel-room-graph")).toBeInTheDocument();
+      // Distinct, numbered labels are on screen; the bare duplicate is gone.
+      expect(getByText("The Drowned Cavern 1")).toBeInTheDocument();
+      expect(getByText("The Drowned Cavern 2")).toBeInTheDocument();
+      expect(queryByText("The Drowned Cavern")).not.toBeInTheDocument();
+    });
+  });
 });
 // Note: The "tactical grid mode (single room with wire-format tactical_grid)" describe
 // block tested the old SVG-cell renderer path (cells: string[][], features sidecar).
