@@ -299,9 +299,8 @@ function toExploredRooms(mapData: MapState): ExploredRoom[] {
     // TACTICAL_GRID message (parked under `cavern_payload`); the renderer
     // takes them through TacticalGridRenderer. Settlement rooms route via
     // `room_type === "settlement"` and don't populate a grid here. The
-    // legacy `tactical_grid` wire field on MAP_UPDATE has a distinct shape
-    // (width/height/cells/features) that no current world emits — leave it
-    // unconsumed until a wire-to-LegacyTacticalGridData parser lands.
+    // legacy `tactical_grid` wire field on MAP_UPDATE (width/height/cells/features
+    // shape) is not emitted by any current world and remains unconsumed.
     cavernGrid: loc.cavern_payload
       ? (tacticalGridFromWire(loc.cavern_payload) ?? undefined)
       : undefined,
