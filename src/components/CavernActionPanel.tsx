@@ -9,6 +9,7 @@ export interface CavernActionPanelProps {
   readonly speed: number;
   readonly position: { x: number; y: number };
   readonly onAction: (id: CavernActionId) => void;
+  readonly actionsEnabled?: boolean;
 }
 
 const ACTIONS: { id: CavernActionId; label: string; primary?: boolean }[] = [
@@ -22,7 +23,7 @@ const ACTIONS: { id: CavernActionId; label: string; primary?: boolean }[] = [
 ];
 
 export function CavernActionPanel({
-  tokenName, className, hp, ac, speed, position, onAction,
+  tokenName, className, hp, ac, speed, position, onAction, actionsEnabled = false,
 }: CavernActionPanelProps) {
   return (
     <div data-testid="cavern-action-panel" className="space-y-3 p-3">
@@ -37,27 +38,29 @@ export function CavernActionPanel({
           <Row k="Position" v={`[${position.x},${position.y}]`} />
         </div>
       </div>
-      <div className="rounded border border-[var(--line)] bg-[var(--surface-2)] p-3">
-        <h3 className="mb-2 text-[10px] font-semibold tracking-widest uppercase text-[var(--text-dim)]">
-          Actions
-        </h3>
-        <div className="grid grid-cols-2 gap-1.5">
-          {ACTIONS.map(a => (
-            <button
-              key={a.id}
-              data-testid={`cavern-action-${a.id}`}
-              onClick={() => onAction(a.id)}
-              className={
-                a.primary
-                  ? "col-span-2 rounded bg-[var(--accent)] px-2 py-2 text-xs font-semibold text-[#1a1500] hover:bg-[#f5d660]"
-                  : "rounded border border-[var(--line)] bg-[var(--surface-3)] px-2 py-2 text-xs text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-              }
-            >
-              {a.label}
-            </button>
-          ))}
+      {actionsEnabled && (
+        <div className="rounded border border-[var(--line)] bg-[var(--surface-2)] p-3">
+          <h3 className="mb-2 text-[10px] font-semibold tracking-widest uppercase text-[var(--text-dim)]">
+            Actions
+          </h3>
+          <div className="grid grid-cols-2 gap-1.5">
+            {ACTIONS.map(a => (
+              <button
+                key={a.id}
+                data-testid={`cavern-action-${a.id}`}
+                onClick={() => onAction(a.id)}
+                className={
+                  a.primary
+                    ? "col-span-2 rounded bg-[var(--accent)] px-2 py-2 text-xs font-semibold text-[#1a1500] hover:bg-[#f5d660]"
+                    : "rounded border border-[var(--line)] bg-[var(--surface-3)] px-2 py-2 text-xs text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                }
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

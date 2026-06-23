@@ -695,6 +695,7 @@ describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
       cellular: { size: [3, 3] as [number, number], seed: 1, density: 0.55, cutoff: 5, passes: 4 },
       derived: { floor_count: 9, exits: {}, pois: [] as [number, number][] },
       tokens: [],
+      features: [],
     };
     const rooms = [
       {

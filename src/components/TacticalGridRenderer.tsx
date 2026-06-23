@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TacticalGridData, TacticalToken } from "@/types/tactical";
 import { CavernActionPanel } from "@/components/CavernActionPanel";
 import { chebyshevReachCells } from "@/lib/cellMath";
+import { FEATURE_MARKERS, FEATURE_COLORS, WATER_MARKER, WATER_COLOR } from "@/lib/featureGlyphs";
 
 export interface TacticalGridRendererProps {
   readonly grid: TacticalGridData;
@@ -43,6 +44,8 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
     const radius = Math.floor(selected.speed / 5);
     return chebyshevReachCells(selected.cell, radius, grid.mask);
   })();
+
+  const presentFeatureTypes = Array.from(new Set(grid.features.map(f => f.feature_type)));
 
   return (
     <div data-testid="tactical-grid-renderer" className="flex gap-4">
@@ -103,8 +106,68 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
               </button>
             );
           })}
+          {grid.features.map(f => {
+            const isWater = f.feature_type === "water";
+            const glyph = isWater ? WATER_MARKER : (FEATURE_MARKERS[f.feature_type] ?? "•");
+            const color = isWater ? WATER_COLOR : (FEATURE_COLORS[f.feature_type] ?? "#9CA3AF");
+            return (
+              <div
+                key={`feat-${f.feature_type}-${f.cell.x}-${f.cell.y}`}
+                data-testid={`feature-${f.feature_type}-${f.cell.x}-${f.cell.y}`}
+                title={f.label}
+                className="absolute pointer-events-none grid place-items-center"
+                style={{
+                  left: f.cell.x * cellSize, top: f.cell.y * cellSize,
+                  width: cellSize, height: cellSize,
+                  color, fontSize: Math.floor(cellSize * 0.6),
+                  textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+                }}
+              >
+                {glyph}
+              </div>
+            );
+          })}
+          {Object.entries(grid.derived.exits).map(([bearing, cell]) =>
+            cell ? (
+              <div
+                key={`exit-${bearing}`}
+                data-testid={`exit-${bearing}`}
+                title={`exit: ${bearing}`}
+                className="absolute pointer-events-none border-2 border-dashed"
+                style={{
+                  left: cell[0] * cellSize, top: cell[1] * cellSize,
+                  width: cellSize, height: cellSize,
+                  borderColor: "rgba(230,200,76,0.8)", borderRadius: 3,
+                }}
+              />
+            ) : null,
+          )}
+          {grid.derived.pois.map(([x, y]) => (
+            <div
+              key={`poi-${x}-${y}`}
+              data-testid={`poi-${x}-${y}`}
+              className="absolute pointer-events-none rounded-full"
+              style={{
+                left: x * cellSize + cellSize * 0.35, top: y * cellSize + cellSize * 0.35,
+                width: cellSize * 0.3, height: cellSize * 0.3,
+                background: "rgba(230,200,76,0.9)",
+              }}
+            />
+          ))}
         </div>
       </div>
+      {presentFeatureTypes.length > 0 && (
+        <div data-testid="feature-legend" className="text-xs space-y-1">
+          {presentFeatureTypes.map(ft => (
+            <div key={ft} data-testid={`legend-${ft}`} className="flex items-center gap-2">
+              <span style={{ color: ft === "water" ? WATER_COLOR : (FEATURE_COLORS[ft] ?? "#9CA3AF") }}>
+                {ft === "water" ? WATER_MARKER : (FEATURE_MARKERS[ft] ?? "•")}
+              </span>
+              <span className="opacity-80">{ft.replace(/_/g, " ")}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {selected && (
         <div className="w-80 flex-shrink-0">
           <CavernActionPanel
@@ -114,7 +177,8 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
             ac={selected.ac}
             speed={selected.speed ?? 30}
             position={selected.cell}
-            onAction={(_id) => { /* wired by future story */ }}
+            actionsEnabled={false}
+            onAction={() => {}}
           />
         </div>
       )}
