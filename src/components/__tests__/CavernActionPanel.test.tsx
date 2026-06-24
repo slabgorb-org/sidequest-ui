@@ -27,15 +27,22 @@ describe("CavernActionPanel", () => {
 
   it("calls onAction with the action id when a button is clicked", () => {
     const onAction = vi.fn();
-    render(<CavernActionPanel {...props} onAction={onAction} />);
+    render(<CavernActionPanel {...props} onAction={onAction} actionsEnabled={true} />);
     fireEvent.click(screen.getByRole("button", { name: /move/i }));
     expect(onAction).toHaveBeenCalledWith("move");
   });
 
-  it("renders all six standard actions plus end-turn", () => {
-    render(<CavernActionPanel {...props} onAction={vi.fn()} />);
+  it("renders all six standard actions plus end-turn when actionsEnabled", () => {
+    render(<CavernActionPanel {...props} onAction={vi.fn()} actionsEnabled={true} />);
     for (const label of ["Move", "Dash", "Attack", "Cast", "Object", "Dodge", "End turn"]) {
       expect(screen.getByRole("button", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
+  });
+
+  it("does NOT render action buttons by default (inspection-only mode)", () => {
+    render(<CavernActionPanel {...props} onAction={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /move/i })).toBeNull();
+    // Stat rows still render
+    expect(screen.getByText("32 / 36")).toBeInTheDocument();
   });
 });

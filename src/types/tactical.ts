@@ -1,30 +1,6 @@
 // TypeScript types for tactical grid rendering (ADR-096 rewrite).
 
-// ─── SVG-mode legacy types (used by DungeonMapRenderer / PlacedRoomData) ────
-
-/**
- * A single cell type for SVG-mode dungeon rendering.
- * Still used by DungeonMapRenderer / PlacedRoomData.
- */
-export type TacticalCellType =
-  | "floor"
-  | "wall"
-  | "void"
-  | "door_closed"
-  | "door_open"
-  | "water"
-  | "difficult_terrain"
-  | "feature";
-
-/**
- * A cell in the SVG grid with its type and optional feature glyph.
- * Feature cells carry the uppercase letter glyph (A-Z) for legend lookup.
- */
-export interface TacticalCell {
-  readonly type: TacticalCellType;
-  /** Uppercase letter glyph for feature cells, undefined otherwise. */
-  readonly glyph?: string;
-}
+// ─── Shared types (grid coords, feature taxonomy) ────────────────────────────
 
 /** Grid coordinate (x=column, y=row). */
 export interface GridPos {
@@ -47,79 +23,11 @@ export interface FeatureDef {
   readonly label: string;
 }
 
-/** Cardinal direction for exit gap identification. */
-export type CardinalDirection = "north" | "east" | "south" | "west";
-
-/** A gap in the wall perimeter where an exit connects to another room. */
-export interface ExitGap {
-  readonly wall: CardinalDirection;
-  readonly cells: readonly number[];
-  readonly width: number;
-}
-
-/**
- * SVG-mode room grid — used by DungeonMapRenderer and PlacedRoomData.
- * Renamed from the old TacticalGridData to free the name for image-mode.
- */
-export interface LegacyTacticalGridData {
-  readonly width: number;
-  readonly height: number;
-  readonly cells: readonly (readonly TacticalCell[])[];
-  readonly legend: Record<string, FeatureDef>;
-  readonly exits: readonly ExitGap[];
-}
-
-/**
- * An entity positioned on the tactical grid (player, NPC, creature).
- * Used by DungeonMapRenderer.
- */
-export interface TacticalEntity {
-  readonly id: string;
-  readonly name: string;
-  readonly position: GridPos;
-  readonly size: number;
-  readonly faction: "player" | "ally" | "hostile" | "neutral";
-}
-
-/**
- * A room placed in global dungeon coordinates by the layout engine.
- */
-export interface PlacedRoomData {
-  readonly roomId: string;
-  readonly roomName: string;
-  readonly grid: LegacyTacticalGridData;
-  readonly globalOffsetX: number;
-  readonly globalOffsetY: number;
-}
-
-/**
- * Complete dungeon layout — all rooms positioned in a global coordinate system.
- */
-export interface DungeonLayoutData {
-  readonly rooms: readonly PlacedRoomData[];
-  readonly globalWidth: number;
-  readonly globalHeight: number;
-}
-
-/**
- * Genre-themed palette for tactical grid rendering (DungeonMapRenderer).
- * Maps cell types to visual styles.
- */
-export interface TacticalThemeConfig {
-  /** Color for walkable floor cells. */
-  readonly floor: string;
-  /** Color for impassable wall cells. */
-  readonly wall: string;
-  /** Color for water cells. */
-  readonly water: string;
-  /** Color for difficult terrain cells. */
-  readonly difficultTerrain: string;
-  /** Color for door cells. */
-  readonly door: string;
-  /** Color for grid lines on floor cells. */
-  readonly gridLine: string;
-  /** Feature type -> color mapping. */
-  readonly features: Readonly<Record<FeatureType, string>>;
+/** A positioned tactical-map feature marker (ADR-096 token+feature phase). */
+export interface TacticalFeatureMarker {
+  readonly feature_type: FeatureType | "water";
+  readonly cell: { readonly x: number; readonly y: number };
+  readonly label: string;
 }
 
 // ─── Image-mode types (ADR-096) ─────────────────────────────────────────────
@@ -164,4 +72,5 @@ export interface TacticalGridData {
   readonly cellular: CavernCellularParams | null;
   readonly derived: CavernDerivedData;
   readonly tokens: readonly TacticalToken[];
+  readonly features: readonly TacticalFeatureMarker[];
 }

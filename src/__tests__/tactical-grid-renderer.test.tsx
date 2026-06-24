@@ -12,6 +12,7 @@ const FIXTURE: TacticalGridData = {
   cell_size: 28,
   cellular: { size: [5, 5], seed: 1, density: 0.55, cutoff: 5, passes: 4 },
   derived: { floor_count: 24, exits: { north: [2, 0], south: null, east: null, west: null }, pois: [[0, 0]] },
+  features: [],
   tokens: [
     {
       id: "k", name: "Keith", initial: "K", faction: "player",
