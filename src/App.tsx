@@ -63,6 +63,7 @@ import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { PausedBanner } from "@/components/PausedBanner";
 import { DeathBanner } from "@/components/DeathBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { BugReportButton } from "@/components/BugReportButton";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { usePeerEventCache } from "@/hooks/usePeerEventCache";
 import { appendHistory, loadHistory } from "@/screens/lobby/historyStore";
@@ -2700,6 +2701,14 @@ function AppInner() {
       <OfflineBanner offline={offline} />
       <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
       <DeathBanner incapacitation={incapacitation} onReroll={handleLeave} />
+      <BugReportButton
+        context={{
+          sessionSlug: slug,
+          genre: currentGenreRef.current ?? undefined,
+          world: currentWorldRef.current ?? undefined,
+          screen: sessionPhase,
+        }}
+      />
       {transientError && (
         <div
           role="alert"
