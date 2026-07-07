@@ -532,6 +532,45 @@ function StatusLine({ data }: { data: ConfrontationData }) {
           // production. Scoped to foes ONLY — never the player.
           const isEnemyGroup =
             group.length > 0 && group.every((a) => a.side === "opponent");
+          const foes = group.map((a, ai) => (
+            <span
+              key={a.name}
+              className="flex items-center gap-1.5"
+              role={isEnemyGroup ? "listitem" : undefined}
+            >
+              {ai > 0 && (
+                // Intra-side separator: allies on the same side, never "vs".
+                <span
+                  className="text-[10px] text-muted-foreground/40"
+                  aria-hidden="true"
+                >
+                  ·
+                </span>
+              )}
+              <ActorChip actor={a} decorative={isEnemyGroup} />
+              {isEnemyGroup && (
+                // The name a screen reader reads for this foe. The portrait
+                // chip is decorative (aria-hidden above), so this sr-only
+                // span is the listitem's accessible text — the clean name,
+                // without the portrait initial contaminating it.
+                <span className="sr-only">{humanizeActorName(a.name)}</span>
+              )}
+              {committedActors !== null && a.side === "player" && (
+                <span
+                  data-testid={`commitment-${a.name}`}
+                  data-committed={committedActors.has(a.name) ? "true" : "false"}
+                  className="text-[9px] uppercase tracking-wide flex-shrink-0"
+                  style={{
+                    color: committedActors.has(a.name)
+                      ? "var(--encounter-player)"
+                      : "var(--muted-foreground)",
+                  }}
+                >
+                  {committedActors.has(a.name) ? "Committed" : "Waiting"}
+                </span>
+              )}
+            </span>
+          ));
           return (
             <span
               key={`roster-group-${gi}`}
@@ -548,45 +587,17 @@ function StatusLine({ data }: { data: ConfrontationData }) {
                   vs
                 </span>
               )}
-              {group.map((a, ai) => (
-                <span
-                  key={a.name}
-                  className="flex items-center gap-1.5"
-                  role={isEnemyGroup ? "listitem" : undefined}
-                >
-                  {ai > 0 && (
-                    // Intra-side separator: allies on the same side, never "vs".
-                    <span
-                      className="text-[10px] text-muted-foreground/40"
-                      aria-hidden="true"
-                    >
-                      ·
-                    </span>
-                  )}
-                  <ActorChip actor={a} decorative={isEnemyGroup} />
-                  {isEnemyGroup && (
-                    // The name a screen reader reads for this foe. The portrait
-                    // chip is decorative (aria-hidden above), so this sr-only
-                    // span is the listitem's accessible text — the clean name,
-                    // without the portrait initial contaminating it.
-                    <span className="sr-only">{humanizeActorName(a.name)}</span>
-                  )}
-                  {committedActors !== null && a.side === "player" && (
-                    <span
-                      data-testid={`commitment-${a.name}`}
-                      data-committed={committedActors.has(a.name) ? "true" : "false"}
-                      className="text-[9px] uppercase tracking-wide flex-shrink-0"
-                      style={{
-                        color: committedActors.has(a.name)
-                          ? "var(--encounter-player)"
-                          : "var(--muted-foreground)",
-                      }}
-                    >
-                      {committedActors.has(a.name) ? "Committed" : "Waiting"}
-                    </span>
-                  )}
+              {isEnemyGroup ? (
+                // Story 162-11: the foe listitems need a `role="list"` parent
+                // (WCAG 1.3.1 aria-required-parent). Same flex container as
+                // before, so the layout is byte-identical — the wrapper adds
+                // list semantics, not a box.
+                <span role="list" className="flex items-center gap-1.5">
+                  {foes}
                 </span>
-              ))}
+              ) : (
+                foes
+              )}
             </span>
           );
         })}
