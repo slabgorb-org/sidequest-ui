@@ -21,9 +21,12 @@ import type { ConfrontationData } from '../ConfrontationOverlay';
 //     (a region labelled "Enemies" containing the player would be a lie AND
 //     would break the detector's "exactly one foe" inference).
 //
-// RED today: ConfrontationOverlay renders the roster as portrait chips with no
-// region, no listitem roles, and no visible opponent name. GREEN = the opponent
-// surface exposes the region + named listitems.
+// The opponent surface exposes the region + named listitems; the decorative
+// portrait chip is aria-hidden so its initial glyph never contaminates the
+// perceived foe name; and the foe listitems live inside a `role="list"`
+// (aria-required-parent). (Rework round-trip 1 added the aria-hidden guard, the
+// list-parent, and the multi-foe case after review found the clean-name
+// property untested.)
 // ═══════════════════════════════════════════════════════════
 
 const DATA: ConfrontationData = {
@@ -60,5 +63,52 @@ describe('[162-11] ConfrontationOverlay exposes an "Enemies" ARIA region with na
     render(<ConfrontationOverlay data={DATA} />);
     const enemies = screen.getByRole('region', { name: /enemies/i });
     expect(within(enemies).queryByText(/rux/i)).toBeNull();
+  });
+
+  // Rework: the story's central property — a CLEAN perceived foe name. The
+  // portrait chip renders the foe's initial ("T") as a visual fallback; it must
+  // be aria-hidden so Playwright's aria_snapshot reads `listitem: Thief`, not
+  // `listitem: T Thief` (which would false-fork the detector on consistent
+  // naming). Review found NO test guarded this: asserting textContent alone
+  // stays green when aria-hidden is removed. This test fails on that regression.
+  it('hides the decorative portrait so the initial glyph never contaminates the foe name', () => {
+    render(<ConfrontationOverlay data={DATA} />);
+    const enemies = screen.getByRole('region', { name: /enemies/i });
+    const item = within(enemies)
+      .getAllByRole('listitem')
+      .find((li) => /thief/i.test(li.textContent ?? ''))!;
+    expect(within(item).getByTestId('actor-portrait')).toHaveAttribute('aria-hidden', 'true');
+    // the clean foe name is the listitem's perceivable text (the sr-only span)
+    expect(within(item).getByText('Thief')).toBeInTheDocument();
+  });
+
+  // Rework: `role="listitem"` requires a `list`/`group` ancestor (WCAG 1.3.1
+  // aria-required-parent). RED until the foe listitems are wrapped in a
+  // `role="list"` inside the Enemies region.
+  it('wraps the foe listitems in a list (aria-required-parent)', () => {
+    render(<ConfrontationOverlay data={DATA} />);
+    const enemies = screen.getByRole('region', { name: /enemies/i });
+    const list = within(enemies).getByRole('list');
+    expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(0);
+  });
+
+  // Rework: each foe in a multi-opponent confrontation gets its own listitem —
+  // the detector counts listitems to infer "exactly one foe", so per-foe
+  // granularity is load-bearing.
+  it('gives each foe its own listitem in a multi-opponent confrontation', () => {
+    const data: ConfrontationData = {
+      ...DATA,
+      actors: [
+        { name: 'Rux', role: 'fighter', side: 'player' },
+        { name: 'Thief', role: 'thug', side: 'opponent' },
+        { name: 'Cutpurse', role: 'thug', side: 'opponent' },
+      ],
+    };
+    render(<ConfrontationOverlay data={data} />);
+    const enemies = screen.getByRole('region', { name: /enemies/i });
+    const items = within(enemies).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items.some((li) => /thief/i.test(li.textContent ?? ''))).toBe(true);
+    expect(items.some((li) => /cutpurse/i.test(li.textContent ?? ''))).toBe(true);
   });
 });

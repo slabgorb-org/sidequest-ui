@@ -1,6 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { NarrationScroll } from '../NarrationScroll';
+import { MessageType, type GameMessage } from '@/types/protocol';
+
+function narration(text: string): GameMessage {
+  return { type: MessageType.NARRATION, payload: { text }, player_id: 'p1' };
+}
 
 // ═══════════════════════════════════════════════════════════
 // Story 162-11 (RED) — real-UI ARIA fidelity for understudy perception.
@@ -21,8 +26,10 @@ import { NarrationScroll } from '../NarrationScroll';
 //   * The role sits on the narration stream surface itself (the scroll
 //     container that accumulates every beat), not a transient child.
 //
-// RED today: NarrationScroll's container has neither role="log" nor aria-live.
-// GREEN = the narration stream is a polite log live-region.
+// The NarrationScroll container is a polite log live-region, and narrated text
+// is a DESCENDANT of that log node (not a sibling) so aria_snapshot nests the
+// prose under `log:`. (Rework round-trip 1 added the populated-content case
+// after review found all tests rendered empty messages.)
 // ═══════════════════════════════════════════════════════════
 
 describe('[162-11] NarrationScroll narration surface is an ARIA log live-region', () => {
@@ -39,5 +46,15 @@ describe('[162-11] NarrationScroll narration surface is an ARIA log live-region'
   it('places the log role on the narration stream surface', () => {
     render(<NarrationScroll messages={[]} />);
     expect(screen.getByRole('log')).toHaveAttribute('data-testid', 'narration-scroll');
+  });
+
+  // Rework: prove narrated text is a DOM DESCENDANT of the log node — the whole
+  // point of the fix is that aria_snapshot nests the prose under `log:`. A
+  // refactor that moved segments to a SIBLING of the role="log" div would pass
+  // the empty-message tests above but fail this one.
+  it('renders narrated text inside the log region', () => {
+    render(<NarrationScroll messages={[narration('Molgrath the Eyeless lunges at you from the dark.')]} />);
+    const log = screen.getByRole('log');
+    expect(within(log).getByText(/Molgrath the Eyeless lunges at you from the dark\./i)).toBeInTheDocument();
   });
 });
