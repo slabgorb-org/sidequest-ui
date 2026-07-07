@@ -62,6 +62,14 @@ export interface BeatOption {
   stat_check: string;
   risk?: string;
   resolution?: boolean;
+  /**
+   * Story 158-56: AWN marker — this is the generic "Use Mutation" beat. The
+   * server sets it on the beat model (rules.yaml) and it rides the projected
+   * beat dict verbatim. When true, committing the tile opens the mutation
+   * picker (sourced from `ConfrontationData.mutation_economy`) instead of a
+   * bare commit; the chosen mutation rides `DICE_THROW.mutation_id`.
+   */
+  mutation_resolution?: boolean;
   /** Tag created when this beat resolves; required for kind=angle. */
   target_tag?: string;
   /**
@@ -198,6 +206,16 @@ export interface ConfrontationData {
    * overlay renders no indicators then.
    */
   committed_actors?: string[] | null;
+  /**
+   * Story 158-56: the recipient's owned-mutation economy, projected by the
+   * server (build_confrontation_payload — the `spellcasting` twin). Drives the
+   * "Use Mutation" picker: `owned` is the list the picker offers, each carrying
+   * its `strain_cost` (player-visible spend math, the Sebastien/Jade lane). The
+   * chosen `id` rides `DICE_THROW.mutation_id`. `null` for non-mutants / non-AWN
+   * packs — the server never fabricates an empty economy, and the picker gates
+   * on the value.
+   */
+  mutation_economy?: ConfrontationMutationEconomy | null;
 }
 
 /** Story 102-2: WN cast economy block on the CONFRONTATION payload. */
@@ -206,6 +224,18 @@ export interface ConfrontationSpellcasting {
   casts_per_day?: number;
   /** Prepared spell IDs (e.g. "wracking_bolt") — labels humanized client-side. */
   prepared: string[];
+}
+
+/** Story 158-56: AWN owned-mutation economy block on the CONFRONTATION payload. */
+export interface ConfrontationMutationEconomy {
+  owned: MutationEconomyEntry[];
+}
+
+/** One owned mutation the picker offers. `id` rides `DICE_THROW.mutation_id`. */
+export interface MutationEconomyEntry {
+  id: string;
+  name: string;
+  strain_cost: number;
 }
 
 /**
@@ -253,11 +283,12 @@ interface ConfrontationOverlayProps {
    */
   meanwhileActions?: MeanwhileAction[];
   /**
-   * Beat commit. `spellId` is present only when the committed beat is the
-   * cast beat and the player chose a prepared spell in the picker (102-2);
-   * undefined on every other beat.
+   * Beat commit. `spellId` is present only on a cast beat where the player
+   * chose a prepared spell (102-2); `mutationId` only on a `mutation_resolution`
+   * beat where the player chose an owned mutation (158-56). The two are mutually
+   * exclusive picks — each rides its own slot; both undefined on every other beat.
    */
-  onBeatSelect?: (beatId: string, spellId?: string) => void;
+  onBeatSelect?: (beatId: string, spellId?: string, mutationId?: string) => void;
   /** Dice state — rendered inline below beats when active. */
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -640,6 +671,66 @@ function SpellPicker({
             style={{ color: "var(--card-foreground)" }}
           >
             {humanizeSpellId(spellId)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Story 158-56 — owned-mutation picker for the "Use Mutation" beat
+// ═══════════════════════════════════════════════════════════
+
+function MutationPicker({
+  economy,
+  onChoose,
+  onCancel,
+}: {
+  economy: ConfrontationMutationEconomy;
+  onChoose: (mutationId: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      data-testid="mutation-picker"
+      role="group"
+      aria-label="Choose a mutation to invoke"
+      className="mt-2 rounded-md border border-border/60 bg-card/80 p-2"
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span
+          className="text-xs uppercase tracking-wide"
+          style={{ color: "var(--muted-foreground)" }}
+        >
+          Use Mutation
+        </span>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Cancel mutation selection"
+          className="text-xs px-1.5 py-0.5 rounded cursor-pointer hover:bg-muted/40"
+          style={{ color: "var(--muted-foreground)" }}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex flex-col gap-1">
+        {economy.owned.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            data-mutation-id={m.id}
+            data-strain-cost={String(m.strain_cost)}
+            onClick={() => onChoose(m.id)}
+            className="text-left text-sm rounded px-2 py-1 cursor-pointer border border-border/40 hover:border-[var(--accent-finisher)] transition-colors motion-reduce:transition-none"
+            style={{ color: "var(--card-foreground)" }}
+          >
+            {m.name}
+            {/* Player-visible spend math (Sebastien/Jade lane) — the casts_remaining twin. */}
+            <span className="ml-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              Strain {m.strain_cost}
+            </span>
           </button>
         ))}
       </div>
@@ -1164,6 +1255,11 @@ export function ConfrontationOverlay({
   // prepared-spell picker — a cast must name WHICH spell so the server can
   // route the WN cast spine instead of a generic stat throw.
   const [spellPickerOpen, setSpellPickerOpen] = useState(false);
+  // Story 158-56: mutation-picker deferral state. `mutationPickerBeatId` holds
+  // the beat that opened the picker (content names it freely — unlike the
+  // hardcoded cast beat id — so we remember it to commit with the right id).
+  const [mutationPickerOpen, setMutationPickerOpen] = useState(false);
+  const [mutationPickerBeatId, setMutationPickerBeatId] = useState<string | null>(null);
   // WN sealed round (story 102-4 / coyote_star ship_combat playtest 2026-06-10):
   // once the local player commits a beat, a SECOND click hits the server's
   // one-Main-Action-per-round seal guard and surfaces as a red error alert. The
@@ -1203,6 +1299,7 @@ export function ConfrontationOverlay({
     if (diceRequestId !== null && committedActorCount === 0) setSealedWaiting(false);
   }
   const spellcasting = data?.spellcasting ?? null;
+  const mutationEconomy = data?.mutation_economy ?? null;
   // useCallback: ConfrontationOverlay re-renders on every WebSocket frame, and
   // this handler is handed to every beat button; a stable identity avoids
   // re-rendering the whole grid each frame (matches GameBoard's own wrapping).
@@ -1226,7 +1323,29 @@ export function ConfrontationOverlay({
         setSpellPickerOpen(true);
         return;
       }
+      // 158-56: the generic "Use Mutation" beat — detected by the server's
+      // `mutation_resolution` marker (content names the beat id freely, so we
+      // gate on the flag, not a literal id). Defer the commit behind the picker
+      // so the chosen mutation rides `mutation_id`; refuse a bare commit when
+      // the economy is missing (mirrors the cast refusal — a bare mutation
+      // commit raises the loud missing-mutation_id DiceDispatchError, 158-54).
+      const mutationBeat = (data?.beats ?? []).find((b) => b.id === id) ?? null;
+      if (mutationBeat?.mutation_resolution) {
+        if (!mutationEconomy || mutationEconomy.owned.length === 0) {
+          console.warn(
+            "[use-mutation] commit refused: no mutation_economy projection on " +
+              "the CONFRONTATION payload (or no owned mutations) — the picker " +
+              "has nothing to offer, and a bare mutation commit bricks server-side",
+          );
+          return;
+        }
+        setSpellPickerOpen(false);
+        setMutationPickerBeatId(id);
+        setMutationPickerOpen(true);
+        return;
+      }
       setSpellPickerOpen(false);
+      setMutationPickerOpen(false);
       setCommittedBeatId(id);
       // Story 106-4 Part C: an item-use beat ("Drink <potion>") is auto-success,
       // no-roll — it produces NO dice result, so the dice-result reset at
@@ -1240,7 +1359,7 @@ export function ConfrontationOverlay({
       }
       onBeatSelect?.(id);
     },
-    [onBeatSelect, spellcasting],
+    [onBeatSelect, spellcasting, mutationEconomy, data?.beats],
   );
   // 102-2: picker selection — the only path that commits the cast beat.
   const handleSpellChoose = useCallback(
@@ -1251,6 +1370,20 @@ export function ConfrontationOverlay({
       onBeatSelect?.(CAST_SPELL_BEAT_ID, spellId);
     },
     [onBeatSelect],
+  );
+  // 158-56: mutation-picker selection — the only path that commits a mutation
+  // beat. Rides the chosen id in the 3rd slot (spell slot undefined); the beat
+  // id is the one that opened the picker (remembered in mutationPickerBeatId).
+  const handleMutationChoose = useCallback(
+    (mutationId: string) => {
+      const beatId = mutationPickerBeatId;
+      if (beatId === null) return;
+      setMutationPickerOpen(false);
+      setCommittedBeatId(beatId);
+      setSealedWaiting(true);
+      onBeatSelect?.(beatId, undefined, mutationId);
+    },
+    [onBeatSelect, mutationPickerBeatId],
   );
   if (!data) return null;
 
@@ -1359,6 +1492,15 @@ export function ConfrontationOverlay({
               spellcasting={spellcasting}
               onChoose={handleSpellChoose}
               onCancel={() => setSpellPickerOpen(false)}
+            />
+          )}
+
+          {/* Story 158-56: owned-mutation picker for the "Use Mutation" beat. */}
+          {mutationPickerOpen && mutationEconomy && (
+            <MutationPicker
+              economy={mutationEconomy}
+              onChoose={handleMutationChoose}
+              onCancel={() => setMutationPickerOpen(false)}
             />
           )}
 

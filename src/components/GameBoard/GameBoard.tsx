@@ -245,7 +245,12 @@ export interface GameBoardProps {
    * replaces it — Zork Problem guardrail); App attaches it to the
    * DICE_THROW as `spell_id` so the server routes the WN cast spine.
    */
-  onBeatSelect?: (beatId: string, playerAction?: string, spellId?: string) => void;
+  onBeatSelect?: (
+    beatId: string,
+    playerAction?: string,
+    spellId?: string,
+    mutationId?: string,
+  ) => void;
   onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
@@ -568,9 +573,9 @@ export function GameBoard({
   // (Story 85-3) because the confrontation dockview panel renders through it.
   const inputBarRef = useRef<InputBarHandle | null>(null);
   const handleBeatTileSelect = useCallback(
-    (beatId: string, spellId?: string) => {
+    (beatId: string, spellId?: string, mutationId?: string) => {
       const draft = inputBarRef.current?.consumeDraft() ?? "";
-      onBeatSelect?.(beatId, draft, spellId);
+      onBeatSelect?.(beatId, draft, spellId, mutationId);
     },
     [onBeatSelect],
   );

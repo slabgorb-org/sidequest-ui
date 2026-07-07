@@ -293,8 +293,11 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationOverlay", ()
     expect(gameBoardSrc).toMatch(
       /handleBeatTileSelect[\s\S]*?inputBarRef\.current\?\.consumeDraft\(\)/,
     );
-    // 102-2: the forward also carries the picker's optional spellId.
-    expect(gameBoardSrc).toMatch(/onBeatSelect\?\.\(beatId,\s*draft,\s*spellId\)/);
+    // 102-2 / 158-56: the forward also carries the picker's optional spellId
+    // and mutationId (both undefined on a plain beat).
+    expect(gameBoardSrc).toMatch(
+      /onBeatSelect\?\.\(beatId,\s*draft,\s*spellId(,\s*mutationId)?\)/,
+    );
     // The InputBar must actually receive the ref so the handle is bound.
     expect(gameBoardSrc).toMatch(/<InputBar[\s\S]*?ref=\{inputBarRef\}/);
   });
@@ -363,9 +366,10 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationOverlay", ()
       path.resolve(__dirname, "../App.tsx"),
       "utf-8",
     );
-    // handleBeatSelect signature must accept the optional playerAction.
+    // handleBeatSelect signature must accept the optional playerAction (and the
+    // 102-2 spellId / 158-56 mutationId picker args).
     expect(appSrc).toMatch(
-      /const handleBeatSelect\s*=\s*useCallback\(\s*\(\s*beatId:\s*string,\s*playerAction\?:\s*string,\s*spellId\?:\s*string\s*\)/,
+      /const handleBeatSelect\s*=\s*useCallback\(\s*\(\s*beatId:\s*string,\s*playerAction\?:\s*string,\s*spellId\?:\s*string(,\s*mutationId\?:\s*string)?\s*\)/,
     );
     // Latched alongside pendingBeatIdRef.
     expect(appSrc).toContain("pendingPlayerActionRef");

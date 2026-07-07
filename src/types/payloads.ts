@@ -558,6 +558,16 @@ export interface DiceThrowPayload {
    * pre-102-2 wire shape byte-for-byte.
    */
   spell_id?: string;
+  /**
+   * Story 158-56: the owned mutation chosen in the overlay's "Use Mutation"
+   * picker. Only present on an AWN `mutation_resolution` beat commit — it lets
+   * the server route the mutation use spine (`awn.mutation.used` + Strain/usage
+   * economy, 158-54) instead of resolving a generic WIS strike (and it prevents
+   * the loud missing-`mutation_id` DiceDispatchError). The key is OMITTED (never
+   * `undefined`-serialized) on every non-mutation beat, keeping the pre-158-56
+   * wire shape byte-for-byte.
+   */
+  mutation_id?: string;
 }
 
 /** Server -> all clients: resolved dice roll outcome. */
