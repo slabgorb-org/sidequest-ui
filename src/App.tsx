@@ -566,6 +566,10 @@ function AppInner() {
   // DICE_THROW.spell_id when dice settle — consumed atomically with the
   // beat so a stale spell can never leak into a later non-cast commit.
   const pendingSpellIdRef = useRef<string | null>(null);
+  // Story 158-56: the owned mutation chosen in the "Use Mutation" picker.
+  // Latched + consumed atomically with the beat exactly like pendingSpellIdRef,
+  // so a stale mutation can never leak into a later non-mutation commit.
+  const pendingMutationIdRef = useRef<string | null>(null);
 
   // Ref bridge: peerReveals.apply is defined after handleMessage (useCallback).
   // Updated synchronously alongside sendRef so handleMessage always calls the
@@ -1773,7 +1777,7 @@ function AppInner() {
   // as a PLAYER_ACTION text string — violating: no keyword matching (Zork Problem,
   // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
-    (beatId: string, playerAction?: string, spellId?: string) => {
+    (beatId: string, playerAction?: string, spellId?: string, mutationId?: string) => {
       // Story 67-8 (Layer 3): single gate for every beat-commit precondition —
       // thinking (duplicate), no active confrontation, unknown beat, and the
       // load-bearing one: session not bound (AwaitingConnect). A beat issued
@@ -1876,6 +1880,9 @@ function AppInner() {
       // every non-cast beat, so the DICE_THROW key is attached iff a spell
       // was actually chosen.
       pendingSpellIdRef.current = spellId ?? null;
+      // Story 158-56: stash the chosen mutation the same way — null on every
+      // non-mutation beat, so the DICE_THROW key attaches iff one was chosen.
+      pendingMutationIdRef.current = mutationId ?? null;
       displayedDiceRequestRef.current = localReq;
       setDiceResult(null);
       setDiceRequest(localReq);
@@ -1918,6 +1925,7 @@ function AppInner() {
         pendingBeatIdRef.current = null;
         pendingPlayerActionRef.current = "";
         pendingSpellIdRef.current = null;
+        pendingMutationIdRef.current = null;
         displayedDiceRequestRef.current = null;
         setDiceResult(null);
         setDiceRequest(null);
@@ -1934,6 +1942,10 @@ function AppInner() {
       // unconditionally so a later non-cast commit can never inherit it.
       const spellId = pendingSpellIdRef.current;
       pendingSpellIdRef.current = null;
+      // Story 158-56: consume the latched mutation the same way — reset
+      // unconditionally so a later non-mutation commit can never inherit it.
+      const mutationId = pendingMutationIdRef.current;
+      pendingMutationIdRef.current = null;
       // REGRESSION fix (playtest 2026-06-04): in a confrontation the player's
       // typed action rides the beat-commit DICE_THROW, not a PLAYER_ACTION
       // frame, so the local transcript never grew a player-echo card — combat
@@ -1971,6 +1983,10 @@ function AppInner() {
           // so the server routes the WN cast spine. Key OMITTED on every
           // non-cast throw — pre-102-2 wire shape unchanged.
           ...(beatId && spellId ? { spell_id: spellId } : {}),
+          // Story 158-56: the chosen mutation rides the mutation-beat commit so
+          // the server routes the AWN use spine. Key OMITTED on every non-mutation
+          // throw — pre-158-56 wire shape unchanged.
+          ...(beatId && mutationId ? { mutation_id: mutationId } : {}),
         },
         player_id: "",
       });
