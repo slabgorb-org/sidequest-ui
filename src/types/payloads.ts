@@ -584,6 +584,11 @@ export interface DiceResultPayload {
   throw_params: DiceThrowParams;
   /** See DiceRequestPayload.roll_role. Defaults to `check` when absent. */
   roll_role?: DiceRollRole;
+  /** Additive tactical range echo (Story 165-4 / ADR-096 v2). Present when the
+   *  strike was reach/range-adjudicated — the resolved weapon band + measured
+   *  cell distance for the resolution-card math. Absent on non-tactical rolls. */
+  range_band?: string;
+  distance_cells?: number;
 }
 
 /** Server -> all clients: one resolved 4dF roll (ADR-144 F3c, Story 118-3).
