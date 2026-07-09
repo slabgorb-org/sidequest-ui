@@ -140,3 +140,72 @@ describe("tacticalGridFromWire — adjudications parsing", () => {
     expect(data!.adjudications).toEqual([]);
   });
 });
+
+// 165-4 REWORK — Reviewer [TEST] coverage gaps: every prior renderer test used a
+// single PC and only the denial + move kinds. These close the multi-PC and
+// valid-reach / aoe gaps. They are regression guards (the renderer maps over all
+// adjudications today), NOT RED drivers — the RED drivers this round are the
+// server OTEL/fail-loud tests and the dice-result partial echo.
+describe("TacticalGridRenderer — multi-PC + reach/aoe coverage (165-4 rework)", () => {
+  it("surfaces a distinct denial and move chip for each actor at a multi-PC table", () => {
+    const grid: TacticalGridData = {
+      ...BASE,
+      adjudications: [
+        { actor: "Rux", kind: "reach", valid: false, distance_cells: 3, max_cells: 1,
+          mode: "melee", reason: "Rux is 3 cells away; reach is 1", cells: [] },
+        { actor: "Bexley", kind: "reach", valid: false, distance_cells: 4, max_cells: 1,
+          mode: "melee", reason: "Bexley is 4 cells away; reach is 1", cells: [] },
+        { actor: "Rux", kind: "move", valid: true, cells_spent: 2, cells_budget: 6,
+          reason: "", cells: [] },
+        { actor: "Bexley", kind: "move", valid: true, cells_spent: 1, cells_budget: 5,
+          reason: "", cells: [] },
+      ],
+    };
+    render(<TacticalGridRenderer grid={grid} />);
+
+    // Two denials, each carrying its OWN actor's reason (not collapsed/overwritten).
+    const denials = screen.getAllByTestId("tactical-denial");
+    expect(denials).toHaveLength(2);
+    const denialText = denials.map(d => d.textContent).join("|");
+    expect(denialText).toContain("Rux is 3 cells away");
+    expect(denialText).toContain("Bexley is 4 cells away");
+
+    // Two move chips, each with its OWN actor + budget.
+    const chips = screen.getAllByTestId("tactical-move-budget");
+    expect(chips).toHaveLength(2);
+    const rux = chips.find(c => c.textContent?.includes("Rux"));
+    const bex = chips.find(c => c.textContent?.includes("Bexley"));
+    expect(rux).toHaveTextContent("6");
+    expect(bex).toHaveTextContent("5");
+  });
+
+  it("does not surface a VALID reach adjudication as a denial", () => {
+    // A valid reach (target in range) is not a denial and not a move — it must
+    // never render a red denial banner. Guards `denials = filter(!valid)`.
+    const grid: TacticalGridData = {
+      ...BASE,
+      adjudications: [
+        { actor: "Rux", kind: "reach", valid: true, distance_cells: 1, max_cells: 6,
+          mode: "melee", reason: "", cells: [] },
+      ],
+    };
+    render(<TacticalGridRenderer grid={grid} />);
+    expect(screen.getByTestId("tactical-grid-renderer")).toBeInTheDocument();
+    expect(screen.queryByTestId("tactical-denial")).not.toBeInTheDocument();
+  });
+
+  it("renders an aoe adjudication without crashing or faking a denial", () => {
+    // An aoe echo (a future kind on the additive contract) must be handled
+    // gracefully — no denial banner, no crash — even though there is no
+    // dedicated aoe surface yet.
+    const grid: TacticalGridData = {
+      ...BASE,
+      adjudications: [
+        { actor: "Rux", kind: "aoe", valid: true, reason: "", cells: [] },
+      ],
+    };
+    render(<TacticalGridRenderer grid={grid} />);
+    expect(screen.getByTestId("tactical-grid-renderer")).toBeInTheDocument();
+    expect(screen.queryByTestId("tactical-denial")).not.toBeInTheDocument();
+  });
+});

@@ -99,4 +99,43 @@ describe("InlineDiceTray — range/cells readout (165-4)", () => {
     // ...but the additive range annotation must be absent (guarded on presence).
     expect(screen.queryByTestId("dice-result-range")).not.toBeInTheDocument();
   });
+
+  // 165-4 REWORK — Reviewer [TEST] partial-echo gap: the two fields are
+  // INDEPENDENT optionals. The server can echo one without the other (e.g. a
+  // grid-less strike resolves range_band but has no measured distance). The
+  // readout must render whichever is present without inventing the other.
+  it("renders the band alone when distance_cells is absent (partial echo)", () => {
+    const bandOnly: DiceResultPayload = { ...RESULT, range_band: "pistol" };
+    render(
+      <InlineDiceTray
+        diceRequest={null}
+        diceResult={bandOnly}
+        playerId="p1"
+        onThrow={vi.fn()}
+        genreSlug="space_opera"
+      />,
+    );
+    const range = screen.getByTestId("dice-result-range");
+    expect(range).toHaveTextContent(/pistol/i);
+    // No distance was measured — the readout must not fabricate a "cells" figure.
+    expect(range).not.toHaveTextContent(/cells/i);
+  });
+
+  it("renders the distance alone when range_band is absent (partial echo)", () => {
+    const distanceOnly: DiceResultPayload = { ...RESULT, distance_cells: 3 };
+    render(
+      <InlineDiceTray
+        diceRequest={null}
+        diceResult={distanceOnly}
+        playerId="p1"
+        onThrow={vi.fn()}
+        genreSlug="space_opera"
+      />,
+    );
+    const range = screen.getByTestId("dice-result-range");
+    expect(range).toHaveTextContent("3");
+    expect(range).toHaveTextContent(/cells/i);
+    // No band resolved — the readout must not invent a "range" label.
+    expect(range).not.toHaveTextContent(/range/i);
+  });
 });
