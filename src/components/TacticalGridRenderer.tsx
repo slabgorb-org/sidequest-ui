@@ -176,18 +176,18 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
       )}
       {(denials.length > 0 || moveEchoes.length > 0) && (
         <div data-testid="tactical-adjudications" className="text-xs space-y-1">
-          {denials.map((a, i) => (
+          {denials.map(a => (
             <div
-              key={`denial-${i}`}
+              key={`denial-${a.actor}-${a.kind}`}
               data-testid="tactical-denial"
               className="text-red-400"
             >
               {a.reason}
             </div>
           ))}
-          {moveEchoes.map((a, i) => (
+          {moveEchoes.map(a => (
             <div
-              key={`move-${i}`}
+              key={`move-${a.actor}`}
               data-testid="tactical-move-budget"
               className="opacity-80"
             >
