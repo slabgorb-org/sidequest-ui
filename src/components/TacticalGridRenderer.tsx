@@ -47,6 +47,12 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
 
   const presentFeatureTypes = Array.from(new Set(grid.features.map(f => f.feature_type)));
 
+  // Echoed tactical math (Story 165-4): denied adjudications surface as a banner
+  // with the server's reason; move summaries surface as a cells-spent/budget chip.
+  const adjudications = grid.adjudications ?? [];
+  const denials = adjudications.filter(a => !a.valid);
+  const moveEchoes = adjudications.filter(a => a.kind === "move");
+
   return (
     <div data-testid="tactical-grid-renderer" className="flex gap-4">
       <div className="relative" style={{ width: W, height: H }}>
@@ -164,6 +170,28 @@ export function TacticalGridRenderer({ grid }: TacticalGridRendererProps) {
                 {ft === "water" ? WATER_MARKER : (FEATURE_MARKERS[ft] ?? "•")}
               </span>
               <span className="opacity-80">{ft.replace(/_/g, " ")}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {(denials.length > 0 || moveEchoes.length > 0) && (
+        <div data-testid="tactical-adjudications" className="text-xs space-y-1">
+          {denials.map((a, i) => (
+            <div
+              key={`denial-${i}`}
+              data-testid="tactical-denial"
+              className="text-red-400"
+            >
+              {a.reason}
+            </div>
+          ))}
+          {moveEchoes.map((a, i) => (
+            <div
+              key={`move-${i}`}
+              data-testid="tactical-move-budget"
+              className="opacity-80"
+            >
+              {a.actor}: {a.cells_spent ?? 0}/{a.cells_budget ?? 0} cells
             </div>
           ))}
         </div>

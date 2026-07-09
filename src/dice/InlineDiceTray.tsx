@@ -449,6 +449,18 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
             >
               {outcomeLabel(diceResult.outcome)}
             </span>
+            {/* Additive tactical range echo (Story 165-4): show the resolved
+                weapon band + measured distance when the strike was range-
+                adjudicated. Guarded on presence — plain checks omit it. */}
+            {(diceResult.range_band != null || diceResult.distance_cells != null) && (
+              <span
+                data-testid="dice-result-range"
+                style={{ fontSize: 12, marginLeft: 4, color: "#a8a29e" }}
+              >
+                {diceResult.range_band != null && `· ${diceResult.range_band} range`}
+                {diceResult.distance_cells != null && ` · ${diceResult.distance_cells} cells`}
+              </span>
+            )}
           </div>
         )}
       </div>
