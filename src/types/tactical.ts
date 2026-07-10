@@ -30,6 +30,21 @@ export interface TacticalFeatureMarker {
   readonly label: string;
 }
 
+/** An echoed tactical adjudication for the player-facing math (Story 165-4 / ADR-096 v2).
+ *  Mirrors the server `TacticalAdjudication` — the client renders this, never recomputes it. */
+export interface TacticalAdjudication {
+  readonly actor: string;
+  readonly kind: string; // "move" | "reach" | "aoe"
+  readonly valid: boolean;
+  readonly cells_spent?: number;
+  readonly cells_budget?: number;
+  readonly distance_cells?: number;
+  readonly max_cells?: number;
+  readonly mode?: string; // "melee" | "ranged"
+  readonly reason: string;
+  readonly cells: ReadonlyArray<readonly [number, number]>;
+}
+
 // ─── Image-mode types (ADR-096) ─────────────────────────────────────────────
 
 export interface CavernCellularParams {
@@ -73,4 +88,8 @@ export interface TacticalGridData {
   readonly derived: CavernDerivedData;
   readonly tokens: readonly TacticalToken[];
   readonly features: readonly TacticalFeatureMarker[];
+  /** Echoed tactical math (move budget, denied reach/range). Additive (Story 165-4):
+   *  the parser always yields [] for pre-165-4 payloads, so this is effectively always
+   *  present, but stays optional so older TacticalGridData fixtures still type-check. */
+  readonly adjudications?: readonly TacticalAdjudication[];
 }

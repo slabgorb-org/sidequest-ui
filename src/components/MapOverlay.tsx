@@ -107,12 +107,27 @@ export interface CartographyMetadata {
   is_cluster?: boolean;
 }
 
+/**
+ * Client twin of the server's CartographyTreatmentWire (Story 163-1 /
+ * spec §4 A1). Rides MAP_UPDATE when the world's map.yaml declares a map
+ * treatment; `kind === "raster"` routes MapWidget to RasterMap. Rendering
+ * branches key off `style_hints` (Track B: wasteland_defacement faction
+ * layer, highway_tracing routes) — data-driven, never off genre strings.
+ */
+export interface RasterTreatment {
+  kind: string; // raster | orrery | dag | generated
+  image_url: string | null;
+  node_anchors: Record<string, [number, number]>;
+  style_hints: Record<string, unknown>;
+}
+
 export interface MapState {
   current_location: string;
   region: string;
   explored: ExploredLocation[];
   fog_bounds: { width: number; height: number };
   cartography?: CartographyMetadata;
+  treatment?: RasterTreatment;
 }
 
 export interface MapOverlayProps {

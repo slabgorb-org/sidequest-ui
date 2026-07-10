@@ -1,4 +1,9 @@
-import type { FeatureType, TacticalGridData, TacticalToken } from "@/types/tactical";
+import type {
+  FeatureType,
+  TacticalAdjudication,
+  TacticalGridData,
+  TacticalToken,
+} from "@/types/tactical";
 
 const FACTIONS = ["player", "ally", "neutral", "hostile"] as const;
 
@@ -33,6 +38,19 @@ interface WirePayload {
   tokens: WireToken[];
   // feature cell is an ARRAY [x,y] on the wire (uniform with other positions)
   features?: { feature_type: string; cell: [number, number]; label: string }[];
+  // Additive tactical math echo (Story 165-4). Absent on pre-165-4 payloads.
+  adjudications?: {
+    actor: string;
+    kind: string;
+    valid: boolean;
+    cells_spent?: number | null;
+    cells_budget?: number | null;
+    distance_cells?: number | null;
+    max_cells?: number | null;
+    mode?: string | null;
+    reason?: string;
+    cells?: [number, number][];
+  }[];
 }
 
 export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
@@ -71,6 +89,20 @@ export function tacticalGridFromWire(p: WirePayload): TacticalGridData | null {
       feature_type: f.feature_type as FeatureType | "water",
       cell: { x: f.cell[0], y: f.cell[1] },   // ARRAY [x,y] → {x,y}
       label: f.label,
+    })),
+    // Additive (Story 165-4): default [] so pre-165-4 payloads (and Track B's
+    // SITE_MAP cutover) parse — the renderer always maps over a real array.
+    adjudications: (p.adjudications ?? []).map((a): TacticalAdjudication => ({
+      actor: a.actor,
+      kind: a.kind,
+      valid: a.valid,
+      cells_spent: a.cells_spent ?? undefined,
+      cells_budget: a.cells_budget ?? undefined,
+      distance_cells: a.distance_cells ?? undefined,
+      max_cells: a.max_cells ?? undefined,
+      mode: a.mode ?? undefined,
+      reason: a.reason ?? "",
+      cells: (a.cells ?? []).map(c => [c[0], c[1]] as const),
     })),
   };
 }

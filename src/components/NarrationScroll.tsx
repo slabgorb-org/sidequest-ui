@@ -84,6 +84,13 @@ export function NarrationScroll({ messages, thinking, genreSlug, peerActionsByRo
     <div
       ref={scrollRef}
       data-testid="narration-scroll"
+      // Story 162-11: the narration stream is an ARIA log live-region, so
+      // aria_snapshot presents it as `log:` — the token every narration-reading
+      // understudy detector greps for (naivety invariant: the bot reads the same
+      // aria tree a screen-reader user hears). `polite` announces each appended
+      // beat without stealing focus.
+      role="log"
+      aria-live="polite"
       onScroll={handleScroll}
       className="narrative-scroll flex-1 min-h-0 overflow-y-auto flex flex-col"
     >
