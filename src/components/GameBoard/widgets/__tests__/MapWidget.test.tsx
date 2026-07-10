@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from "vitest";
 import { MapWidget } from "../MapWidget";
 import type { MapState } from "@/components/MapOverlay";
 import type { OrbitalIntentResponse } from "@/types/orbital-intent";
-import { dungeonMapToMapState } from "@/lib/dungeonMap";
+import { siteMapToMapState } from "@/lib/siteMap";
 
 function roomGraphMapState(): MapState {
   // Shape matches MAP_UPDATE emitted by build_room_graph_explored in
@@ -222,12 +222,12 @@ describe("MapWidget", () => {
 
   // Story 158-6: the deep-view DUNGEON_MAP frame labels regions by their shared
   // THEME display name, so distinct procedural regions arrive as duplicate
-  // "The Drowned Cavern" labels. `dungeonMapToMapState` disambiguates them; this
+  // "The Drowned Cavern" labels. `siteMapToMapState` disambiguates them; this
   // proves the distinct labels survive the real adapter → MapWidget → Automapper
   // render path and reach the on-screen <text> nodes (CLAUDE.md wiring rule).
   describe("deep-view region labels (158-6)", () => {
     it("renders distinct labels for theme-shared regions in the Automapper", () => {
-      const mapData = dungeonMapToMapState({
+      const mapData = siteMapToMapState({
         current_location: "exp001.r2",
         region: "exp001.r2",
         explored: [
