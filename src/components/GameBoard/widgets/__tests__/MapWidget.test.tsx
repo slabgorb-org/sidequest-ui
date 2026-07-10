@@ -11,7 +11,7 @@
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { MapWidget } from "../MapWidget";
-import type { MapState } from "@/components/MapOverlay";
+import type { MapState, RasterTreatment } from "@/components/MapOverlay";
 import type { OrbitalIntentResponse } from "@/types/orbital-intent";
 import { dungeonMapToMapState } from "@/lib/dungeonMap";
 
@@ -267,3 +267,76 @@ describe("MapWidget", () => {
 // block tested the old SVG-cell renderer path (cells: string[][], features sidecar).
 // That path was deleted in ADR-096 (image-mode renderer). The new wire format delivers
 // cavern_image_url + mask instead of string cells. Tests removed 2026-05-10.
+
+/**
+ * Story 163-5 / plan task 14 (Track A, spec §4 A1): MapWidget routes a
+ * `treatment.kind === "raster"` MapState to RasterMap via ONE early-return
+ * branch after the `if (!mapData)` guard and before the room-graph branch.
+ * dag/generated/absent treatments fall through to the existing cascade
+ * unchanged (by design); orrery worlds are chosen by the `orbital` flag
+ * before this branch and need no MapWidget change.
+ */
+describe("raster treatment routing (Story 163-5 task 14)", () => {
+  function rasterTreatment(): RasterTreatment {
+    return {
+      kind: "raster",
+      image_url: "https://cdn/x.jpg",
+      node_anchors: { r1: [1, 2] },
+      style_hints: {},
+    };
+  }
+
+  function rasterMapState(): MapState {
+    return {
+      current_location: "r1",
+      region: "w",
+      explored: [],
+      fog_bounds: { width: 0, height: 0 },
+      cartography: {
+        navigation_mode: "region",
+        starting_region: "r1",
+        regions: { r1: { name: "R1" } },
+        routes: [],
+      },
+      treatment: rasterTreatment(),
+    };
+  }
+
+  it("routes a raster treatment to RasterMap, not MapOverlay", () => {
+    const { queryByTestId } = render(<MapWidget mapData={rasterMapState()} />);
+    expect(queryByTestId("map-panel-raster")).toBeInTheDocument();
+    expect(queryByTestId("map-overlay")).not.toBeInTheDocument();
+  });
+
+  it("raster treatment wins over the room-graph branch", () => {
+    const mapData: MapState = {
+      ...roomGraphMapState(),
+      treatment: rasterTreatment(),
+    };
+    const { queryByTestId } = render(<MapWidget mapData={mapData} />);
+    expect(queryByTestId("map-panel-raster")).toBeInTheDocument();
+    expect(queryByTestId("map-panel-room-graph")).not.toBeInTheDocument();
+  });
+
+  it("dag and generated treatments fall through to the existing cascade", () => {
+    for (const kind of ["dag", "generated"]) {
+      const mapData: MapState = {
+        ...rasterMapState(),
+        treatment: { ...rasterTreatment(), kind },
+      };
+      const { queryByTestId, unmount } = render(
+        <MapWidget mapData={mapData} />
+      );
+      expect(queryByTestId("map-panel-raster")).not.toBeInTheDocument();
+      expect(queryByTestId("map-overlay")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("MapWidget module imports RasterMap (raw-import wiring guard)", async () => {
+    const src = (await import("../MapWidget?raw")) as unknown as {
+      default: string;
+    };
+    expect(src.default).toContain("@/components/map/RasterMap");
+  });
+});
