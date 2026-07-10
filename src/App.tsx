@@ -37,7 +37,7 @@ import { makeRequestId } from "@/lib/utils";
 import { loadNarratorPrefs, saveNarratorPrefs } from "@/lib/narratorPrefs";
 import { beatDispatchBlockReason, isItemUseBeat } from "@/lib/beatDispatch";
 import { toCharacterSummary, toCharacterSheetData } from "@/lib/partyStatusMapping";
-import { isDungeonMapPayload, dungeonMapToMapState } from "@/lib/dungeonMap";
+import { isSiteMapPayload, siteMapToMapState, type SiteMapState } from "@/lib/siteMap";
 import {
   computeSubmittedPlayerIds,
   mergePeerRevealsWithSubmittedStatus,
@@ -376,7 +376,13 @@ function AppInner() {
   // Overlay data from server messages
   const [characterSheet, setCharacterSheet] = useState<CharacterSheetData | null>(null);
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
-  const [mapData, setMapData] = useState<MapState | null>(null);
+  // Scene-keyed map state (Track B, story 164-5). The world cartography scene
+  // and an active site scene coexist in SEPARATE slots so entering a site no
+  // longer clobbers the surface map (the 158-36 bug). `worldMap` ← MAP_UPDATE;
+  // `siteMap` ← SITE_MAP; MapWidget foregrounds the site and drills out to the
+  // world via a view-only breadcrumb.
+  const [worldMap, setWorldMap] = useState<MapState | null>(null);
+  const [siteMap, setSiteMap] = useState<SiteMapState | null>(null);
 
   // GameBoard layout — widget visibility managed internally by useGameBoardLayout
   const { toggleWidget } = useGameBoardLayout(currentGenre ?? undefined);
@@ -1272,58 +1278,75 @@ function AppInner() {
 
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
-      setMapData(msg.payload as unknown as MapState);
+      setWorldMap(msg.payload as unknown as MapState);
+      // Exit-heal: the server's scene arbitration is mutually exclusive per turn
+      // — a world-scene MAP_UPDATE fires ONLY when this connection is NOT in a
+      // site (map_emit.py `_maybe_emit_cartography_map` stands down on a site
+      // scene). So its arrival authoritatively means "back on the surface":
+      // clear the stale site scene, or the Map tab stays stranded on a site the
+      // party has left (the single-slot design self-healed by overwriting the
+      // same slot; the scene split must clear it explicitly).
+      setSiteMap(null);
       return;
     }
-    // ADR-055 / story 153-25: the dungeon room-graph frame. The server already
-    // broadcasts DUNGEON_MAP alongside the surface MAP_UPDATE (map_emit.py); it
-    // carries the discovered room graph. Route it into `mapData` so MapWidget
-    // renders the Automapper room graph while the PC is inside the dungeon,
-    // instead of leaving only the 2 surface cartography nodes (the bug). The
-    // dungeon wire omits x/y/fog_bounds, so we adapt it explicitly rather than
-    // blind-casting it into MapState. Fail loud on a malformed frame (No Silent
-    // Fallbacks) — a silent drop is exactly the defect this story fixes.
-    if (msg.type === MessageType.DUNGEON_MAP) {
-      if (!isDungeonMapPayload(msg.payload)) {
+    // ADR-055 / story 164-5 (Track B, task 9): the site room-graph frame. The
+    // server broadcasts SITE_MAP alongside the surface MAP_UPDATE (map_emit.py);
+    // it carries the discovered site room graph + the site descriptor. Route it
+    // into the SEPARATE `siteMap` slot (NOT `worldMap`) so the surface map is
+    // never clobbered — MapWidget foregrounds the site and drills out to the
+    // world (the 158-36 fix). The site wire omits x/y/fog_bounds, so we adapt it
+    // explicitly rather than blind-casting into MapState. Fail loud on a
+    // malformed frame (No Silent Fallbacks) — a silent drop is exactly the
+    // defect this story fixes.
+    if (msg.type === MessageType.SITE_MAP) {
+      if (!isSiteMapPayload(msg.payload)) {
         console.warn(
-          "[dungeon-map] dropped malformed DUNGEON_MAP frame (missing current_location/explored)",
+          "[site-map] dropped malformed SITE_MAP frame (missing current_location/explored/site_id/site_name)",
           msg.payload,
         );
         return;
       }
-      const dungeonPayload = msg.payload;
-      setMapData(dungeonMapToMapState(dungeonPayload));
-      // Client-side consumption marker (story 153-25 AC-5): the server proves it
-      // SENT via the dungeon.map_emitted span; this proves the client RECEIVED
-      // and APPLIED the frame, so a playtest can confirm it isn't being dropped.
+      const sitePayload = msg.payload;
+      setSiteMap(siteMapToMapState(sitePayload));
+      // Client-side consumption marker: the server proves it SENT via the
+      // dungeon.map_emitted span; this proves the client RECEIVED and APPLIED
+      // the frame, so a playtest can confirm it isn't being dropped.
       console.info(
-        `[dungeon-map] applied room-graph frame: rooms=${dungeonPayload.explored.length} current=${dungeonPayload.current_location}`,
+        `[site-map] applied room-graph frame: site=${sitePayload.site_id} rooms=${sitePayload.explored.length} current=${sitePayload.current_location}`,
       );
       return;
     }
     // ADR-096 Task 20b: TACTICAL_GRID arrives on room entry and carries the
     // cavern/settlement layout for the Automapper. Patch the matching
-    // ExploredLocation in mapData with the payload so the Automapper can
-    // route by room_type and render cavern grids via TacticalGridRenderer.
+    // ExploredLocation with the payload so the Automapper can route by room_type
+    // and render cavern grids via TacticalGridRenderer. Scene-keyed (164-5): the
+    // grid belongs to whichever scene holds the room, so patch the site scene
+    // first (rooms inside a site) and fall back to the world scene — cavern
+    // grids inside a site would otherwise stop rendering after the scene split.
     if (msg.type === MessageType.TACTICAL_GRID) {
       // Shape mirrors ExploredLocation.cavern_payload exactly so the patch
       // below type-checks. Loosening cellular/derived to ``object | null``
-      // breaks the ExploredLocation contract (TS2345 at the setMapData
+      // breaks the ExploredLocation contract (TS2345 at the setState
       // call) — the TACTICAL_GRID wire shape and the patched-into shape
       // must agree at the field level.
       const tgPayload = msg.payload as NonNullable<ExploredLocation["cavern_payload"]>;
-      setMapData((prev) => {
+      // Patch a scene's matching room, or return `prev` unchanged when the room
+      // isn't in that scene — so exactly one slot re-renders. If the room isn't
+      // in explored yet (TACTICAL_GRID before its MAP_UPDATE/SITE_MAP), it's a
+      // no-op: those frames are the authoritative room list; we only patch here.
+      const patchScene = <T extends MapState>(prev: T | null): T | null => {
         if (!prev) return prev;
+        let hit = false;
         const explored = prev.explored.map((loc) => {
           const locId = loc.id ?? loc.name;
           if (locId !== tgPayload.room_id) return loc;
+          hit = true;
           return { ...loc, cavern_payload: tgPayload };
         });
-        // If the room isn't in explored yet (first time seeing it via
-        // TACTICAL_GRID before MAP_UPDATE), skip — MAP_UPDATE is the
-        // authoritative source for the room list; we only patch here.
-        return { ...prev, explored };
-      });
+        return hit ? { ...prev, explored } : prev;
+      };
+      setSiteMap((prev) => patchScene(prev));
+      setWorldMap((prev) => patchScene(prev));
       return;
     }
     // COMBAT_EVENT handler removed in story 28-9
@@ -2088,7 +2111,8 @@ function AppInner() {
     setThinking(false);
     setCharacterSheet(null);
     setInventoryData(null);
-    setMapData(null);
+    setWorldMap(null);
+    setSiteMap(null);
     setPartyMembers([]);
     setPartyCompanions([]);
     setConnectedPlayerName("");
@@ -2789,7 +2813,8 @@ function AppInner() {
                 thinking={thinking}
                 characterSheet={characterSheet}
                 inventoryData={inventoryData}
-                mapData={mapData}
+                mapData={worldMap}
+                siteMap={siteMap}
                 currentLocation={gameState.currentLocation ?? null}
                 relationshipsData={gameState.relationships ?? null}
                 questsData={gameState.questsData ?? null}

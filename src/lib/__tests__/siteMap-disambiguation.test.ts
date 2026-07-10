@@ -1,24 +1,38 @@
 // Story 158-6 — deep-view region nodes get DISTINCT labels.
 //
+// Ported to the SITE_MAP module in the 164-5 cutover (was dungeonMap.test.ts).
+// Preserves the full 158-6 regression coverage — 3-duplicate ordering, topology
+// preservation, and fog-of-war growth stability — that the siteMap.test.ts
+// smoke test only samples.
+//
 // FINDING (sq-playtest 2026-06-22, beneath_sunden): in the Map-tab deep-view,
 // distinct procedural regions collapse to duplicate "The Drowned Cavern" labels.
 // ROOT CAUSE: the server labels each region by its THEME display name
-// (map_emit.py `_build_dungeon_map_payload`: name = palette.get(node.theme)
+// (map_emit.py `_build_site_map_payload`: name = palette.get(node.theme)
 // .display_name), and a megadungeon theme spans many regions — so every region
 // of one theme arrives with an identical `name` while its `id` stays distinct.
 //
-// `dungeonMapToMapState` now disambiguates colliding labels by numbering the
-// duplicates in payload order ("The Drowned Cavern 1/2/3"), keyed off the
-// distinct id, without touching id / connections / room_exits (graph topology).
+// `siteMapToMapState` disambiguates colliding labels by numbering the duplicates
+// in payload order ("The Drowned Cavern 1/2/3"), keyed off the distinct id,
+// without touching id / connections / room_exits (graph topology).
 
 import { describe, it, expect } from "vitest";
-import { dungeonMapToMapState, type DungeonMapPayload } from "@/lib/dungeonMap";
+import { siteMapToMapState, type SiteMapPayload } from "@/lib/siteMap";
 
-/** A DUNGEON_MAP frame whose three distinct regions share one theme label. */
-function drownedCavernFrame(): DungeonMapPayload {
+/** The site descriptor fields every SITE_MAP frame carries (Track B, task 8). */
+const SITE_FIELDS = {
+  site_id: "frontier",
+  site_name: "The Deep",
+  archetype: "megadungeon",
+  extent: "frontier",
+} as const;
+
+/** A SITE_MAP frame whose three distinct regions share one theme label. */
+function drownedCavernFrame(): SiteMapPayload {
   return {
     current_location: "exp001.r2",
     region: "exp001.r2",
+    ...SITE_FIELDS,
     explored: [
       {
         id: "entrance",
@@ -66,9 +80,9 @@ function drownedCavernFrame(): DungeonMapPayload {
   };
 }
 
-describe("dungeonMapToMapState — distinct labels for theme-shared regions (158-6)", () => {
+describe("siteMapToMapState — distinct labels for theme-shared regions (158-6)", () => {
   it("numbers duplicate region labels so each node is distinguishable", () => {
-    const state = dungeonMapToMapState(drownedCavernFrame());
+    const state = siteMapToMapState(drownedCavernFrame());
     const names = state.explored.map((l) => l.name);
 
     // The three "The Drowned Cavern" regions become distinct, ordered labels.
@@ -83,13 +97,13 @@ describe("dungeonMapToMapState — distinct labels for theme-shared regions (158
   });
 
   it("leaves a label that occurs once untouched (no spurious numbering)", () => {
-    const state = dungeonMapToMapState(drownedCavernFrame());
+    const state = siteMapToMapState(drownedCavernFrame());
     expect(state.explored[0].name).toBe("The Rope Gallery");
   });
 
   it("never collapses nodes — node count equals the discovered set", () => {
     const frame = drownedCavernFrame();
-    const state = dungeonMapToMapState(frame);
+    const state = siteMapToMapState(frame);
     expect(state.explored).toHaveLength(frame.explored.length);
     // Distinct ids are preserved verbatim (the key the Automapper joins on).
     expect(state.explored.map((l) => l.id)).toEqual([
@@ -102,7 +116,7 @@ describe("dungeonMapToMapState — distinct labels for theme-shared regions (158
 
   it("never rewrites id / connections / room_exits — graph topology is preserved", () => {
     const frame = drownedCavernFrame();
-    const state = dungeonMapToMapState(frame);
+    const state = siteMapToMapState(frame);
     // Connections/exits still reference the original region IDS, not the
     // renumbered display labels — so the Automapper can still join the graph.
     const current = state.explored.find((l) => l.id === "exp001.r2")!;
@@ -116,27 +130,28 @@ describe("dungeonMapToMapState — distinct labels for theme-shared regions (158
 
   it("is stable as the discovered set grows: existing labels keep their number", () => {
     // Turn N: two drowned-cavern regions discovered.
-    const small: DungeonMapPayload = {
+    const small: SiteMapPayload = {
       current_location: "exp001.r1",
       region: "exp001.r1",
+      ...SITE_FIELDS,
       explored: [
         { id: "exp001.r1", name: "The Drowned Cavern", type: "region", connections: [] },
         { id: "exp001.r2", name: "The Drowned Cavern", type: "region", connections: [] },
       ],
     };
-    const smallNames = dungeonMapToMapState(small).explored.map((l) => l.name);
+    const smallNames = siteMapToMapState(small).explored.map((l) => l.name);
     expect(smallNames).toEqual(["The Drowned Cavern 1", "The Drowned Cavern 2"]);
 
     // Turn N+1: a third region is APPENDED (fog-of-war reveal). The first two
     // keep their numbers; only the new tail gets the next ordinal.
-    const grown: DungeonMapPayload = {
+    const grown: SiteMapPayload = {
       ...small,
       explored: [
         ...small.explored,
         { id: "exp002.r3", name: "The Drowned Cavern", type: "region", connections: [] },
       ],
     };
-    const grownNames = dungeonMapToMapState(grown).explored.map((l) => l.name);
+    const grownNames = siteMapToMapState(grown).explored.map((l) => l.name);
     expect(grownNames).toEqual([
       "The Drowned Cavern 1",
       "The Drowned Cavern 2",
