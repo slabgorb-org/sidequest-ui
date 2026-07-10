@@ -15,12 +15,15 @@
 export const MessageType = {
   PARTY_STATUS: "PARTY_STATUS",
   MAP_UPDATE: "MAP_UPDATE",
-  // ADR-055 / story 153-25: the dungeon room-graph frame. The server already
-  // broadcasts this alongside the surface-cartography MAP_UPDATE
-  // (sidequest-server .../map_emit.py `emit_fn(msg, "DUNGEON_MAP")`); it carries
-  // the discovered room graph (explored[] with room_exits) so the Map tab can
-  // draw the maze the player is standing in, not just the surface regions.
-  DUNGEON_MAP: "DUNGEON_MAP",
+  // ADR-055 / story 164-5 (Track B, task 9): the site room-graph frame. Renamed
+  // from DUNGEON_MAP in the 164-4 server cutover — the beneath_sunden-only
+  // dungeon frame generalized to ANY declared site (megadungeon, tavern, vault…).
+  // The server broadcasts this alongside the surface-cartography MAP_UPDATE
+  // (sidequest-server .../map_emit.py `emit_fn(msg, "SITE_MAP")`); it carries the
+  // discovered site room graph (explored[] with room_exits) + the owning site's
+  // descriptor (site_id/site_name/archetype/extent) so the Map tab can draw the
+  // site the player is inside, keyed per-scene, with a breadcrumb back out.
+  SITE_MAP: "SITE_MAP",
   PLAYER_ACTION: "PLAYER_ACTION",
   NARRATION: "NARRATION",
   TURN_STATUS: "TURN_STATUS",

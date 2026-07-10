@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Automapper, type ExploredRoom } from "@/components/Automapper";
 import { MapOverlay, type MapState } from "@/components/MapOverlay";
+import type { SiteMapState } from "@/lib/siteMap";
 import { OrbitalChartView } from "@/components/OrbitalChart";
 import { useOrbitalChart } from "@/hooks/useOrbitalChart";
 import { tacticalGridFromWire } from "@/lib/tacticalGridFromWire";
@@ -12,6 +13,14 @@ import type {
 
 interface MapWidgetProps {
   mapData: MapState | null;
+  /**
+   * Active site scene (story 164-5 / Track B task 9). When set, MapWidget
+   * foregrounds the site's room graph (Automapper) with a breadcrumb that
+   * drills out — VIEW-ONLY — to the world `mapData`. The world and site scenes
+   * live in separate slots, so entering a site no longer clobbers the surface
+   * map (the 158-36 fix). Null when the party is in the world scene.
+   */
+  siteMap?: SiteMapState | null;
   /**
    * Server-announced orbital capability (GameResponse.orbital — the world
    * ships orbital content). Since ADR-141 / story 98-3 this is a
@@ -77,12 +86,18 @@ interface MapWidgetProps {
  */
 export function MapWidget({
   mapData,
+  siteMap = null,
   orbital = false,
   lastOrbitalChart = null,
   lastOrbitalError = null,
   sendOrbitalIntent,
   sessionBoundEpoch = 0,
 }: MapWidgetProps) {
+  // Site-scene drill-out (story 164-5). Keyed by site_id, not a boolean, so the
+  // drill-out is stale by construction when a NEW site arrives — entering a
+  // different site re-foregrounds it rather than stranding the player on the
+  // world map. Mirrors the orbital `drilledRegionId` pattern below.
+  const [drilledOutSiteId, setDrilledOutSiteId] = useState<string | null>(null);
   // Campaign ↔ local scale state (ADR-141). Only meaningful for cluster
   // worlds; single-system worlds are always at local scale (collapse).
   // Keyed by REGION, not a boolean: a drill is into a specific system, so
@@ -230,6 +245,75 @@ export function MapWidget({
           nextConjunction={chart.next_conjunction}
           onIntent={onIntent}
         />
+      </div>
+    );
+  }
+
+  // Story 164-5 (Track B, task 9): a site scene is active. Foreground the site's
+  // room graph with a breadcrumb that drills out — VIEW-ONLY — to the world map.
+  // The clobber class (surface-vs-deep, site-vs-site) dies structurally: the
+  // world map lives in its own `mapData` slot, untouched here. Drill-out is a
+  // client view toggle; it never moves the party (travel stays
+  // prose-through-the-turn-barrier). The Track A orbital/cartography branches
+  // above are left alone.
+  if (siteMap) {
+    const drilledOut = drilledOutSiteId === siteMap.siteId;
+    const siteRooms = toExploredRooms(siteMap);
+    const currentRoomId =
+      siteRooms.find((r) => r.is_current)?.id ?? siteRooms[0]?.id ?? "";
+    const worldRegionName =
+      mapData?.region ?? mapData?.current_location ?? "the surface";
+    return (
+      <div
+        data-testid="map-panel-site"
+        className="flex flex-col"
+        style={{ width: "100%", height: "100%" }}
+      >
+        <div
+          data-testid="map-site-breadcrumb"
+          className="shrink-0 p-1 text-xs text-muted-foreground"
+        >
+          {drilledOut ? (
+            <button
+              data-testid="map-drill-in"
+              onClick={() => setDrilledOutSiteId(null)}
+              className="px-1 rounded hover:text-[var(--primary)]"
+            >
+              ▾ Back into {siteMap.siteName}
+            </button>
+          ) : (
+            <>
+              You are inside{" "}
+              <span className="text-[var(--primary)]">{siteMap.siteName}</span>
+              {" · "}
+              <button
+                data-testid="map-drill-out"
+                onClick={() => setDrilledOutSiteId(siteMap.siteId)}
+                className="px-1 rounded hover:text-[var(--primary)]"
+              >
+                ▴ {worldRegionName}
+              </button>
+            </>
+          )}
+        </div>
+        <div className="grow" style={{ minHeight: 0 }}>
+          {drilledOut ? (
+            mapData ? (
+              <MapOverlay mapData={mapData} />
+            ) : (
+              <div
+                data-testid="map-panel-empty"
+                className="p-4 text-sm text-muted-foreground/60 italic"
+              >
+                No world map yet. The world map will populate as you explore.
+              </div>
+            )
+          ) : (
+            <div data-testid="map-panel-room-graph" className="p-2">
+              <Automapper rooms={siteRooms} currentRoomId={currentRoomId} />
+            </div>
+          )}
+        </div>
       </div>
     );
   }

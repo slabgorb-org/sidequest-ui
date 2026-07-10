@@ -33,6 +33,7 @@ import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
+import type { SiteMapState } from "@/lib/siteMap";
 import {
   ConfrontationOverlay,
   type ConfrontationData,
@@ -157,6 +158,9 @@ export interface GameBoardProps {
   characterSheet?: CharacterSheetData | null;
   inventoryData?: InventoryData | null;
   mapData?: MapState | null;
+  /** Active site scene (story 164-5). When set, MapWidget foregrounds the site
+   * room graph + a view-only breadcrumb that drills out to `mapData`. */
+  siteMap?: SiteMapState | null;
   /**
    * Story 54-9 / ADR-109: persistent location description for the
    * current room. Mirrored from state.currentLocation. Null when no
@@ -326,6 +330,7 @@ export function GameBoard({
   characterSheet = null,
   inventoryData = null,
   mapData = null,
+  siteMap = null,
   currentLocation = null,
   audio,
   nowPlaying = null,
@@ -642,6 +647,7 @@ export function GameBoard({
         return (
           <MapWidget
             mapData={mapData ?? null}
+            siteMap={siteMap ?? null}
             orbital={worldOrbital}
             lastOrbitalChart={lastOrbitalChart ?? null}
             lastOrbitalError={lastOrbitalError ?? null}
@@ -748,7 +754,7 @@ export function GameBoard({
       default:
         return null;
     }
-  }, [messages, thinking, characterSheet, inventoryData, mapData,
+  }, [messages, thinking, characterSheet, inventoryData, mapData, siteMap,
       currentLocation, knowledgeEntries, relationshipsData, questsData, fateData, latestFateRoll, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, companions, genreSlug, worldSlug,
       worldOrbital, peerActionsByRound,
