@@ -93,11 +93,21 @@ export function MapWidget({
   sendOrbitalIntent,
   sessionBoundEpoch = 0,
 }: MapWidgetProps) {
-  // Site-scene drill-out (story 164-5). Keyed by site_id, not a boolean, so the
-  // drill-out is stale by construction when a NEW site arrives — entering a
-  // different site re-foregrounds it rather than stranding the player on the
-  // world map. Mirrors the orbital `drilledRegionId` pattern below.
-  const [drilledOutSiteId, setDrilledOutSiteId] = useState<string | null>(null);
+  // Site-scene drill-out (story 164-5): a client-only view toggle showing the
+  // world map instead of the active site's room graph.
+  const [drilledOut, setDrilledOut] = useState(false);
+  // Reset the drill-out whenever the active site changes — including to null on
+  // exit (world MAP_UPDATE clears siteMap) — so re-entering a site foregrounds
+  // it fresh rather than opening on the stale drilled-out world view. Tracking
+  // the site id and adjusting state DURING RENDER is React's sanctioned "reset
+  // state on prop change" pattern: no effect, no extra commit, and it sidesteps
+  // react-hooks/set-state-in-effect.
+  const activeSiteId = siteMap?.siteId ?? null;
+  const [trackedSiteId, setTrackedSiteId] = useState<string | null>(activeSiteId);
+  if (activeSiteId !== trackedSiteId) {
+    setTrackedSiteId(activeSiteId);
+    setDrilledOut(false);
+  }
   // Campaign ↔ local scale state (ADR-141). Only meaningful for cluster
   // worlds; single-system worlds are always at local scale (collapse).
   // Keyed by REGION, not a boolean: a drill is into a specific system, so
@@ -257,7 +267,6 @@ export function MapWidget({
   // prose-through-the-turn-barrier). The Track A orbital/cartography branches
   // above are left alone.
   if (siteMap) {
-    const drilledOut = drilledOutSiteId === siteMap.siteId;
     const siteRooms = toExploredRooms(siteMap);
     const currentRoomId =
       siteRooms.find((r) => r.is_current)?.id ?? siteRooms[0]?.id ?? "";
@@ -276,7 +285,7 @@ export function MapWidget({
           {drilledOut ? (
             <button
               data-testid="map-drill-in"
-              onClick={() => setDrilledOutSiteId(null)}
+              onClick={() => setDrilledOut(false)}
               className="px-1 rounded hover:text-[var(--primary)]"
             >
               ▾ Back into {siteMap.siteName}
@@ -288,7 +297,7 @@ export function MapWidget({
               {" · "}
               <button
                 data-testid="map-drill-out"
-                onClick={() => setDrilledOutSiteId(siteMap.siteId)}
+                onClick={() => setDrilledOut(true)}
                 className="px-1 rounded hover:text-[var(--primary)]"
               >
                 ▴ {worldRegionName}

@@ -1274,6 +1274,14 @@ function AppInner() {
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
       setWorldMap(msg.payload as unknown as MapState);
+      // Exit-heal: the server's scene arbitration is mutually exclusive per turn
+      // — a world-scene MAP_UPDATE fires ONLY when this connection is NOT in a
+      // site (map_emit.py `_maybe_emit_cartography_map` stands down on a site
+      // scene). So its arrival authoritatively means "back on the surface":
+      // clear the stale site scene, or the Map tab stays stranded on a site the
+      // party has left (the single-slot design self-healed by overwriting the
+      // same slot; the scene split must clear it explicitly).
+      setSiteMap(null);
       return;
     }
     // ADR-055 / story 164-5 (Track B, task 9): the site room-graph frame. The

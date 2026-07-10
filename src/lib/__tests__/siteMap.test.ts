@@ -75,6 +75,16 @@ describe("isSiteMapPayload (164-5 AC-2)", () => {
     delete p.site_name;
     expect(isSiteMapPayload(p)).toBe(false);
   });
+
+  // Empty strings type-check as strings but render "You are inside " (blank) —
+  // reject them too, fully honoring the guard's fail-loud intent.
+  it("rejects an empty site_id", () => {
+    expect(isSiteMapPayload({ ...validSitePayload(), site_id: "" })).toBe(false);
+  });
+
+  it("rejects an empty site_name", () => {
+    expect(isSiteMapPayload({ ...validSitePayload(), site_name: "" })).toBe(false);
+  });
 });
 
 describe("siteMapToMapState (164-5 AC-2)", () => {

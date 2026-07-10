@@ -44,8 +44,9 @@ export type SiteMapState = MapState & {
  * fields so a malformed frame is dropped LOUDLY by the caller (No Silent
  * Fallbacks) instead of silently corrupting the Map tab. `site_id`/`site_name`
  * are load-bearing NEW fields — the scene key and the breadcrumb label — so a
- * frame that cannot name its site is rejected rather than rendered as "You are
- * inside undefined". Per-room fields are trusted from the server contract.
+ * frame that cannot name its site (missing OR empty) is rejected rather than
+ * rendered as "You are inside undefined"/"You are inside ". Per-room fields are
+ * trusted from the server contract.
  */
 export function isSiteMapPayload(p: unknown): p is SiteMapPayload {
   if (typeof p !== "object" || p === null) return false;
@@ -54,7 +55,9 @@ export function isSiteMapPayload(p: unknown): p is SiteMapPayload {
     typeof o.current_location === "string" &&
     Array.isArray(o.explored) &&
     typeof o.site_id === "string" &&
-    typeof o.site_name === "string"
+    o.site_id.length > 0 &&
+    typeof o.site_name === "string" &&
+    o.site_name.length > 0
   );
 }
 

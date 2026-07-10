@@ -249,6 +249,40 @@ describe("SITE_MAP wiring (164-5) — message → siteMap → Automapper + bread
     expect(roomRects()).toHaveLength(0);
   });
 
+  it("heals the exit: a world-scene MAP_UPDATE clears the stale site scene (AC-3)", async () => {
+    // The server's scene arbitration is mutually exclusive per turn: inside a
+    // site only SITE_MAP fires; on exit to the surface the cartography emit
+    // stands down its site-scene gate and a world-scene MAP_UPDATE fires with NO
+    // clearing SITE_MAP (map_emit.py `_maybe_emit_cartography_map` returns when
+    // scene.kind == "site"). So a MAP_UPDATE authoritatively means "world scene
+    // now" — the client must DROP the stale site, not stay stranded on it (the
+    // inverse of the 158-36 bug the scene split introduced if left unhealed).
+    const server = new WS(`ws://${location.host}/ws`, { jsonProtocol: true });
+    await renderToMapTab(server);
+
+    // Inside the site: room graph + breadcrumb.
+    act(() => {
+      server.send(SITE_MAP_FRAME);
+    });
+    await waitFor(() => {
+      expect(roomRects()).toHaveLength(2);
+    });
+    expect(screen.getByTestId("map-site-breadcrumb")).toBeInTheDocument();
+
+    // Exit to the surface — a world-scene MAP_UPDATE arrives (no SITE_MAP).
+    act(() => {
+      server.send(SURFACE_MAP_UPDATE);
+    });
+
+    // The site scene is gone: world cartography shows, no room graph, no crumb.
+    await waitFor(() => {
+      expect(screen.queryByTestId("map-overlay")).toBeInTheDocument();
+    });
+    expect(roomRects()).toHaveLength(0);
+    expect(screen.queryByTestId("map-site-breadcrumb")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("map-panel-room-graph")).not.toBeInTheDocument();
+  });
+
   it("consumes the server's exact SITE_MAP wire shape — no x/y/fog_bounds required (AC-2)", async () => {
     // SITE_MAP_FRAME omits x, y, and fog_bounds exactly as the server emits
     // (SiteMapLocation has no x/y; SiteMapPayload has no fog_bounds). If the
