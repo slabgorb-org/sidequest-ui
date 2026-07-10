@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Automapper, type ExploredRoom } from "@/components/Automapper";
 import { MapOverlay, type MapState } from "@/components/MapOverlay";
+import { RasterMap } from "@/components/map/RasterMap";
 import { OrbitalChartView } from "@/components/OrbitalChart";
 import { useOrbitalChart } from "@/hooks/useOrbitalChart";
 import { tacticalGridFromWire } from "@/lib/tacticalGridFromWire";
@@ -241,6 +242,22 @@ export function MapWidget({
         className="p-4 text-sm text-muted-foreground/60 italic"
       >
         No map data yet. The world map will populate as you explore.
+      </div>
+    );
+  }
+
+  // Raster treatment (Story 163-5, spec §4 A1): a world whose map.yaml
+  // declares a PD scan renders RasterMap ahead of the room-graph/overlay
+  // cascade. Gated strictly on kind === "raster" — dag/generated/absent
+  // treatments fall through unchanged; orrery worlds were already routed
+  // by the `orbital` flag above.
+  if (mapData.treatment?.kind === "raster") {
+    return (
+      <div
+        data-testid="map-panel-raster-host"
+        style={{ width: "100%", height: "100%" }}
+      >
+        <RasterMap treatment={mapData.treatment} mapData={mapData} />
       </div>
     );
   }
