@@ -9,7 +9,21 @@ import { YieldButton } from "@/components/YieldButton";
 // ═══════════════════════════════════════════════════════════
 
 export interface EncounterActor {
+  /**
+   * The seat's entity ID — NOT a label. The server resolves this actor's stat
+   * block by it (`find_creature_core`), and tag targets / `last_beat_impacts`
+   * keys reference it. Render it only through `actorDisplayName`; never send
+   * anything but this string back as a target.
+   */
   name: string;
+  /**
+   * The stage name (story 166-10 / ADR-156 §6). When the narrator's prose names
+   * a generic, unnamed Other — "Ihnsch of the Rusted Works" for a bestiary row
+   * canonically called "the Scrapborn" — the server puts that name HERE and
+   * leaves `name` alone. Display only. Absent for the overwhelming majority of
+   * actors, which then render under `name` exactly as they always have.
+   */
+  display_name?: string | null;
   role: string;
   portrait_url?: string;
   /**
@@ -355,14 +369,14 @@ function ActorChip({ actor, decorative = false }: { actor: EncounterActor; decor
     <div
       data-testid="actor-portrait"
       data-has-portrait={hasPortrait ? "true" : "false"}
-      title={`${humanizeActorName(actor.name)} — ${actor.role}`}
+      title={`${actorDisplayName(actor)} — ${actor.role}`}
       aria-hidden={decorative || undefined}
       className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0 overflow-hidden"
     >
       {hasPortrait ? (
         <img
           src={actor.portrait_url}
-          alt={humanizeActorName(actor.name)}
+          alt={actorDisplayName(actor)}
           loading="lazy"
           className="w-full h-full object-cover"
         />
@@ -553,7 +567,7 @@ function StatusLine({ data }: { data: ConfrontationData }) {
                 // chip is decorative (aria-hidden above), so this sr-only
                 // span is the listitem's accessible text — the clean name,
                 // without the portrait initial contaminating it.
-                <span className="sr-only">{humanizeActorName(a.name)}</span>
+                <span className="sr-only">{actorDisplayName(a)}</span>
               )}
               {committedActors !== null && a.side === "player" && (
                 <span
@@ -659,6 +673,16 @@ function humanizeActorName(name: string): string {
     .split("_")
     .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
     .join(" ");
+}
+
+/** The name to SHOW for an actor: its stage name if the world has given it one,
+ * otherwise its seat id (story 166-10 / ADR-156 §6). Both go through the same
+ * humanizing transform — a narrator-invented stage name can arrive slugged just
+ * as a seat id can. One helper, used at every display site, so the roster chip,
+ * the portrait tooltip and the THEM panel can never disagree about what this
+ * enemy is called. The id itself is never rewritten — see `EncounterActor.name`. */
+function actorDisplayName(actor: EncounterActor): string {
+  return humanizeActorName(actor.display_name ?? actor.name);
 }
 
 function SpellPicker({
@@ -1216,7 +1240,7 @@ function ThemPanel({ data }: { data: ConfrontationData }) {
       </span>
       <ActorChip actor={opponent} />
       <span className="font-semibold text-[13px] text-foreground">
-        {humanizeActorName(opponent.name)}
+        {actorDisplayName(opponent)}
       </span>
       {opponent.role && (
         <span className="text-[11px] text-muted-foreground">{opponent.role}</span>
