@@ -241,8 +241,12 @@ describe("FateConflictSurface stage name (166-10)", () => {
       ),
     );
 
-    expect(screen.getByText(new RegExp(PROSE))).toBeInTheDocument();
-    expect(screen.queryByText(/Scrapborn attacks/)).not.toBeInTheDocument();
+    // Scoped to the ledger: once every display site is fixed, the prose name appears
+    // in the roster and the track heading too, so an unscoped getByText matches three
+    // elements. The assertion is about THIS section's clause.
+    const ledger = within(screen.getByTestId("fate-last-exchange"));
+    expect(ledger.getByText(new RegExp(`^${PROSE} attacks`))).toBeInTheDocument();
+    expect(ledger.queryByText(/Scrapborn/)).not.toBeInTheDocument();
   });
 
   it("falls back to the seat id for an Other the world has not named yet", () => {

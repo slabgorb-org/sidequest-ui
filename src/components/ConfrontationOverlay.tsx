@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
 import { isItemUseBeat } from "@/lib/beatDispatch";
+import { actorDisplayName } from "@/lib/actorDisplayName";
 import { YieldButton } from "@/components/YieldButton";
 
 // ═══════════════════════════════════════════════════════════
@@ -381,7 +382,14 @@ function ActorChip({ actor, decorative = false }: { actor: EncounterActor; decor
           className="w-full h-full object-cover"
         />
       ) : (
-        actor.name.charAt(0).toUpperCase()
+        // Story 166-10: the initial comes from the DISPLAY name, not the seat id.
+        // A coal Other is a `generics:` bestiary row and essentially never has a
+        // portrait, so this fallback is the common case for a promoted enemy —
+        // reading `actor.name` here rendered a chip saying "T" (the Scrapborn)
+        // beside a label saying "Ihnsch of the Rusted Works". The coal name leaked
+        // out one character at a time, at the two sites ActorChip mounts (the
+        // roster row and the THEM panel).
+        actorDisplayName(actor).charAt(0).toUpperCase()
       )}
     </div>
   );
@@ -664,26 +672,13 @@ function humanizeSpellId(id: string): string {
  * A runtime-seated opponent with no known name carries a slug as its
  * `actor.name`, and that field is a load-bearing entity id (tag targets /
  * last_beat_impacts keys reference it) — so we humanize for DISPLAY only and
- * never rewrite the id. De-underscore + capitalize the first letter of each
- * segment; the rest of each segment is left untouched, so an already-humanized
- * real name ("Kanga Moana-Teru") passes through unchanged rather than being
- * lower-cased and mangled. Same transform the spell-id picker uses. */
-function humanizeActorName(name: string): string {
-  return name
-    .split("_")
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
-
-/** The name to SHOW for an actor: its stage name if the world has given it one,
- * otherwise its seat id (story 166-10 / ADR-156 §6). Both go through the same
- * humanizing transform — a narrator-invented stage name can arrive slugged just
- * as a seat id can. One helper, used at every display site, so the roster chip,
- * the portrait tooltip and the THEM panel can never disagree about what this
- * enemy is called. The id itself is never rewritten — see `EncounterActor.name`. */
-function actorDisplayName(actor: EncounterActor): string {
-  return humanizeActorName(actor.display_name ?? actor.name);
-}
+ * never rewrite the id.
+ *
+ * Story 166-10 (round 3): both helpers now live in `@/lib/actorDisplayName` and
+ * are shared with `FateConflictSurface` — the confrontation panel for the four
+ * Fate packs. They were private to this file, which is how the Fate surface came
+ * to render the raw seat id at seven display sites while this one rendered the
+ * stage name. One helper, used at every display site, on every surface. */
 
 function SpellPicker({
   spellcasting,
