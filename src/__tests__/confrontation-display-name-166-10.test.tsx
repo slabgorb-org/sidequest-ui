@@ -126,4 +126,39 @@ describe("ConfrontationOverlay stage name (166-10)", () => {
 
     expect(themPanel().getByText("Ihnsch Of The Rusted Works")).toBeInTheDocument();
   });
+
+  it("draws the avatar initial from the prose name, not the seat id", () => {
+    // THE FIFTH DISPLAY SITE. Round 2's assessment claimed "all four display sites"
+    // and counted the four that called `actorDisplayName`. `ActorChip`'s no-portrait
+    // fallback still reads the raw id:
+    //
+    //     ActorChip: actor.name.charAt(0).toUpperCase()
+    //
+    // A coal Other essentially never has a portrait — it is a `generics:` bestiary
+    // row, a stat donor, and portraits are authored for named entities. So the
+    // overwhelmingly common promoted case renders a chip reading "T" (from "the
+    // Scrapborn") immediately beside a label reading "Ihnsch of the Rusted Works".
+    // The coal name leaks out one character at a time, in the very component this
+    // story fixed.
+    renderOverlay(
+      makeData([
+        { name: "Magpie", role: "scavenger", side: "player" },
+        { name: COAL, display_name: PROSE, role: "foe", side: "opponent" },
+      ] as EncounterActor[]),
+    );
+
+    const initials = screen
+      .getAllByTestId("actor-portrait")
+      .filter((el) => el.getAttribute("data-has-portrait") === "false")
+      .map((el) => el.textContent);
+
+    // THREE chips, because `ActorChip` is mounted at two sites — the StatusLine
+    // roster (player + foes) and the THEM panel (the foe again). So the coal initial
+    // leaks TWICE per promoted Other, not once. Both flow through the same component,
+    // so both are one fix.
+    //
+    // "Magpie" -> M (the player: unpromoted, correct either way).
+    // the Other -> I (Ihnsch), NOT T (the Scrapborn). Twice.
+    expect(initials).toEqual(["M", "I", "I"]);
+  });
 });
