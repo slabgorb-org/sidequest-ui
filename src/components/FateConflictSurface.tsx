@@ -9,6 +9,7 @@ import type {
   FateThrowPayload,
 } from "@/types/payloads";
 import { FateDiceTray } from "@/dice/FateDiceTray";
+import { actorDisplayName, humanizeActorName } from "@/lib/actorDisplayName";
 
 /**
  * FateConflictSurface — the player-facing Fate conflict surface (ADR-144 F3f,
@@ -188,9 +189,13 @@ function opponentProgress(
  *  renders as a colored badge. Localizes "You"/"you" when an actor is the local PC,
  *  and conjugates the verb (2nd vs 3rd person) so "You attack" / "Queen attacks" both
  *  read naturally. NPC dice stay hidden (ADR-148); the derived TOTALS are shown. */
-function exchangeClause(line: FateExchangeLine, me: string): string {
+function exchangeClause(
+  line: FateExchangeLine,
+  me: string,
+  labelFor: (name: string) => string,
+): string {
   const subjectIsMe = line.actor === me;
-  const subject = subjectIsMe ? "You" : line.actor;
+  const subject = subjectIsMe ? "You" : labelFor(line.actor);
   const verb =
     line.action === "attack"
       ? subjectIsMe
@@ -212,7 +217,7 @@ function exchangeClause(line: FateExchangeLine, me: string): string {
     const dskill = line.defense_skill ? ` ${line.defense_skill}` : "";
     clause += defenderIsMe
       ? ` → you defend${dskill}${dtotal}`
-      : ` → ${line.target} defends${dskill}${dtotal}`;
+      : ` → ${labelFor(line.target)} defends${dskill}${dtotal}`;
   }
   return `${clause} →`;
 }
@@ -278,6 +283,18 @@ export function FateConflictSurface({
   // offered when there are several. Overcome/create_advantage are passive — no target.
   const opponents = conflict.participants.filter((p) => p.side === "opponent");
   const activeTarget = target || opponents[0]?.name || "";
+  // Story 166-10 (ADR-156 §6): the seat-id → stage-name resolver for the surfaces
+  // that carry a bare NAME on the wire rather than a whole participant — the
+  // exchange ledger (`FateExchangeLine.actor` / `.target`) and the Defend! banner
+  // (`FateDefendRequestPayload.attacker`). Those payloads reference an actor by its
+  // canonical id, and the participants list is the ONE place that knows the label
+  // for an id, so we resolve here rather than widening three more wire models. An
+  // unknown name (a PC, or an actor who has left the conflict) still humanizes —
+  // never falls through raw.
+  const labelFor = (name: string): string => {
+    const p = conflict.participants.find((x) => x.name === name);
+    return p ? actorDisplayName(p) : humanizeActorName(name);
+  };
   // ADR-144 F3e: the narrator's offered compels awaiting accept/refuse. The
   // server is the economy authority; the panel only reflects FATE_STATE.
   const compels = conflict.pending_compels ?? [];
@@ -446,7 +463,7 @@ export function FateConflictSurface({
                   p.side === "opponent" ? "bg-destructive" : "bg-primary"
                 }`}
               />
-              <span className="flex-1">{p.name}</span>
+              <span className="flex-1">{actorDisplayName(p)}</span>
               <span
                 className={`text-[10px] uppercase tracking-wide rounded px-1.5 py-0.5 border ${
                   p.side === "opponent"
@@ -525,7 +542,7 @@ export function FateConflictSurface({
             data-opponent={o.name}
             className="flex flex-col gap-1"
           >
-            <div className={SECTION_LABEL}>{o.name}</div>
+            <div className={SECTION_LABEL}>{actorDisplayName(o)}</div>
             {/* Taken-out win-meter (mirrors EdgeBar): fills toward 100% as the Other
                 absorbs harm; flashes at threshold (next overflow takes them out). */}
             <div
@@ -536,7 +553,7 @@ export function FateConflictSurface({
             >
               <span
                 className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground flex-shrink-0"
-                aria-label={`${o.name} taken-out progress`}
+                aria-label={`${actorDisplayName(o)} taken-out progress`}
               >
                 Taken out
               </span>
@@ -617,7 +634,7 @@ export function FateConflictSurface({
                 data-outcome={line.outcome}
                 className="flex flex-wrap items-baseline gap-x-1 tabular-nums"
               >
-                <span>{exchangeClause(line, actorName)}</span>
+                <span>{exchangeClause(line, actorName, labelFor)}</span>
                 {line.detail && (
                   <span className="font-semibold" style={{ color: outcomeTint(line.outcome) }}>
                     {line.detail}
@@ -641,7 +658,7 @@ export function FateConflictSurface({
           className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2"
         >
           <span style={{ fontFamily: FONT_DISPLAY }} className="text-base">
-            Defend! <strong>{pendingDefend.attacker}</strong> attacks with{" "}
+            Defend! <strong>{labelFor(pendingDefend.attacker)}</strong> attacks with{" "}
             <strong>{pendingDefend.attack_skill}</strong> at total{" "}
             <strong className="tabular-nums">{pendingDefend.attack_total}</strong>
             {pendingDefend.mental ? " (mental)" : ""}
@@ -858,8 +875,12 @@ export function FateConflictSurface({
                 className={FIELD_CLS}
               >
                 {opponents.map((o) => (
+                  // The player READS the option; the server READS the value. The
+                  // value rides back as `FATE_THROW.target` and `_resolve_attack`
+                  // resolves the victim by it — so it stays the canonical seat id
+                  // while the text carries the stage name (story 166-10).
                   <option key={o.name} value={o.name}>
-                    {o.name}
+                    {actorDisplayName(o)}
                   </option>
                 ))}
               </select>

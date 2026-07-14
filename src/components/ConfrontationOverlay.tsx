@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
 import { isItemUseBeat } from "@/lib/beatDispatch";
+import { actorDisplayName } from "@/lib/actorDisplayName";
 import { YieldButton } from "@/components/YieldButton";
 
 // ═══════════════════════════════════════════════════════════
@@ -9,7 +10,21 @@ import { YieldButton } from "@/components/YieldButton";
 // ═══════════════════════════════════════════════════════════
 
 export interface EncounterActor {
+  /**
+   * The seat's entity ID — NOT a label. The server resolves this actor's stat
+   * block by it (`find_creature_core`), and tag targets / `last_beat_impacts`
+   * keys reference it. Render it only through `actorDisplayName`; never send
+   * anything but this string back as a target.
+   */
   name: string;
+  /**
+   * The stage name (story 166-10 / ADR-156 §6). When the narrator's prose names
+   * a generic, unnamed Other — "Ihnsch of the Rusted Works" for a bestiary row
+   * canonically called "the Scrapborn" — the server puts that name HERE and
+   * leaves `name` alone. Display only. Absent for the overwhelming majority of
+   * actors, which then render under `name` exactly as they always have.
+   */
+  display_name?: string | null;
   role: string;
   portrait_url?: string;
   /**
@@ -355,19 +370,26 @@ function ActorChip({ actor, decorative = false }: { actor: EncounterActor; decor
     <div
       data-testid="actor-portrait"
       data-has-portrait={hasPortrait ? "true" : "false"}
-      title={`${humanizeActorName(actor.name)} — ${actor.role}`}
+      title={`${actorDisplayName(actor)} — ${actor.role}`}
       aria-hidden={decorative || undefined}
       className="w-5 h-5 rounded-full bg-muted border border-border grid place-items-center text-[10px] font-semibold text-foreground flex-shrink-0 overflow-hidden"
     >
       {hasPortrait ? (
         <img
           src={actor.portrait_url}
-          alt={humanizeActorName(actor.name)}
+          alt={actorDisplayName(actor)}
           loading="lazy"
           className="w-full h-full object-cover"
         />
       ) : (
-        actor.name.charAt(0).toUpperCase()
+        // Story 166-10: the initial comes from the DISPLAY name, not the seat id.
+        // A coal Other is a `generics:` bestiary row and essentially never has a
+        // portrait, so this fallback is the common case for a promoted enemy —
+        // reading `actor.name` here rendered a chip saying "T" (the Scrapborn)
+        // beside a label saying "Ihnsch of the Rusted Works". The coal name leaked
+        // out one character at a time, at the two sites ActorChip mounts (the
+        // roster row and the THEM panel).
+        actorDisplayName(actor).charAt(0).toUpperCase()
       )}
     </div>
   );
@@ -553,7 +575,7 @@ function StatusLine({ data }: { data: ConfrontationData }) {
                 // chip is decorative (aria-hidden above), so this sr-only
                 // span is the listitem's accessible text — the clean name,
                 // without the portrait initial contaminating it.
-                <span className="sr-only">{humanizeActorName(a.name)}</span>
+                <span className="sr-only">{actorDisplayName(a)}</span>
               )}
               {committedActors !== null && a.side === "player" && (
                 <span
@@ -650,16 +672,13 @@ function humanizeSpellId(id: string): string {
  * A runtime-seated opponent with no known name carries a slug as its
  * `actor.name`, and that field is a load-bearing entity id (tag targets /
  * last_beat_impacts keys reference it) — so we humanize for DISPLAY only and
- * never rewrite the id. De-underscore + capitalize the first letter of each
- * segment; the rest of each segment is left untouched, so an already-humanized
- * real name ("Kanga Moana-Teru") passes through unchanged rather than being
- * lower-cased and mangled. Same transform the spell-id picker uses. */
-function humanizeActorName(name: string): string {
-  return name
-    .split("_")
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
+ * never rewrite the id.
+ *
+ * Story 166-10 (round 3): both helpers now live in `@/lib/actorDisplayName` and
+ * are shared with `FateConflictSurface` — the confrontation panel for the four
+ * Fate packs. They were private to this file, which is how the Fate surface came
+ * to render the raw seat id at seven display sites while this one rendered the
+ * stage name. One helper, used at every display site, on every surface. */
 
 function SpellPicker({
   spellcasting,
@@ -1216,7 +1235,7 @@ function ThemPanel({ data }: { data: ConfrontationData }) {
       </span>
       <ActorChip actor={opponent} />
       <span className="font-semibold text-[13px] text-foreground">
-        {humanizeActorName(opponent.name)}
+        {actorDisplayName(opponent)}
       </span>
       {opponent.role && (
         <span className="text-[11px] text-muted-foreground">{opponent.role}</span>

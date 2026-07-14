@@ -1234,6 +1234,16 @@ export interface FateCharacterEntry {
  *  side (player / opponent / neutral). */
 export interface FateConflictParticipant {
   name: string;
+  // Story 166-10 / ADR-156 §6: the stage name the narrator's prose gave a generic
+  // Other ("Ihnsch of the Rusted Works" for a bestiary row seated as "the
+  // Scrapborn"). Mirrors `EncounterActor.display_name`. Optional/back-compat like
+  // `committed?` — absent until the world names the enemy.
+  //
+  // `name` above stays the canonical seat id and is what the surface must keep
+  // SENDING (the attack-target `<option value>` rides back as `FATE_THROW.target`
+  // and the server resolves the victim by it). THIS is what the surface must
+  // SHOW — always via `actorDisplayName()`, never raw.
+  display_name?: string | null;
   side: string;
   // Story 126-29: True when this actor has sealed a proactive action this exchange
   // (server-authoritative, resume-safe). Optional/back-compat like `stunts?` — the
