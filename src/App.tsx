@@ -62,7 +62,7 @@ import { MultiplayerSessionStatus, type SessionPlayerStatus } from "@/components
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { PausedBanner } from "@/components/PausedBanner";
 import { DeathBanner } from "@/components/DeathBanner";
-import { MutationRefusalBanner } from "@/components/MutationRefusalBanner";
+import { MutationRefusalBanner, type MutationRefusal } from "@/components/MutationRefusalBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { BugReportButton } from "@/components/BugReportButton";
 import { useDisplayName } from "@/hooks/useDisplayName";
@@ -438,13 +438,15 @@ function AppInner() {
     canReroll: boolean;
   } | null>(null);
   // Story 158-57: the player-facing mirror of awn.mutation.refused. Dismissible
-  // (unlike incapacitation above, a refusal does not lock the seat) — cleared on
-  // dismiss or session leave; a fresh MUTATION_REFUSED simply replaces it.
-  const [mutationRefusal, setMutationRefusal] = useState<{
-    actor: string;
-    mutationId: string;
-    reason: string;
-  } | null>(null);
+  // (unlike incapacitation above, a refusal does not lock the seat). A LIST, not
+  // a single nullable slot: run_wn_round appends one MUTATION_REFUSED frame per
+  // doomed slot in the round walk, so two doomed mutations in one round arrive
+  // as two frames (Reviewer round 3 [MEDIUM] — a single slot silently dropped
+  // every refusal but the last, the exact MP shape the server-side
+  // test_refusal_survives_the_multiplayer_barrier test exists to prove doesn't
+  // get lost). Each entry carries a client-generated id for a targeted dismiss;
+  // dismissing one never clears the others. Cleared on session leave.
+  const [mutationRefusals, setMutationRefusals] = useState<MutationRefusal[]>([]);
   // Ref bridge: handleMessage (useCallback, declared above localCharacterName)
   // matches the incapacitated character against the local PC. Synced by an
   // effect once localCharacterName is computed.
@@ -1293,7 +1295,13 @@ function AppInner() {
     // so the whole table learns the round's mechanical truth when it fires.
     if (msg.type === MessageType.MUTATION_REFUSED) {
       const p = msg.payload as unknown as MutationRefusedPayload;
-      setMutationRefusal({ actor: p.actor, mutationId: p.mutation_id, reason: p.reason });
+      // APPEND — never replace. Two doomed mutations in one round walk
+      // (run_wn_round appends per-slot) arrive as two frames, and each must
+      // render (Reviewer round 3 [MEDIUM]).
+      setMutationRefusals((prev) => [
+        ...prev,
+        { id: makeRequestId(), actor: p.actor, mutationId: p.mutation_id, reason: p.reason },
+      ]);
       return;
     }
 
@@ -2147,7 +2155,7 @@ function AppInner() {
     setPaused(false);
     setPauseWaitingFor([]);
     setIncapacitation(null);
-    setMutationRefusal(null);
+    setMutationRefusals([]);
     setSeatedPlayers({});
     setOffline(false);
     seenEventKeysRef.current.clear();
@@ -2764,8 +2772,8 @@ function AppInner() {
       <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
       <DeathBanner incapacitation={incapacitation} onReroll={handleLeave} />
       <MutationRefusalBanner
-        refusal={mutationRefusal}
-        onDismiss={() => setMutationRefusal(null)}
+        refusals={mutationRefusals}
+        onDismiss={(id) => setMutationRefusals((prev) => prev.filter((r) => r.id !== id))}
       />
       <BugReportButton
         context={{

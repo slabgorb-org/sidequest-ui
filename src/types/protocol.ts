@@ -142,8 +142,15 @@ export const MessageType = {
   // OTEL span (previously GM-panel-only). Broadcast by the WN sealed round walk
   // when a committed AWN mutation use did NOT apply — not_owned /
   // limit_exhausted / strain_over_max (use_ops economy) or unknown_mutation (the
-  // pre-spine catalog guard). PC-scoped via payload.actor; reason carries the
-  // mechanics-first math server-side (e.g. "limit_exhausted (per_day: 1/1)").
+  // pre-spine catalog guard). TABLE-WIDE, not PC-scoped: the server
+  // room_broadcasts it to every connected socket (no per-recipient filter, same
+  // as DICE_REQUEST/DICE_RESULT), and ADR-036 already has the whole table wait
+  // on the round barrier, so the whole table is meant to learn the round's
+  // mechanical truth when it fires — unlike CHARACTER_INCAPACITATED, a refusal
+  // never locks a seat, so there is no "hide it from peers" reason. payload.actor
+  // names WHO was refused for display, not for client-side filtering. reason
+  // carries the mechanics-first math server-side (e.g. "limit_exhausted
+  // (per_day: 1/1)").
   MUTATION_REFUSED: "MUTATION_REFUSED",
 } as const;
 
