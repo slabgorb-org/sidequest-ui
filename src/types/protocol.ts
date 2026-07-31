@@ -138,6 +138,20 @@ export const MessageType = {
   // physics-is-the-roll, exactly like the proactive throw. Dropping this message
   // hangs the exchange forever (the 126-17 showstopper).
   FATE_DEFEND_REQUEST: "FATE_DEFEND_REQUEST",
+  // Story 158-57: player-facing mirror of the server's awn.mutation.refused
+  // OTEL span (previously GM-panel-only). Broadcast by the WN sealed round walk
+  // when a committed AWN mutation use did NOT apply — not_owned /
+  // limit_exhausted / strain_over_max (use_ops economy) or unknown_mutation (the
+  // pre-spine catalog guard). TABLE-WIDE, not PC-scoped: the server
+  // room_broadcasts it to every connected socket (no per-recipient filter, same
+  // as DICE_REQUEST/DICE_RESULT), and ADR-036 already has the whole table wait
+  // on the round barrier, so the whole table is meant to learn the round's
+  // mechanical truth when it fires — unlike CHARACTER_INCAPACITATED, a refusal
+  // never locks a seat, so there is no "hide it from peers" reason. payload.actor
+  // names WHO was refused for display, not for client-side filtering. reason
+  // carries the mechanics-first math server-side (e.g. "limit_exhausted
+  // (per_day: 1/1)").
+  MUTATION_REFUSED: "MUTATION_REFUSED",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

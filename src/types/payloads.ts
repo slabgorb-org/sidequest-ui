@@ -827,6 +827,11 @@ export interface FateStateMessage extends BaseMessage {
   payload: FateStatePayload;
 }
 
+export interface MutationRefusedMessage extends BaseMessage {
+  type: typeof MessageType.MUTATION_REFUSED;
+  payload: MutationRefusedPayload;
+}
+
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -855,7 +860,8 @@ export type TypedGameMessage =
   | RelationshipsMessage
   | CharacterIncapacitatedMessage
   | FateStateMessage
-  | FateDefendRequestMessage;
+  | FateDefendRequestMessage
+  | MutationRefusedMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -1110,6 +1116,20 @@ export interface CharacterIncapacitatedPayload {
   status_text: string;
   headline: string;
   can_reroll: boolean;
+}
+
+// Story 158-57: player-facing mirror of the server's awn.mutation.refused OTEL
+// span (previously GM-panel-only). Broadcast by the WN sealed round walk when a
+// committed AWN mutation use did NOT apply. Field names mirror the server
+// pydantic model (MutationRefusedPayload in
+// sidequest-server/sidequest/protocol/messages.py) on the snake_case wire.
+// `reason` already carries the mechanics-first math server-side (e.g.
+// "limit_exhausted (per_day: 1/1)", "strain_over_max (would exceed max (10))")
+// — display it as-is, do not reformat or re-derive it client-side.
+export interface MutationRefusedPayload {
+  actor: string;
+  mutation_id: string;
+  reason: string;
 }
 
 // Story 77-5 / ADR-137: player-facing quest spine snapshot. Field names mirror
