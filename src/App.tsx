@@ -48,7 +48,7 @@ import type { ExploredLocation, MapState } from "@/components/MapOverlay";
 import type { CharacterSummary, CompanionSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption, ConfrontationOutcome } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
-import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry, CharacterIncapacitatedPayload, ResourcePoolPayload } from "@/types/payloads";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams, ErrorPayload, ActionRevealEntry, CharacterIncapacitatedPayload, ResourcePoolPayload, MutationRefusedPayload } from "@/types/payloads";
 import type { InputBarRevealCall } from "@/components/InputBar";
 import { usePeerReveals } from "@/hooks/usePeerReveals";
 import { usePersistedPeerActions } from "@/hooks/usePersistedPeerActions";
@@ -62,6 +62,7 @@ import { MultiplayerSessionStatus, type SessionPlayerStatus } from "@/components
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { PausedBanner } from "@/components/PausedBanner";
 import { DeathBanner } from "@/components/DeathBanner";
+import { MutationRefusalBanner } from "@/components/MutationRefusalBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { BugReportButton } from "@/components/BugReportButton";
 import { useDisplayName } from "@/hooks/useDisplayName";
@@ -435,6 +436,14 @@ function AppInner() {
     headline: string;
     verdict: string;
     canReroll: boolean;
+  } | null>(null);
+  // Story 158-57: the player-facing mirror of awn.mutation.refused. Dismissible
+  // (unlike incapacitation above, a refusal does not lock the seat) — cleared on
+  // dismiss or session leave; a fresh MUTATION_REFUSED simply replaces it.
+  const [mutationRefusal, setMutationRefusal] = useState<{
+    actor: string;
+    mutationId: string;
+    reason: string;
   } | null>(null);
   // Ref bridge: handleMessage (useCallback, declared above localCharacterName)
   // matches the incapacitated character against the local PC. Synced by an
@@ -1273,6 +1282,18 @@ function AppInner() {
         });
         setThinking(false);
       }
+      return;
+    }
+
+    // Story 158-57: a committed AWN mutation that did NOT apply (not_owned /
+    // limit_exhausted / strain_over_max / unknown_mutation) — the player-facing
+    // mirror of the GM-panel-only awn.mutation.refused span. Table-wide, unlike
+    // CHARACTER_INCAPACITATED above: a refusal never locks input, so it is not
+    // PC-scoped — ADR-036 already has the whole table wait on the round barrier,
+    // so the whole table learns the round's mechanical truth when it fires.
+    if (msg.type === MessageType.MUTATION_REFUSED) {
+      const p = msg.payload as unknown as MutationRefusedPayload;
+      setMutationRefusal({ actor: p.actor, mutationId: p.mutation_id, reason: p.reason });
       return;
     }
 
@@ -2126,6 +2147,7 @@ function AppInner() {
     setPaused(false);
     setPauseWaitingFor([]);
     setIncapacitation(null);
+    setMutationRefusal(null);
     setSeatedPlayers({});
     setOffline(false);
     seenEventKeysRef.current.clear();
@@ -2741,6 +2763,10 @@ function AppInner() {
       <OfflineBanner offline={offline} />
       <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
       <DeathBanner incapacitation={incapacitation} onReroll={handleLeave} />
+      <MutationRefusalBanner
+        refusal={mutationRefusal}
+        onDismiss={() => setMutationRefusal(null)}
+      />
       <BugReportButton
         context={{
           sessionSlug: slug,

@@ -138,6 +138,13 @@ export const MessageType = {
   // physics-is-the-roll, exactly like the proactive throw. Dropping this message
   // hangs the exchange forever (the 126-17 showstopper).
   FATE_DEFEND_REQUEST: "FATE_DEFEND_REQUEST",
+  // Story 158-57: player-facing mirror of the server's awn.mutation.refused
+  // OTEL span (previously GM-panel-only). Broadcast by the WN sealed round walk
+  // when a committed AWN mutation use did NOT apply — not_owned /
+  // limit_exhausted / strain_over_max (use_ops economy) or unknown_mutation (the
+  // pre-spine catalog guard). PC-scoped via payload.actor; reason carries the
+  // mechanics-first math server-side (e.g. "limit_exhausted (per_day: 1/1)").
+  MUTATION_REFUSED: "MUTATION_REFUSED",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
