@@ -4,14 +4,15 @@ import { ConfrontationOverlay } from '../ConfrontationOverlay';
 import type { ConfrontationData } from '../ConfrontationOverlay';
 
 // ═══════════════════════════════════════════════════════════
-// Story 162-11 (RED) — real-UI ARIA fidelity for understudy perception.
+// Story 162-11 — real-UI ARIA fidelity for understudy perception (shipped).
 //
 // The understudy `two_names_one_enemy` detector (162-7) reads the aria snapshot
 // a player perceives and looks for a `region "Enemies"` whose foes are
-// `listitem`s. sidequest-understudy's fixture stubs those tokens, so the
-// detector passes in the fixture but returns None on every REAL session — the
-// live ConfrontationOverlay exposes no such region and the opponent's name is
-// carried only in a portrait `title`, never as perceivable listitem text.
+// `listitem`s. Before this story, sidequest-understudy's fixture stubbed those
+// tokens, so the detector passed in the fixture but returned None on every REAL
+// session — the live ConfrontationOverlay exposed no such region and the
+// opponent's name was carried only in a portrait `title`, never as perceivable
+// listitem text. These tests pin the shape that closed that gap.
 //
 // CONTRACT PINNED HERE (production DOM — what Playwright aria_snapshot sees):
 //   * The foes are wrapped in an ARIA region whose accessible name is "Enemies".
@@ -76,15 +77,21 @@ describe('[162-11] ConfrontationOverlay exposes an "Enemies" ARIA region with na
     const enemies = screen.getByRole('region', { name: /enemies/i });
     const item = within(enemies)
       .getAllByRole('listitem')
-      .find((li) => /thief/i.test(li.textContent ?? ''))!;
+      .find((li) => /thief/i.test(li.textContent ?? ''));
+    // Guard instead of `!` (typescript.md #1: no non-null assertion on a value
+    // that can be undefined at runtime). DATA guarantees a Thief listitem
+    // today; if the cast ever changes, this fails legibly here rather than as
+    // an opaque TypeError on the next line. `toBeDefined()` alone would not
+    // narrow the type, so the throw does the narrowing.
+    if (!item) throw new Error('no listitem in the Enemies region carries the foe name "Thief"');
     expect(within(item).getByTestId('actor-portrait')).toHaveAttribute('aria-hidden', 'true');
     // the clean foe name is the listitem's perceivable text (the sr-only span)
     expect(within(item).getByText('Thief')).toBeInTheDocument();
   });
 
   // Rework: `role="listitem"` requires a `list`/`group` ancestor (WCAG 1.3.1
-  // aria-required-parent). RED until the foe listitems are wrapped in a
-  // `role="list"` inside the Enemies region.
+  // aria-required-parent). Pins the `role="list"` wrapper around the foe
+  // listitems inside the Enemies region.
   it('wraps the foe listitems in a list (aria-required-parent)', () => {
     render(<ConfrontationOverlay data={DATA} />);
     const enemies = screen.getByRole('region', { name: /enemies/i });

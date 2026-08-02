@@ -8,14 +8,15 @@ function narration(text: string): GameMessage {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Story 162-11 (RED) — real-UI ARIA fidelity for understudy perception.
+// Story 162-11 — real-UI ARIA fidelity for understudy perception (shipped).
 //
 // The understudy detectors read the narration a player perceives as `log:`
 // lines in the aria snapshot (perception/snapshot.py; two_names_one_enemy pulls
-// the narrated foe name out of the log). The live NarrationScroll surface is a
-// plain scrollable div — no ARIA log role, no live region — so Playwright's
-// aria_snapshot never emits `log:` and the narrated name is invisible to the
-// detector on real sessions.
+// the narrated foe name out of the log). Before this story, the live
+// NarrationScroll surface was a plain scrollable div — no ARIA log role, no
+// live region — so Playwright's aria_snapshot never emitted `log:` and the
+// narrated name was invisible to the detector on real sessions. These tests pin
+// the shape that closed that gap.
 //
 // CONTRACT PINNED HERE (production DOM):
 //   * The narration stream is an ARIA `log` role, so aria_snapshot presents it
